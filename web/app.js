@@ -37,6 +37,7 @@
   const DB_NAME = "lottery-personal-web";
   const DB_VERSION = 1;
   const RECORD_STORE = "records";
+  const FINAL_RECORD_STATUSES = new Set(["won", "lost", "prize_float"]);
 
   const state = {
     gameKey: "ssq",
@@ -280,6 +281,11 @@
     const multiple = clampInt(els.multipleInput.value, 1, 99);
     const price = Math.max(0, Number(els.priceInput.value || 0));
     const batchId = `batch_${compactDate(now)}_${randomId()}`;
+    const targetDraw = getNextDrawTarget(state.gameKey);
+    if (!targetDraw.available) {
+      toast(targetDraw.message);
+      return;
+    }
     const records = state.draftTickets.map((ticket, index) => {
       return {
         id: `${batchId}_${String(index + 1).padStart(3, "0")}`,
@@ -287,8 +293,13 @@
         gameKey: state.gameKey,
         gameName: GAME_CONFIGS[state.gameKey].label,
         playMode: ticket.playMode || state.playMode || "",
-        expect: "",
-        openDate: "",
+        expect: targetDraw.expect,
+        openDate: targetDraw.openDate,
+        targetExpect: targetDraw.expect,
+        targetOpenDate: targetDraw.openDate,
+        targetOpenTime: targetDraw.openTime,
+        targetBuyEndTime: targetDraw.buyEndTime,
+        targetSourceDrawId: targetDraw.sourceDrawId,
         numbers: ticket,
         price,
         multiple,
@@ -321,11 +332,30 @@
   }
 
   async function checkAllRecords(showToast = true) {
-    const checked = state.records.map(evaluateRecord);
-    for (const record of checked) await dbPut(record);
+    const checked = [];
+    let checkedCount = 0;
+    let updatedCount = 0;
+
+    for (const record of state.records) {
+      if (!shouldEvaluateRecord(record)) {
+        checked.push(record);
+        continue;
+      }
+
+      checkedCount += 1;
+      const nextRecord = evaluateRecord(record);
+      checked.push(nextRecord);
+      if (shouldPersistEvaluatedRecord(record, nextRecord)) {
+        await dbPut(nextRecord);
+        updatedCount += 1;
+      }
+    }
+
     state.records = checked;
     renderRecords();
-    if (showToast) toast("记录已重新核对");
+    if (showToast) {
+      toast(checkedCount ? `已核对 ${checkedCount} 条待开奖记录` : "暂无待核对记录");
+    }
   }
 
   async function clearRecords() {
@@ -465,7 +495,7 @@
               <span class="status-pill ${statusClass(record.status)}">${record.resultText || "待核对"}</span>
             </div>
             <div class="meta">
-              ${record.expect ? `${record.expect}期` : "未绑定期号"} · ${record.price || 0}元 · ${record.multiple || 1}倍 · ${formatDateTime(record.createdAt)}
+              ${record.expect ? `${record.expect}期` : "未绑定期号"}${record.openDate ? ` · ${record.status === "pending" ? "预计" : ""}${record.openDate}开奖` : ""} · ${record.price || 0}元 · ${record.multiple || 1}倍 · ${formatDateTime(record.createdAt)}
             </div>
           </div>
           <button class="text-button danger-text" type="button" data-delete="${record.id}">删除</button>
@@ -501,7 +531,9 @@
 
   function evaluateRecord(record) {
     const draw = findDrawForRecord(record);
-    if (!draw) return { ...record, status: "pending", resultText: "待开奖", updatedAt: new Date().toISOString() };
+    if (!draw) {
+      return { ...record, status: "pending", resultText: "待开奖" };
+    }
     const drawValues = draw.drawValues || parseOpenCodeToDrawValues(record.gameKey, draw.openCode);
     const check = evaluateTicket(record.gameKey, record.numbers, drawValues, record.multiple);
     const status = check.float ? "prize_float" : check.amount > 0 ? "won" : "lost";
@@ -520,10 +552,34 @@
     };
   }
 
+  function shouldEvaluateRecord(record) {
+    if (!record) return false;
+    if (FINAL_RECORD_STATUSES.has(record.status) && record.matched) return false;
+    return record.status === "pending" || !record.status || !record.matched;
+  }
+
+  function shouldPersistEvaluatedRecord(record, nextRecord) {
+    if (record.status !== nextRecord.status) return true;
+    if (String(record.resultText || "") !== String(nextRecord.resultText || "")) return true;
+    if (Number(record.prizeAmount || 0) !== Number(nextRecord.prizeAmount || 0)) return true;
+    if (String(record.prizeName || "") !== String(nextRecord.prizeName || "")) return true;
+    if (String(record.expect || "") !== String(nextRecord.expect || "")) return true;
+    if (String(record.openDate || "") !== String(nextRecord.openDate || "")) return true;
+    if (String(record.drawId || "") !== String(nextRecord.drawId || "")) return true;
+    if (String(record.drawOpenCode || "") !== String(nextRecord.drawOpenCode || "")) return true;
+    return JSON.stringify(record.matched || null) !== JSON.stringify(nextRecord.matched || null);
+  }
+
   function findDrawForRecord(record) {
     if (record.drawId) {
       const bound = state.draws.find((draw) => draw.id === record.drawId);
       if (bound) return bound;
+    }
+    const targetExpect = String(record.targetExpect || record.expect || "");
+    if (targetExpect) {
+      const exact = state.draws.find((draw) => draw.gameKey === record.gameKey && String(draw.expect || "") === targetExpect);
+      if (exact) return exact;
+      return null;
     }
     const createdDate = String(record.createdAt || "").slice(0, 10);
     return state.draws
@@ -533,6 +589,41 @@
         return !createdDate || !openDate || openDate >= createdDate;
       })
       .sort(sortDrawAsc)[0] || null;
+  }
+
+  function getNextDrawTarget(gameKey) {
+    const latest = getLatestDraw(gameKey);
+    if (!latest) {
+      return { available: false, message: "暂无下期开奖数据，请稍后刷新" };
+    }
+    const expect = String(latest.nextExpect || "");
+    const openTime = String(latest.nextOpenTime || "");
+    const buyEndTime = String(latest.nextBuyEndTime || "");
+    if (!expect || !openTime || !buyEndTime) {
+      return { available: false, message: "下期信息不完整，请稍后刷新" };
+    }
+
+    const now = new Date();
+    const openDateValue = parseApiDate(openTime);
+    const buyEndDateValue = parseApiDate(buyEndTime);
+    if (!openDateValue || !buyEndDateValue) {
+      return { available: false, message: "下期时间格式异常，请稍后刷新" };
+    }
+    if (now >= openDateValue) {
+      return { available: false, message: "开奖数据待更新，请稍后刷新" };
+    }
+    if (now >= buyEndDateValue) {
+      return { available: false, message: "本期已截止，请等待下一期数据更新" };
+    }
+
+    return {
+      available: true,
+      expect,
+      openDate: String(latest.nextOpenDate || normalizeDate(openTime) || ""),
+      openTime,
+      buyEndTime,
+      sourceDrawId: latest.id || ""
+    };
   }
 
   function generateTickets(gameKey, count, playMode) {
@@ -746,6 +837,18 @@
     const dateCompare = String(a.openDate || a.time || "").localeCompare(String(b.openDate || b.time || ""));
     if (dateCompare) return dateCompare;
     return String(a.expect || "").localeCompare(String(b.expect || ""));
+  }
+
+  function normalizeDate(value) {
+    return String(value || "").slice(0, 10);
+  }
+
+  function parseApiDate(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    const normalized = text.includes("T") ? text : text.replace(/-/g, "/");
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 
   function countMatches(ticket = [], draw = []) {
