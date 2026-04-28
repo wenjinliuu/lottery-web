@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-28T16:02:12.959Z",
+  "updatedAt": "2026-04-28T16:24:51.666Z",
   "draws": [
     {
       "id": "pl3_26108_2026-04-28",
@@ -83,7 +83,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:10.681Z"
+      "fetchedAt": "2026-04-28T16:24:49.211Z"
     },
     {
       "id": "pl5_26108_2026-04-28",
@@ -147,7 +147,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:11.511Z"
+      "fetchedAt": "2026-04-28T16:24:50.049Z"
     },
     {
       "id": "qxc_26047_2026-04-28",
@@ -278,7 +278,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:09.849Z"
+      "fetchedAt": "2026-04-28T16:24:48.374Z"
     },
     {
       "id": "fc3d_2026108_2026-04-28",
@@ -361,7 +361,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:08.189Z"
+      "fetchedAt": "2026-04-28T16:24:46.697Z"
     },
     {
       "id": "k8_2026108_2026-04-28",
@@ -929,7 +929,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:12.342Z"
+      "fetchedAt": "2026-04-28T16:24:50.887Z"
     },
     {
       "id": "ssq_2026047_2026-04-28",
@@ -1075,7 +1075,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:06.528Z"
+      "fetchedAt": "2026-04-28T16:24:45.020Z"
     },
     {
       "id": "pl3_26107_2026-04-27",
@@ -1389,7 +1389,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:09.020Z",
+      "fetchedAt": "2026-04-28T16:24:47.536Z",
       "nextExpect": "26046",
       "nextOpenDate": "2026-04-29",
       "nextOpenTime": "2026-04-29 21:25:00",
@@ -2185,7 +2185,7 @@
         ]
       },
       "dataSource": "jisuapi",
-      "fetchedAt": "2026-04-28T16:02:07.359Z",
+      "fetchedAt": "2026-04-28T16:24:45.859Z",
       "nextExpect": "2026047",
       "nextOpenDate": "2026-04-29",
       "nextOpenTime": "2026-04-29 21:15:00",
