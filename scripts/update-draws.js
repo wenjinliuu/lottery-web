@@ -1,7 +1,8 @@
 const fs = require("fs/promises");
 const path = require("path");
 
-const API_URL = "https://api.jisuapi.com/caipiao/query";
+const QUERY_API_URL = "https://api.jisuapi.com/caipiao/query";
+const CLASS_API_URL = "https://api.jisuapi.com/caipiao/class";
 const APP_KEY = process.env.JISU_APPKEY || "";
 const DATA_PATH = path.join(__dirname, "..", "web", "data", "lottery_draws.json");
 
@@ -30,11 +31,12 @@ async function main() {
 
   const existing = await readCurrentData();
   const draws = Array.isArray(existing.draws) ? existing.draws : [];
+  const classInfoById = await fetchClassInfo();
   const results = [];
 
   for (const gameKey of GAME_ORDER) {
     try {
-      const draw = await fetchDraw(gameKey);
+      const draw = await fetchDraw(gameKey, classInfoById);
       validateDraw(draw);
       upsertDraw(draws, draw);
       results.push(`${GAME_CONFIGS[gameKey].label}:${draw.expect}`);
@@ -63,9 +65,34 @@ async function readCurrentData() {
   }
 }
 
-async function fetchDraw(gameKey) {
+async function fetchClassInfo() {
+  const url = new URL(CLASS_API_URL);
+  url.searchParams.set("appkey", APP_KEY);
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Class API HTTP ${response.status}`);
+  const payload = await response.json();
+  const list = extractClassList(payload);
+
+  const byId = {};
+  list.forEach((item) => {
+    const id = Number(item.caipiaoid);
+    if (!Number.isNaN(id)) byId[id] = item;
+  });
+  return byId;
+}
+
+function extractClassList(payload) {
+  const result = payload && payload.result;
+  if (Array.isArray(result)) return result;
+  if (result && Array.isArray(result.list)) return result.list;
+  if (result && Array.isArray(result.data)) return result.data;
+  return [];
+}
+
+async function fetchDraw(gameKey, classInfoById) {
   const config = GAME_CONFIGS[gameKey];
-  const url = new URL(API_URL);
+  const url = new URL(QUERY_API_URL);
   url.searchParams.set("appkey", APP_KEY);
   url.searchParams.set("caipiaoid", String(config.jisuId));
 
@@ -81,6 +108,7 @@ async function fetchDraw(gameKey) {
   const prizeList = normalizePrizeList(data.prize);
   const firstPrize = findPrizeByName(prizeList, "一等奖");
   const openDate = String(data.opendate || data.officialopendate || "");
+  const classInfo = classInfoById[config.jisuId] || {};
 
   return {
     id: buildDrawId(gameKey, data.issueno, openDate),
@@ -89,6 +117,11 @@ async function fetchDraw(gameKey) {
     caipiaoid: Number(data.caipiaoid || config.jisuId),
     expect: String(data.issueno || ""),
     openDate,
+    nextExpect: String(classInfo.nextissueno || ""),
+    nextOpenDate: normalizeDate(classInfo.nextopentime),
+    nextOpenTime: String(classInfo.nextopentime || ""),
+    nextBuyEndTime: String(classInfo.nextbuyendtime || ""),
+    classLastExpect: String(classInfo.lastissueno || ""),
     deadline: String(data.deadline || ""),
     openCode,
     mainNumber: mainNumber.join(","),
@@ -187,6 +220,10 @@ function sortDrawDesc(a, b) {
   const dateCompare = String(b.openDate || "").localeCompare(String(a.openDate || ""));
   if (dateCompare) return dateCompare;
   return String(b.expect || "").localeCompare(String(a.expect || ""));
+}
+
+function normalizeDate(value) {
+  return String(value || "").slice(0, 10);
 }
 
 function sleep(ms) {
