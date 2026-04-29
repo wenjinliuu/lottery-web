@@ -10,6 +10,8 @@
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(["ssq", "dlt"]);
+  const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
+  const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CONFIGS = {
     ssq: { label: "双色球", accent: "red", price: 2, sections: [{ key: "red", label: "红球", count: 6, color: "red" }, { key: "blue", label: "蓝球", count: 1, color: "blue" }] },
     qlc: { label: "七乐彩", accent: "yellow", price: 2, sections: [{ key: "nums7", label: "基本号", count: 7, color: "yellow" }], drawSections: [{ key: "nums7", label: "基本号", count: 7, color: "yellow" }, { key: "special", label: "特别号", count: 1, color: "k8orange" }] },
@@ -238,11 +240,9 @@
 
   async function loadDraws(showToast = false) {
     try {
-      const response = await fetch(`./data/lottery_draws.json?t=${Date.now()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      state.draws = Array.isArray(payload.draws) ? payload.draws : [];
-      els.historySummary.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无自动开奖数据";
+      const payload = await fetchRemoteDraws();
+      state.draws = payload.draws;
+      els.historySummary.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无开奖数据";
       renderDraws();
       if (showToast) toast("开奖数据已刷新");
     } catch (error) {
@@ -250,6 +250,120 @@
       renderDraws();
       if (showToast) toast("读取开奖 JSON 失败");
     }
+  }
+
+  async function fetchRemoteDraws() {
+    const cacheBust = `t=${Date.now()}`;
+    const latest = await fetchJson(`${LOTTERY_DATA_BASE_URL}/latest.json?${cacheBust}`);
+    const latestByLocalKey = normalizeRemoteLatest(latest.draws || {});
+    const recentGroups = await Promise.all(GAME_ORDER.map(async (gameKey) => {
+      const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
+      try {
+        const payload = await fetchJson(`${LOTTERY_DATA_BASE_URL}/draws/${remoteKey}.json?${cacheBust}`);
+        return Array.isArray(payload.draws) ? payload.draws.map((draw) => convertRemoteDraw(draw, gameKey)) : [];
+      } catch (error) {
+        return latestByLocalKey[gameKey] ? [latestByLocalKey[gameKey]] : [];
+      }
+    }));
+    const draws = dedupeDraws(recentGroups.flat().concat(Object.values(latestByLocalKey)));
+    return {
+      updatedAt: latest.updated_at || latest.updatedAt || "",
+      draws
+    };
+  }
+
+  async function fetchJson(url) {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }
+
+  function normalizeRemoteLatest(remoteDraws) {
+    return Object.keys(remoteDraws).reduce((map, remoteKey) => {
+      const gameKey = remoteKey === "kl8" ? "k8" : remoteKey;
+      if (GAME_CONFIGS[gameKey]) map[gameKey] = convertRemoteDraw(remoteDraws[remoteKey], gameKey);
+      return map;
+    }, {});
+  }
+
+  function convertRemoteDraw(remoteDraw, gameKeyOverride) {
+    const gameKey = gameKeyOverride || (remoteDraw.lottery_type === "kl8" ? "k8" : remoteDraw.lottery_type);
+    const drawValues = convertRemoteNumbers(gameKey, remoteDraw.numbers || {});
+    const openCode = buildOpenCodeFromDrawValues(gameKey, drawValues);
+    const prizeList = normalizeRemotePrizeList(remoteDraw.prize_details);
+    const firstPrize = findPrizeByName(prizeList, "一等奖");
+    const expect = String(remoteDraw.issue || "");
+    const openDate = String(remoteDraw.draw_date || "");
+    return {
+      id: [gameKey, expect, openDate].filter(Boolean).join("_"),
+      gameKey,
+      gameName: remoteDraw.lottery_name || GAME_CONFIGS[gameKey]?.label || gameKey,
+      caipiaoid: Number(remoteDraw.caipiaoid || 0),
+      expect,
+      openDate,
+      deadline: String(remoteDraw.deadline || ""),
+      openCode,
+      drawValues,
+      saleAmount: String(remoteDraw.sales_amount || ""),
+      totalMoney: String(remoteDraw.prize_pool || ""),
+      prizeList,
+      firstPrize,
+      nextExpect: String(remoteDraw.next_issue || ""),
+      nextOpenDate: String(remoteDraw.next_draw_date || ""),
+      nextOpenTime: String(remoteDraw.next_open_time || ""),
+      nextBuyEndTime: String(remoteDraw.next_buy_end_time || ""),
+      classLastExpect: String(remoteDraw.class_last_issue || ""),
+      dataSource: "lottery-data-repo",
+      fetchedAt: String(remoteDraw.fetched_at || remoteDraw.source?.fetched_at || "")
+    };
+  }
+
+  function convertRemoteNumbers(gameKey, numbers) {
+    if (gameKey === "ssq") return { red: numbers.red || [], blue: numbers.blue || [] };
+    if (gameKey === "dlt") return { front: numbers.front || [], back: numbers.back || [] };
+    if (gameKey === "k8") return { nums: numbers.nums || [] };
+    if (gameKey === "fc3d" || gameKey === "pl3") return { nums: numbers.digits || [] };
+    if (gameKey === "pl5") return { nums: numbers.digits || [] };
+    if (gameKey === "qlc") return { front: numbers.basic || [], special: numbers.special };
+    if (gameKey === "qxc") {
+      const digits = numbers.digits || [];
+      return { nums6: digits.slice(0, 6), tail: digits[6] };
+    }
+    return {};
+  }
+
+  function buildOpenCodeFromDrawValues(gameKey, drawValues) {
+    if (gameKey === "ssq") return (drawValues.red || []).concat(drawValues.blue || []).join(",");
+    if (gameKey === "dlt") return (drawValues.front || []).concat(drawValues.back || []).join(",");
+    if (gameKey === "k8") return (drawValues.nums || []).join(",");
+    if (gameKey === "fc3d" || gameKey === "pl3" || gameKey === "pl5") return (drawValues.nums || []).join(",");
+    if (gameKey === "qlc") return (drawValues.front || []).concat([drawValues.special]).filter((item) => item !== undefined).join(",");
+    if (gameKey === "qxc") return (drawValues.nums6 || []).concat([drawValues.tail]).filter((item) => item !== undefined).join(",");
+    return "";
+  }
+
+  function normalizeRemotePrizeList(prizeDetails) {
+    if (!Array.isArray(prizeDetails)) return [];
+    return prizeDetails.map((item) => ({
+      prizeName: String(item.prize_name || item.prize_level || ""),
+      require: String(item.require || ""),
+      num: Number(item.winning_count || 0),
+      singleBonus: String(item.prize_amount || ""),
+      prize: String(item.prize_amount || "")
+    }));
+  }
+
+  function findPrizeByName(prizeList, keyword) {
+    return prizeList.find((prize) => String(prize.prizeName || "").includes(keyword)) || null;
+  }
+
+  function dedupeDraws(draws) {
+    const map = new Map();
+    draws.forEach((draw) => {
+      if (!draw || !draw.gameKey || !draw.expect) return;
+      map.set(draw.id || `${draw.gameKey}_${draw.expect}_${draw.openDate || ""}`, draw);
+    });
+    return Array.from(map.values()).sort(sortDrawDesc);
   }
 
   async function loadRecords() {
@@ -964,7 +1078,18 @@
   }
 
   function randomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    const lower = Math.ceil(Number(min));
+    const upper = Math.floor(Number(max));
+    if (upper < lower) return lower;
+    const range = upper - lower + 1;
+    const limit = Math.floor(0x100000000 / range) * range;
+    const buffer = new Uint32Array(1);
+
+    do {
+      crypto.getRandomValues(buffer);
+    } while (buffer[0] >= limit);
+
+    return lower + (buffer[0] % range);
   }
 
   function pad(value, digits = 2) {
@@ -1018,7 +1143,9 @@
   }
 
   function randomId() {
-    return Math.random().toString(36).slice(2, 8);
+    const bytes = new Uint8Array(4);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("").slice(0, 8);
   }
 
   function toast(message) {
