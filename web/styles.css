@@ -1,6 +1,19 @@
 /* ==========================================================================
    彩票号码备忘 — iOS 26 Liquid Glass Edition
    颜色身份锁定：8 个彩种渐变 / 球填充色 / 卡片底色 — 任何位置不可改
+
+   彩种 → token 三层映射（CSS / JS GAME_CONFIGS 共同维护）：
+
+       gameKey   accent (game-tab/segment)   sections.color (ball)
+       ssq       red                          red + blue
+       dlt       blue                         blue + yellow
+       k8        k8orange                     k8orange  → var(--orange)
+       fc3d      fc3d                         fc3d
+       pl3 / pl5 plum                         plum
+       qlc       yellow                       yellow + k8orange (drawSections.special)
+       qxc       indigo                       indigo + amber (tail)
+
+   注：accent != gameKey；ball-k8orange / [data-accent=k8orange] 都映射到 --orange。
    ========================================================================== */
 
 /* ---------- 1. Design Tokens ---------- */
@@ -13,6 +26,8 @@
   --ink: #10213c;
   --text: #253a63;
   --muted: rgba(61, 81, 115, 0.72);
+  /* WCAG AA-safe muted（≈ 5.6:1）— 用于 ≤12px 字号，避免 --muted 在小字上对比不足 */
+  --muted-strong: rgba(40, 55, 80, 0.85);
   --tint: #2563eb; /* iOS 系统强调色（dock 选中等） */
 
   /* === 八个彩种渐变（颜色身份 — 锁死） === */
@@ -22,8 +37,6 @@
   --orange: linear-gradient(180deg, #ffb184, #f05a28);
   --fc3d: linear-gradient(180deg, #69d1ea, #239fc5);
   --plum: linear-gradient(180deg, #de97c7, #bf5ea1);
-  --qlcyellow: linear-gradient(180deg, #f7d24f, #de9e00);
-  --qlcorange: linear-gradient(180deg, #ffb154, #f57c00);
   --indigo: linear-gradient(180deg, #858bcf, #525ba7);
   --amber: linear-gradient(180deg, #edbf73, #e0a24a);
   --green: linear-gradient(180deg, rgba(52, 211, 153, 0.98), rgba(16, 185, 129, 0.92));
@@ -35,8 +48,6 @@
   --c-orange: 240, 90, 40;
   --c-fc3d: 35, 159, 197;
   --c-plum: 191, 94, 161;
-  --c-qlcyellow: 222, 158, 0;
-  --c-qlcorange: 245, 124, 0;
   --c-indigo: 82, 91, 167;
   --c-amber: 224, 162, 74;
 
@@ -90,6 +101,7 @@
     --ink: #f1f5fc;
     --text: #cfd9eb;
     --muted: rgba(207, 217, 235, 0.66);
+    --muted-strong: rgba(220, 228, 242, 0.86);
 
     --glass-tint: rgba(28, 33, 48, 0.46);
     --glass-tint-soft: rgba(28, 33, 48, 0.32);
@@ -111,6 +123,7 @@
   --ink: #f1f5fc;
   --text: #cfd9eb;
   --muted: rgba(207, 217, 235, 0.66);
+  --muted-strong: rgba(220, 228, 242, 0.86);
   --glass-tint: rgba(28, 33, 48, 0.46);
   --glass-tint-soft: rgba(28, 33, 48, 0.32);
   --glass-tint-deep: rgba(28, 33, 48, 0.66);
@@ -258,10 +271,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 .today-recommend-chips::-webkit-scrollbar { display: none; }
 
 .today-recommend-empty {
-  color: var(--muted);
+  color: var(--muted-strong);
   font-size: 12px;
   font-weight: 700;
-  opacity: 0.7;
 }
 
 .today-chip {
@@ -275,7 +287,8 @@ button { border: 0; cursor: pointer; background: transparent; }
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #fff;
-  text-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
+  /* a11y: 强化文字阴影避免浅色 chip(yellow/amber) 上白字对比不足 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   cursor: pointer;
   white-space: nowrap;
   transition: transform var(--dur-fast) var(--ease-glide), filter var(--dur-fast) var(--ease-glide);
@@ -290,10 +303,8 @@ button { border: 0; cursor: pointer; background: transparent; }
 .today-chip-fc3d { background: var(--fc3d);      box-shadow: 0 4px 10px rgba(var(--c-fc3d),      0.24); }
 .today-chip-pl3,
 .today-chip-pl5  { background: var(--plum);      box-shadow: 0 4px 10px rgba(var(--c-plum),      0.24); }
-.today-chip-qlc  { background: var(--qlcyellow); box-shadow: 0 4px 10px rgba(var(--c-qlcyellow), 0.24); }
+.today-chip-qlc  { background: var(--yellow);    box-shadow: 0 4px 10px rgba(var(--c-yellow),    0.24); }
 .today-chip-qxc  { background: var(--indigo);    box-shadow: 0 4px 10px rgba(var(--c-indigo),    0.24); }
-
-.recommend { display: none; }
 
 .view-section[hidden] { display: none; }
 
@@ -356,7 +367,6 @@ button { border: 0; cursor: pointer; background: transparent; }
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  opacity: 0.82;
 }
 
 .section-title-no-margin { margin-bottom: 0; }
@@ -458,11 +468,6 @@ button { border: 0; cursor: pointer; background: transparent; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.32),
               0 8px 18px rgba(var(--c-plum), 0.32);
 }
-.game-tab-qlcyellow.game-tab-active {
-  background: var(--qlcyellow);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.32),
-              0 8px 18px rgba(var(--c-qlcyellow), 0.32);
-}
 .game-tab-indigo.game-tab-active {
   background: var(--indigo);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.32),
@@ -507,7 +512,6 @@ button { border: 0; cursor: pointer; background: transparent; }
 [data-accent="k8orange"] .segment-btn-active { background: var(--orange);    box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.28), 0 6px 14px rgba(var(--c-orange),    0.30); }
 [data-accent="fc3d"]     .segment-btn-active { background: var(--fc3d);      box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.28), 0 6px 14px rgba(var(--c-fc3d),      0.30); }
 [data-accent="plum"]     .segment-btn-active { background: var(--plum);      box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.28), 0 6px 14px rgba(var(--c-plum),      0.30); }
-[data-accent="qlcyellow"].segment-btn-active { background: var(--qlcyellow); box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.28), 0 6px 14px rgba(var(--c-qlcyellow), 0.30); }
 [data-accent="indigo"]   .segment-btn-active { background: var(--indigo);    box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.28), 0 6px 14px rgba(var(--c-indigo),    0.30); }
 
 .play-row-k8 .segment-btn {
@@ -559,7 +563,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 .toolbar-secondary { margin-top: 10px; }
 
 .toolbar-primary .tool-btn-light { flex: 1 1 0; min-width: 0; }
-.toolbar-primary .multiplier-control { flex: 0 0 152px; min-height: 50px; }
+.toolbar-primary .multiplier-control { flex: 0 0 168px; min-height: 50px; }
 
 /* 大乐透 追加 toggle —— 玻璃 pill；按下用大乐透后区球（--yellow）橙色填充 */
 .dlt-addon-btn {
@@ -594,13 +598,13 @@ button { border: 0; cursor: pointer; background: transparent; }
 }
 
 @media (max-width: 380px) {
-  .toolbar-primary .multiplier-control { flex-basis: 140px; }
+  .toolbar-primary .multiplier-control { flex-basis: 156px; }
   .toolbar-primary { gap: 6px; }
   .dlt-addon-btn { padding: 0 12px; font-size: 13px; }
 }
 
 @media (max-width: 340px) {
-  .toolbar-primary .multiplier-control { flex-basis: 128px; }
+  .toolbar-primary .multiplier-control { flex-basis: 148px; }
   .dlt-addon-btn { padding: 0 10px; }
 }
 
@@ -775,22 +779,25 @@ button { border: 0; cursor: pointer; background: transparent; }
 .multiplier-btn,
 .multiplier-value {
   height: 50px;
-  min-width: 36px;
+  min-width: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--text);
   font-size: 13px;
   font-weight: 900;
-  transition: background var(--dur-fast) var(--ease-glide), color var(--dur-fast) var(--ease-glide);
+  transition: background var(--dur-fast) var(--ease-glide), color var(--dur-fast) var(--ease-glide), transform var(--dur-fast) var(--ease-glide);
 }
 
 .multiplier-btn { background: rgba(255, 255, 255, 0.18); }
 .multiplier-btn:hover { background: rgba(255, 255, 255, 0.32); }
+.multiplier-btn:active { background: rgba(255, 255, 255, 0.42); transform: scale(.94); }
 [data-theme="dark"] .multiplier-btn,
 :root:not([data-theme="light"]) .multiplier-btn { background: rgba(255, 255, 255, 0.06); }
 [data-theme="dark"] .multiplier-btn:hover,
 :root:not([data-theme="light"]) .multiplier-btn:hover { background: rgba(255, 255, 255, 0.14); }
+[data-theme="dark"] .multiplier-btn:active,
+:root:not([data-theme="light"]) .multiplier-btn:active { background: rgba(255, 255, 255, 0.20); }
 
 .multiplier-value {
   flex: 1 1 auto;
@@ -886,7 +893,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 .random-ticket-qlc,
 .draw-card-qlc {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-qlcyellow), 0.16), transparent 60%),
+    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-yellow), 0.16), transparent 60%),
     var(--glass-spec),
     linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 246, 212, 0.52));
 }
@@ -961,7 +968,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .random-ticket-qlc,
 :root:not([data-theme="light"]) .draw-card-qlc {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-qlcyellow), 0.22), transparent 60%),
+    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-yellow), 0.22), transparent 60%),
     var(--glass-spec),
     linear-gradient(180deg, rgba(46, 38, 16, 0.46), rgba(40, 32, 12, 0.42));
 }
@@ -1055,21 +1062,12 @@ button { border: 0; cursor: pointer; background: transparent; }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.ball.small {
-  width: 32px;
-  height: 32px;
-  font-size: 12px;
-}
-
 .ball-red       { background: var(--red); }
 .ball-blue      { background: var(--blue); }
 .ball-yellow    { background: var(--yellow); }
-.ball-orange,
 .ball-k8orange  { background: var(--orange); }
 .ball-fc3d      { background: var(--fc3d); }
 .ball-plum      { background: var(--plum); }
-.ball-qlcyellow { background: var(--qlcyellow); }
-.ball-qlcorange { background: var(--qlcorange); }
 .ball-indigo    { background: var(--indigo); }
 .ball-amber     { background: var(--amber); }
 
@@ -1079,12 +1077,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 .ball.hit.ball-red       { box-shadow: 0 0 0 2px rgba(var(--c-red),       .55), 0 4px 10px rgba(var(--c-red),       .26); }
 .ball.hit.ball-blue      { box-shadow: 0 0 0 2px rgba(var(--c-blue),      .55), 0 4px 10px rgba(var(--c-blue),      .26); }
 .ball.hit.ball-yellow    { box-shadow: 0 0 0 2px rgba(var(--c-yellow),    .55), 0 4px 10px rgba(var(--c-yellow),    .26); }
-.ball.hit.ball-orange,
 .ball.hit.ball-k8orange  { box-shadow: 0 0 0 2px rgba(var(--c-orange),    .55), 0 4px 10px rgba(var(--c-orange),    .26); }
 .ball.hit.ball-fc3d      { box-shadow: 0 0 0 2px rgba(var(--c-fc3d),      .55), 0 4px 10px rgba(var(--c-fc3d),      .26); }
 .ball.hit.ball-plum      { box-shadow: 0 0 0 2px rgba(var(--c-plum),      .55), 0 4px 10px rgba(var(--c-plum),      .26); }
-.ball.hit.ball-qlcyellow { box-shadow: 0 0 0 2px rgba(var(--c-qlcyellow), .55), 0 4px 10px rgba(var(--c-qlcyellow), .26); }
-.ball.hit.ball-qlcorange { box-shadow: 0 0 0 2px rgba(var(--c-qlcorange), .55), 0 4px 10px rgba(var(--c-qlcorange), .26); }
 .ball.hit.ball-indigo    { box-shadow: 0 0 0 2px rgba(var(--c-indigo),    .55), 0 4px 10px rgba(var(--c-indigo),    .26); }
 .ball.hit.ball-amber     { box-shadow: 0 0 0 2px rgba(var(--c-amber),     .55), 0 4px 10px rgba(var(--c-amber),     .26); }
 
@@ -1120,10 +1115,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .draw-update-time {
   margin-top: 4px;
-  color: var(--muted);
+  color: var(--muted-strong);
   font-size: 12px;
   font-weight: 800;
-  opacity: 0.84;
 }
 
 .check-expand-btn,
@@ -1516,7 +1510,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .mine-stat-label {
   margin-top: 4px;
-  color: var(--muted);
+  color: var(--muted-strong);
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
@@ -1527,6 +1521,13 @@ button { border: 0; cursor: pointer; background: transparent; }
 @media (max-width: 360px) {
   .mine-stat-value { font-size: 14px; }
   .mine-stat-label { font-size: 10px; }
+}
+
+/* 320px 极窄屏：4 列每格 ~71px 文字溢出，改 2x2 */
+@media (max-width: 359px) {
+  .mine-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mine-stat-value { font-size: 15px; }
+  .mine-stat-label { font-size: 11px; }
 }
 
 .mine-menu-item {
@@ -1560,7 +1561,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .mine-menu-sub {
   margin-top: 5px;
-  color: var(--muted);
+  color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -1621,7 +1622,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .profit-net-delta {
   margin-top: 4px;
-  color: var(--muted);
+  color: var(--muted-strong);
   font-size: 11px;
   font-weight: 700;
 }

@@ -32,7 +32,6 @@
             <span class="today-recommend-label">今日推荐</span>
             <div class="today-recommend-chips" id="todayRecommendChips"><span class="today-recommend-empty">加载中…</span></div>
           </div>
-          <div class="recommend" id="heroTitle">双色球 选号</div>
         </div>
       </header>
 
@@ -92,7 +91,7 @@
             <div class="meta meta-row ticket-meta-row">
               <div id="draftSummary">暂无号码</div>
             </div>
-            <div id="draftList" class="ticket-list empty">点击“重新随机”生成号码</div>
+            <div id="draftList" class="ticket-list empty" aria-live="polite">点击“重新随机”生成号码</div>
           </section>
         </div>
       </section>
@@ -125,7 +124,7 @@
             </button>
           </div>
           <section class="card check-records-card">
-            <div id="recordList" class="record-list empty">暂无保存记录</div>
+            <div id="recordList" class="record-list empty" aria-live="polite">暂无保存记录</div>
           </section>
         </div>
       </section>
@@ -159,7 +158,7 @@
             </button>
           </div>
           <section class="card check-records-card">
-            <div id="mineRecordList" class="record-list empty">暂无保存记录</div>
+            <div id="mineRecordList" class="record-list empty" aria-live="polite">暂无保存记录</div>
           </section>
         </div>
       </section>
@@ -266,7 +265,7 @@
 
     <nav class="dock-wrap" aria-label="底部导航">
       <div class="dock">
-        <button class="dock-item dock-item-active" type="button" data-view="random" aria-label="选号">
+        <button class="dock-item dock-item-active" type="button" data-view="random" aria-label="选号" aria-current="page">
           <span class="dock-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12"   cy="12"  r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>
           </span>

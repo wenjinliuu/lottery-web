@@ -67,6 +67,16 @@
     loadCalendar(); /* 不阻塞首屏，calendar 后台拉 */
     await loadDraws();
     await loadRecords();
+    /* 首屏默认 ssq；若今日不开 ssq，自动切到今日开奖列表第一个 */
+    const todayGames = getTodayOpenGames();
+    if (todayGames.length && !todayGames.includes(state.gameKey)) {
+      state.gameKey = todayGames[0];
+      els.gameSelect.value = state.gameKey;
+      renderGameTabs();
+      syncPlayModeOptions();
+      syncDefaultPrice();
+      renderCountTabs();
+    }
     randomizeTickets();
   }
 
@@ -76,7 +86,7 @@
       "randomBtn", "saveBtn", "clearDraftBtn", "draftSummary", "draftList",
       "latestDraws", "reloadDrawsBtn", "recordList", "checkRecordsBtn",
       "historyList", "historySummary", "exportBackupBtn", "importBackupInput", "gameTabs",
-      "playModeTabs", "todayTitle", "weekTitle", "heroTitle", "decreaseMultiplierBtn",
+      "playModeTabs", "todayTitle", "weekTitle", "decreaseMultiplierBtn",
       "increaseMultiplierBtn", "multiplierText", "toggleDrawsBtn",
       "mineTotalCost", "minePrizeTotal", "mineWinRate", "mineWonCount", "mineRecordSummary",
       "mineRecordToggleBtn", "mineRecordList",
@@ -102,6 +112,10 @@
         const next = cur === "system" ? "dark" : cur === "dark" ? "light" : "system";
         saveTheme(next);
         applyTheme(next);
+      });
+      /* a11y: role=switch 必须支持 Space / Enter 键盘触发 */
+      els.themeToggleBtn.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "Enter") { e.preventDefault(); els.themeToggleBtn.click(); }
       });
     }
     if (window.matchMedia) {
@@ -190,6 +204,7 @@
     els.randomBtn.addEventListener("click", randomizeTickets);
     els.saveBtn.addEventListener("click", () => saveDraftRecords(true));
     els.clearDraftBtn.addEventListener("click", () => {
+      if (state.draftTickets.length && !window.confirm(`清空当前 ${state.draftTickets.length} 注未保存号码？`)) return;
       state.draftTickets = [];
       renderDraft();
     });
@@ -347,7 +362,10 @@
         panel.hidden = panel.dataset.viewPanel !== view;
       });
       document.querySelectorAll("[data-view]").forEach((btn) => {
-        btn.classList.toggle("dock-item-active", btn.dataset.view === view);
+        const isActive = btn.dataset.view === view;
+        btn.classList.toggle("dock-item-active", isActive);
+        if (isActive) btn.setAttribute("aria-current", "page");
+        else btn.removeAttribute("aria-current");
       });
       renderHero();
     });
@@ -358,7 +376,6 @@
     const week = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"][now.getDay()];
     els.todayTitle.textContent = `${now.getMonth() + 1}月${now.getDate()}日`;
     els.weekTitle.textContent = week;
-    els.heroTitle.textContent = "";
     renderTodayRecommend();
   }
 
