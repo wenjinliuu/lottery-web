@@ -97,7 +97,8 @@
       "myRecordsBackBtn", "myRecordsSummary",
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
-      "lastBackupHint"
+      "lastBackupHint",
+      "draftGameTag", "draftDrawTag"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -303,11 +304,14 @@
     `).join("");
     els.countTabs.querySelectorAll("[data-count]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        const newCount = Number(btn.dataset.count);
+        const prevCount = clampInt(els.countInput.value, 1, 10);
         els.countInput.value = btn.dataset.count;
         renderCountTabs();
-        /* B-R1: 切注数即清空旧 draft 重新随机 N 注，不再叠加 */
-        state.draftTickets = [];
-        appendTickets(Number(btn.dataset.count));
+        /* 切到不同注数 → 清空旧 draft 重新生成 N
+           连点同一个注数 → 在已有基础上累加 N */
+        if (newCount !== prevCount) state.draftTickets = [];
+        appendTickets(newCount);
       });
     });
   }
@@ -372,6 +376,8 @@
         else btn.removeAttribute("aria-current");
       });
       renderHero();
+      /* 进 random 时刷新开奖日期标注（处理停售时刻跨越） */
+      if (view === "random") renderDraftHead();
     });
   }
 
@@ -649,6 +655,16 @@
       toast(targetDraw.message);
       return;
     }
+
+    /* iOS Safari 修复：剪贴板必须在 await 之前同步触发，
+       否则 user activation 会在 dbPut 的 await 之后失效，
+       navigator.clipboard.writeText 会被静默拒绝。
+       业务逻辑（record 生成 / dbPut / dbGetAll / renderRecords）保持不变。 */
+    let copyOk = true;
+    if (copyAfter) {
+      copyOk = copyToClipboard(buildClipboardBlock(state.draftTickets, state.gameKey));
+    }
+
     const records = state.draftTickets.map((ticket, index) => {
       return {
         id: `${batchId}_${String(index + 1).padStart(3, "0")}`,
@@ -679,25 +695,64 @@
     renderRecords();
     const viewAction = { label: "查看", onClick: () => switchView("check") };
     if (copyAfter) {
-      await copyDraftText(false);
-      toast(`已保存并复制 ${records.length} 注`, viewAction);
+      toast(copyOk ? `已保存并复制 ${records.length} 注` : `已保存 ${records.length} 注（复制失败请长按号码手动复制）`, viewAction);
     } else {
       toast(`已保存 ${records.length} 注`, viewAction);
     }
   }
 
-  async function copyDraftText(showToast = true) {
+  /* iOS Safari 兼容剪贴板：必须在用户手势同帧内同步执行，
+     不能放在 await 之后 — transient user activation 会失效，
+     现代 navigator.clipboard.writeText 会被静默拒绝。
+     这里同步走 execCommand 路径（execCommand 对 activation 检查更宽松）；
+     失败再 fallback 到 Clipboard API（fire-and-forget）。 */
+  function legacyCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    /* 16px 防 iOS 自动放大；fixed 偏屏外让用户看不见 */
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;outline:none;font-size:16px;opacity:0";
+    document.body.appendChild(ta);
+    /* iOS 需要 contentEditable + Range API 才能选中 textarea 内容 */
+    ta.contentEditable = "true";
+    ta.readOnly = false;
+    const range = document.createRange();
+    range.selectNodeContents(ta);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    sel.removeAllRanges();
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function copyToClipboard(text) {
+    /* 1. 同步 execCommand 路径（iOS Safari + 老浏览器友好）*/
+    let ok = false;
+    try { ok = legacyCopy(text); } catch (e) {}
+    if (ok) return true;
+    /* 2. fallback：现代 Clipboard API（fire-and-forget，不阻塞调用方）*/
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        navigator.clipboard.writeText(text).catch(() => {});
+        return true;
+      } catch (e) {}
+    }
+    return false;
+  }
+
+  function copyDraftText(showToast = true) {
     if (!state.draftTickets.length) {
       if (showToast) toast("暂无可复制号码");
-      return;
+      return false;
     }
     const text = buildClipboardBlock(state.draftTickets, state.gameKey);
-    try {
-      await navigator.clipboard.writeText(text);
-      if (showToast) toast("号码已复制");
-    } catch (error) {
-      if (showToast) toast("复制失败，请手动选择文本");
-    }
+    const ok = copyToClipboard(text);
+    if (showToast) toast(ok ? "号码已复制" : "复制失败，请手动选择文本");
+    return ok;
   }
 
   /* ===== 剪贴板格式：标题｜投入｜分组号码 ===== */
@@ -921,7 +976,43 @@
     renderRecords();
   }
 
+  /* 当前彩种"本批号码归属哪天开奖"的标注。三态：
+       ok    — 当期可投注，显示"X月X日 开奖" + 期号
+       warn  — 本期已截止，显示"已截止 · 下期 X月X日"
+       muted — 没拿到开奖数据 */
+  function getDraftDrawHint(gameKey) {
+    const target = getNextDrawTarget(gameKey);
+    if (target.available) {
+      const md = formatDrawMD(target.openTime) || formatDrawMD(target.openDate);
+      const expectShort = target.expect ? `第 ${target.expect} 期` : "";
+      return { tone: "ok", text: md ? `${md} 开奖${expectShort ? ` · ${expectShort}` : ""}` : (expectShort || "下期开奖") };
+    }
+    const fallbackMD = getNextOpenDateMMDD(gameKey);
+    if (fallbackMD && /截止/.test(target.message || "")) {
+      return { tone: "warn", text: `已截止 · 下期 ${fallbackMD.replace("/", "月") + "日"}` };
+    }
+    return { tone: "muted", text: target.message || "等待开奖数据" };
+  }
+
+  function formatDrawMD(value) {
+    const m = String(value || "").match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (!m) return "";
+    return `${parseInt(m[2], 10)}月${parseInt(m[3], 10)}日`;
+  }
+
+  function renderDraftHead() {
+    if (els.draftGameTag) {
+      els.draftGameTag.textContent = GAME_CONFIGS[state.gameKey]?.label || state.gameKey;
+    }
+    if (els.draftDrawTag) {
+      const hint = getDraftDrawHint(state.gameKey);
+      els.draftDrawTag.textContent = hint.text;
+      els.draftDrawTag.dataset.tone = hint.tone;
+    }
+  }
+
   function renderDraft() {
+    renderDraftHead();
     const multiplier = clampInt(els.multipleInput.value, 1, 99);
     const price = getCurrentTicketPrice();
     const ticketCount = state.draftTickets.length;
@@ -974,12 +1065,12 @@
         <article class="draw-card draw-card-${gameKey}" style="--stagger-i:${idx}">
           <div class="draw-top">
             <div class="draw-title">${config.label}</div>
-            <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
+            <span class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</span>
+            ${renderFirstPrize(draw)}
+            <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="往期">${ICON.chevronRight}</button>
           </div>
-          ${renderFirstPrize(draw)}
           <div class="draw-number-row">
             ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))}
-            <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="往期">${ICON.chevronRight}</button>
           </div>
         </article>
       `;
@@ -1011,9 +1102,9 @@
         <article class="history-card draw-card-${draw.gameKey}" style="--stagger-i:${idx}">
           <div class="draw-top">
             <div class="draw-title">${cfg.label || draw.gameKey}</div>
-            <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
+            <span class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</span>
+            ${renderFirstPrize(draw)}
           </div>
-          ${renderFirstPrize(draw)}
           <div class="draw-number-row">
             ${renderDrawBalls(draw.gameKey, draw.drawValues || parseOpenCodeToDrawValues(draw.gameKey, draw.openCode))}
           </div>

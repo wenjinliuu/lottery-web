@@ -668,6 +668,62 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .title-main { min-width: 0; flex: 1 1 auto; }
 .title-row > .title-main { min-width: 0; }
+
+/* 选号列表卡片 head：标题 + 彩种 chip + 开奖日期 chip 同行 */
+.draft-head .title-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.draft-game-tag,
+.draft-draw-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+/* 彩种 chip：中性玻璃 */
+.draft-game-tag {
+  color: var(--text);
+  background: var(--glass-tint-soft);
+  box-shadow: inset 0 0 0 1px var(--glass-stroke);
+}
+
+/* 开奖日期 chip 三态：ok/warn/muted */
+.draft-draw-tag[data-tone="ok"] {
+  color: #15803d;
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.92), rgba(255, 255, 255, 0.34));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.24);
+}
+.draft-draw-tag[data-tone="warn"] {
+  color: #a16207;
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.92), rgba(255, 255, 255, 0.34));
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.28);
+}
+.draft-draw-tag[data-tone="muted"] {
+  color: var(--muted-strong);
+  background: var(--glass-tint-soft);
+  box-shadow: inset 0 0 0 1px var(--glass-stroke);
+}
+
+[data-theme="dark"] .draft-draw-tag[data-tone="ok"],
+:root:not([data-theme="light"]) .draft-draw-tag[data-tone="ok"] {
+  color: #6ee7b7;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.20), rgba(16, 185, 129, 0.06));
+}
+[data-theme="dark"] .draft-draw-tag[data-tone="warn"],
+:root:not([data-theme="light"]) .draft-draw-tag[data-tone="warn"] {
+  color: #fcd34d;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.22), rgba(245, 158, 11, 0.06));
+}
 .check-page-head > div:first-child,
 .check-records-head > div:first-child,
 .history-head > .history-title-wrap { min-width: 0; flex: 1 1 auto; }
@@ -866,36 +922,41 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 /* ---------- 14. 八个彩种卡的"主题光斑"（颜色身份保留） ---------- */
 
+/* 双光源冰冻玻璃（light）：
+   层 1 — 主光斑：右上 70%/25% 位置，柔和大光圈
+   层 2 — 副光斑：左下贴角微染（让卡片不至于"上重下轻"）
+   层 3 — 对角玻璃片：白起 → 半透 → 末端微染色（135°，模拟玻璃厚度）
+   色身份保持：每张卡仍由本彩种 --c-XX 着色 */
 .random-ticket-ssq,
 .draw-card-ssq {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-red), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 232, 238, 0.46));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-red), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-red), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-red), 0.08) 100%);
 }
 
 .random-ticket-dlt,
 .draw-card-dlt {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-blue), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(232, 242, 255, 0.48));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-blue), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-blue), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-blue), 0.08) 100%);
 }
 
 .random-ticket-k8,
 .draw-card-k8 {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-orange), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 238, 225, 0.5));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-orange), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-orange), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-orange), 0.08) 100%);
 }
 
 .random-ticket-fc3d,
 .draw-card-fc3d {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-fc3d), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(223, 246, 252, 0.48));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-fc3d), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-fc3d), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-fc3d), 0.08) 100%);
 }
 
 .random-ticket-pl3,
@@ -903,38 +964,38 @@ button { border: 0; cursor: pointer; background: transparent; }
 .draw-card-pl3,
 .draw-card-pl5 {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-plum), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(248, 230, 242, 0.5));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-plum), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-plum), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-plum), 0.08) 100%);
 }
 
 .random-ticket-qlc,
 .draw-card-qlc {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-yellow), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 246, 212, 0.52));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-yellow), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-yellow), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-yellow), 0.08) 100%);
 }
 
 .random-ticket-qxc,
 .draw-card-qxc {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-indigo), 0.16), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(232, 234, 255, 0.48));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-indigo), 0.22), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-indigo), 0.10), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(var(--c-indigo), 0.08) 100%);
 }
 
 .ticket-card { margin-top: 10px; }
 
-/* 暗色下卡片底色重新调（保留色身份，调暗白光层） */
+/* 双光源冰冻玻璃（dark）：色光斑强度提升 + 对角玻璃片底色用低明度同色调 */
 [data-theme="dark"] .random-ticket-ssq,
 [data-theme="dark"] .draw-card-ssq,
 :root:not([data-theme="light"]) .random-ticket-ssq,
 :root:not([data-theme="light"]) .draw-card-ssq {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-red), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(40, 22, 30, 0.46), rgba(40, 18, 28, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-red), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-red), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(40, 22, 30, 0.52) 0%, rgba(30, 18, 26, 0.40) 45%, rgba(var(--c-red), 0.20) 100%);
 }
 
 [data-theme="dark"] .random-ticket-dlt,
@@ -942,9 +1003,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .random-ticket-dlt,
 :root:not([data-theme="light"]) .draw-card-dlt {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-blue), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(20, 30, 50, 0.46), rgba(18, 26, 46, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-blue), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-blue), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(20, 30, 50, 0.52) 0%, rgba(18, 26, 46, 0.40) 45%, rgba(var(--c-blue), 0.20) 100%);
 }
 
 [data-theme="dark"] .random-ticket-k8,
@@ -952,9 +1013,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .random-ticket-k8,
 :root:not([data-theme="light"]) .draw-card-k8 {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-orange), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(46, 28, 18, 0.46), rgba(40, 24, 16, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-orange), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-orange), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(46, 28, 18, 0.52) 0%, rgba(40, 24, 16, 0.40) 45%, rgba(var(--c-orange), 0.20) 100%);
 }
 
 [data-theme="dark"] .random-ticket-fc3d,
@@ -962,9 +1023,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .random-ticket-fc3d,
 :root:not([data-theme="light"]) .draw-card-fc3d {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-fc3d), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(18, 38, 46, 0.46), rgba(16, 32, 42, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-fc3d), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-fc3d), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(18, 38, 46, 0.52) 0%, rgba(16, 32, 42, 0.40) 45%, rgba(var(--c-fc3d), 0.20) 100%);
 }
 
 [data-theme="dark"] .random-ticket-pl3,
@@ -976,9 +1037,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .draw-card-pl3,
 :root:not([data-theme="light"]) .draw-card-pl5 {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-plum), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(42, 24, 38, 0.46), rgba(36, 20, 32, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-plum), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-plum), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(42, 24, 38, 0.52) 0%, rgba(36, 20, 32, 0.40) 45%, rgba(var(--c-plum), 0.20) 100%);
 }
 
 [data-theme="dark"] .random-ticket-qlc,
@@ -986,9 +1047,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .random-ticket-qlc,
 :root:not([data-theme="light"]) .draw-card-qlc {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-yellow), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(46, 38, 16, 0.46), rgba(40, 32, 12, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-yellow), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-yellow), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(46, 38, 16, 0.52) 0%, rgba(40, 32, 12, 0.40) 45%, rgba(var(--c-yellow), 0.20) 100%);
 }
 
 [data-theme="dark"] .random-ticket-qxc,
@@ -996,9 +1057,9 @@ button { border: 0; cursor: pointer; background: transparent; }
 :root:not([data-theme="light"]) .random-ticket-qxc,
 :root:not([data-theme="light"]) .draw-card-qxc {
   background:
-    radial-gradient(80% 60% at 100% 0%, rgba(var(--c-indigo), 0.22), transparent 60%),
-    var(--glass-spec),
-    linear-gradient(180deg, rgba(24, 28, 50, 0.46), rgba(22, 24, 44, 0.42));
+    radial-gradient(60% 55% at 80% 20%, rgba(var(--c-indigo), 0.32), transparent 65%),
+    radial-gradient(75% 90% at 5% 100%, rgba(var(--c-indigo), 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(24, 28, 50, 0.52) 0%, rgba(22, 24, 44, 0.40) 45%, rgba(var(--c-indigo), 0.20) 100%);
 }
 
 /* ---------- 15. 票据元信息 ---------- */
@@ -1176,36 +1237,40 @@ button { border: 0; cursor: pointer; background: transparent; }
   flex-wrap: wrap;
 }
 
-/* 标题和"期号·日期"在卡片头部一行内左右对齐，间距收紧 */
+/* 兑奖 / 往期卡 head：标题 + 期号·日期 chip + 一等奖 chip + 往期按钮 同行
+   320px 屏 flex-wrap 兜底允许换行，避免硬撑横向滚动 */
 .draw-top {
   align-items: center;
-  flex-wrap: nowrap;
-  margin-bottom: 6px;
-  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  gap: 6px 8px;
 }
 
 .draw-top > .draw-title {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.draw-top > .draw-meta-tag {
+.draw-top > .draw-meta-tag,
+.draw-top > .draw-prize-tag {
   flex: 0 0 auto;
   margin-top: 0;
+  margin-bottom: 0;
+  max-width: 100%;
 }
 
-/* 一等奖标签独占一行，紧贴标题下方与号码球之间 */
-.draw-card > .draw-prize-tag,
-.history-card > .draw-prize-tag {
-  display: inline-flex;
-  margin: 0 0 8px 0;
+.draw-top > .draw-action-btn {
+  flex: 0 0 36px;
+  margin-left: auto; /* 推到行末 */
 }
 
+/* 球独占一行 */
 .draw-number-row {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   margin-top: 0;
 }
 
@@ -1213,7 +1278,6 @@ button { border: 0; cursor: pointer; background: transparent; }
   flex: 1 1 auto;
   min-width: 0;
 }
-.draw-number-row .draw-action-btn { flex: 0 0 36px; }
 
 .record-group-head > div:first-child { min-width: 0; flex: 1 1 auto; }
 .record-group-right { min-width: 0; max-width: 100%; }
