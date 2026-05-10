@@ -79,7 +79,8 @@
       "mineTotalCost", "minePrizeTotal", "mineWinRate", "mineWonCount", "mineRecordSummary",
       "mineRecordToggleBtn", "mineRecordCloseBtn", "mineRecordPanel", "mineRecordList",
       "latestDrawsUpdated", "historyBackBtn", "toast",
-      "themeToggleBtn", "themeToggleSub"
+      "themeToggleBtn", "themeToggleSub",
+      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -849,6 +850,142 @@
     if (els.mineRecordSummary) {
       els.mineRecordSummary.textContent = `共 ${stats.totalRecords} 条 · 待开奖 ${stats.pendingCount} 条 · 已花 ${formatMoney(stats.totalCost)}`;
     }
+    renderProfitChart();
+  }
+
+  /* ===== iOS 26 Liquid Glass — Profit-trend SVG line chart ===== */
+
+  function renderProfitChart() {
+    if (!els.profitChartWrap) return;
+    const series = buildProfitSeries(state.records);
+    if (els.profitNetValue && els.profitNetDelta) {
+      const net = series.netTotal;
+      const cls = net > 0 ? "is-positive" : net < 0 ? "is-negative" : "";
+      els.profitNetValue.className = `profit-net-value ${cls}`;
+      els.profitNetValue.textContent = `${net > 0 ? "+" : ""}${formatCompactMoney(net)}`;
+      els.profitNetDelta.textContent = series.points.length
+        ? `共 ${series.points.length} 期 · 投入 ${formatCompactMoney(series.costTotal)} / 中奖 ${formatCompactMoney(series.prizeTotal)}`
+        : "总盈亏";
+    }
+    if (els.profitSub) {
+      els.profitSub.textContent = series.points.length
+        ? (series.spanDays >= 1 ? `最近 ${Math.min(series.spanDays, 90)} 天 · ${series.points.length} 期` : `${series.points.length} 期`)
+        : "尚无完整数据";
+    }
+    if (!series.points.length) {
+      els.profitChartWrap.innerHTML = `<div class="profit-empty" id="profitEmpty">暂无数据，先去选号吧</div>`;
+      return;
+    }
+    els.profitChartWrap.innerHTML = buildProfitChartSvg(series);
+  }
+
+  function buildProfitSeries(records) {
+    const settled = (records || [])
+      .filter((r) => r && (r.status === "won" || r.status === "lost") && r.createdAt)
+      .slice()
+      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+
+    const points = [];
+    let cumCost = 0;
+    let cumPrize = 0;
+    for (const r of settled) {
+      const cost = Number(r.price || 0) * Number(r.multiple || 1);
+      const prize = Number(r.prizeAmount || 0);
+      cumCost += cost;
+      cumPrize += prize;
+      points.push({
+        t: new Date(r.createdAt).getTime(),
+        cost: cumCost,
+        prize: cumPrize,
+        net: cumPrize - cumCost
+      });
+    }
+    const first = points[0]?.t || 0;
+    const last = points[points.length - 1]?.t || first;
+    const spanDays = first ? Math.max(1, Math.ceil((last - first) / 86400000)) : 0;
+    return {
+      points,
+      costTotal: cumCost,
+      prizeTotal: cumPrize,
+      netTotal: cumPrize - cumCost,
+      spanDays
+    };
+  }
+
+  function buildProfitChartSvg(series) {
+    const W = 320, H = 168;
+    const padL = 36, padR = 12, padT = 14, padB = 22;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+    const pts = series.points;
+
+    const minT = pts[0].t;
+    const maxT = pts[pts.length - 1].t;
+    const tRange = maxT - minT || 1;
+
+    const allVals = pts.flatMap((p) => [p.cost, p.prize, p.net]);
+    const yMin = Math.min(0, ...allVals);
+    const yMax = Math.max(0, ...allVals);
+    const yRange = (yMax - yMin) || 1;
+
+    const xOf = (t) => padL + ((t - minT) / tRange) * innerW;
+    const yOf = (v) => padT + (1 - (v - yMin) / yRange) * innerH;
+
+    const buildPath = (key) => pts.map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.t).toFixed(1)} ${yOf(p[key]).toFixed(1)}`).join(" ");
+    const buildArea = (key) => {
+      if (pts.length < 2) return "";
+      const top = pts.map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.t).toFixed(1)} ${yOf(p[key]).toFixed(1)}`).join(" ");
+      const baseY = yOf(yMin).toFixed(1);
+      const bottom = `L${xOf(pts[pts.length - 1].t).toFixed(1)} ${baseY} L${xOf(pts[0].t).toFixed(1)} ${baseY} Z`;
+      return top + " " + bottom;
+    };
+
+    const gridYs = [0.0, 0.5, 1.0].map((p) => padT + p * innerH);
+    const grid = gridYs.map((y) => `<line class="profit-grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}"/>`).join("");
+
+    const yLabels = [yMax, yMin + yRange / 2, yMin].map((v, i) => {
+      const y = padT + (i * innerH) / 2;
+      return `<text class="profit-axis-label" x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${formatChartTick(v)}</text>`;
+    }).join("");
+
+    const xLabels = (() => {
+      const fmt = (t) => {
+        const d = new Date(t);
+        return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+      };
+      const labels = [fmt(minT)];
+      if (pts.length > 1) labels.push(fmt(maxT));
+      return [
+        `<text class="profit-axis-label" x="${padL}" y="${(H - 6).toFixed(1)}" text-anchor="start">${labels[0]}</text>`,
+        labels[1] ? `<text class="profit-axis-label" x="${(W - padR).toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="end">${labels[1]}</text>` : ""
+      ].join("");
+    })();
+
+    const last = pts[pts.length - 1];
+    const dot = (key, cls) => `<circle class="profit-dot ${cls}" cx="${xOf(last.t).toFixed(1)}" cy="${yOf(last[key]).toFixed(1)}" r="3.4"/>`;
+
+    return `
+      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="收益趋势折线图">
+        ${grid}
+        <path class="profit-area-cost"  d="${buildArea("cost")}"/>
+        <path class="profit-area-prize" d="${buildArea("prize")}"/>
+        <path class="profit-line-cost"  d="${buildPath("cost")}"/>
+        <path class="profit-line-prize" d="${buildPath("prize")}"/>
+        <path class="profit-line-net"   d="${buildPath("net")}"/>
+        ${dot("cost", "is-cost")}
+        ${dot("prize", "is-prize")}
+        ${dot("net", "is-net")}
+        ${yLabels}
+        ${xLabels}
+      </svg>
+    `;
+  }
+
+  function formatChartTick(value) {
+    const n = Number(value) || 0;
+    if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(n % 10000 === 0 ? 0 : 1)}万`;
+    if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
+    return `${Math.round(n)}`;
   }
 
   function getMineStats() {

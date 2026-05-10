@@ -21,8 +21,6 @@
     </script>
   </head>
   <body>
-    <div class="bg-mesh" aria-hidden="true"></div>
-    <div class="bg-noise" aria-hidden="true"></div>
     <main class="page">
       <header class="hero">
         <div class="hero-main">
@@ -150,6 +148,27 @@
             </div>
           </section>
 
+          <section class="card profit-card" id="profitCard">
+            <div class="profit-head">
+              <div class="profit-head-left">
+                <div class="profit-title">收益趋势</div>
+                <div class="profit-sub" id="profitSub">最近 30 天</div>
+              </div>
+              <div class="profit-net">
+                <div class="profit-net-value" id="profitNetValue">0元</div>
+                <div class="profit-net-delta" id="profitNetDelta">总盈亏</div>
+              </div>
+            </div>
+            <div class="profit-chart-wrap" id="profitChartWrap">
+              <div class="profit-empty" id="profitEmpty">暂无数据，先去选号吧</div>
+            </div>
+            <div class="profit-legend">
+              <span class="profit-legend-item"><span class="profit-legend-dot is-cost"></span>累计花费</span>
+              <span class="profit-legend-item"><span class="profit-legend-dot is-prize"></span>累计中奖</span>
+              <span class="profit-legend-item"><span class="profit-legend-dot is-net"></span>净收益</span>
+            </div>
+          </section>
+
           <section class="card mine-section-card">
             <div class="section-title section-title-no-margin">外观</div>
             <div class="mine-menu-item mine-menu-item-last">
@@ -199,16 +218,22 @@
 
       <nav class="dock-wrap" aria-label="底部导航">
         <div class="dock">
-          <button class="dock-item dock-item-active" type="button" data-view="random">
-            <span class="dock-icon">随</span>
+          <button class="dock-item dock-item-active" type="button" data-view="random" aria-label="选号">
+            <span class="dock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12"   cy="12"  r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+            </span>
             <span class="dock-label">选号</span>
           </button>
-          <button class="dock-item" type="button" data-view="check">
-            <span class="dock-icon">兑</span>
+          <button class="dock-item" type="button" data-view="check" aria-label="兑奖">
+            <span class="dock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.8 1.8 0 0 0 0 3.6V14.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.2a1.8 1.8 0 0 0 0-3.6Z"/><path d="M9.5 14.2 11.3 16l3.6-4"/></svg>
+            </span>
             <span class="dock-label">兑奖</span>
           </button>
-          <button class="dock-item" type="button" data-view="mine">
-            <span class="dock-icon">我</span>
+          <button class="dock-item" type="button" data-view="mine" aria-label="我的">
+            <span class="dock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 19.5c.8-3.6 3.7-6 7.5-6s6.7 2.4 7.5 6"/></svg>
+            </span>
             <span class="dock-label">我的</span>
           </button>
         </div>
