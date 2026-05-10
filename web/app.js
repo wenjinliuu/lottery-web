@@ -78,6 +78,7 @@
       renderCountTabs();
     }
     randomizeTickets();
+    renderBackupHint();
   }
 
   function cacheElements() {
@@ -95,7 +96,8 @@
       "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub",
       "myRecordsBackBtn", "myRecordsSummary",
       "dltAddOnBtn",
-      "todayRecommend", "todayRecommendChips"
+      "todayRecommend", "todayRecommendChips",
+      "lastBackupHint"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -303,6 +305,8 @@
       btn.addEventListener("click", () => {
         els.countInput.value = btn.dataset.count;
         renderCountTabs();
+        /* B-R1: 切注数即清空旧 draft 重新随机 N 注，不再叠加 */
+        state.draftTickets = [];
         appendTickets(Number(btn.dataset.count));
       });
     });
@@ -422,7 +426,9 @@
     els.todayRecommendChips.innerHTML = games.map((g) => {
       const cfg = GAME_CONFIGS[g] || {};
       const label = cfg.label || g;
-      return `<button class="today-chip today-chip-${g}" type="button" data-today-game="${g}" aria-label="切换到 ${label}">${label}</button>`;
+      const active = g === state.gameKey ? " is-active" : "";
+      const aria = active ? ` aria-current="true"` : "";
+      return `<button class="today-chip today-chip-${g}${active}" type="button" data-today-game="${g}" aria-label="切换到 ${label}"${aria}>${label}</button>`;
     }).join("");
     els.todayRecommendChips.querySelectorAll("[data-today-game]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -475,9 +481,25 @@
       state.draws = [];
       state.latestUpdatedAt = "";
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = "暂无更新时间";
-      renderDraws();
+      renderDrawsError();
       if (showToast) toast("读取开奖 JSON 失败");
     }
+  }
+
+  /* B-C5: 兑奖页加载失败的可重试 empty state */
+  function renderDrawsError() {
+    if (!els.latestDraws) return;
+    els.latestDraws.innerHTML = `
+      <div class="empty empty-error">
+        <div>开奖数据加载失败 — 检查网络后重试</div>
+        <button class="mini-blue has-icon" type="button" id="retryDrawsBtn">
+          <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+          <span>重试</span>
+        </button>
+      </div>
+    `;
+    const retryBtn = document.getElementById("retryDrawsBtn");
+    if (retryBtn) retryBtn.addEventListener("click", () => loadDraws(true));
   }
 
   async function fetchRemoteDraws() {
@@ -655,11 +677,12 @@
     for (const record of records) await dbPut(record);
     state.records = await dbGetAll();
     renderRecords();
+    const viewAction = { label: "查看", onClick: () => switchView("check") };
     if (copyAfter) {
       await copyDraftText(false);
-      toast(`已保存并复制 ${records.length} 注`);
+      toast(`已保存并复制 ${records.length} 注`, viewAction);
     } else {
-      toast(`已保存 ${records.length} 注`);
+      toast(`已保存 ${records.length} 注`, viewAction);
     }
   }
 
@@ -829,10 +852,37 @@
     toast("本地记录已清空");
   }
 
+  /* B-M4: 备份时间提示 */
+  const LAST_BACKUP_KEY = "lottery-last-backup";
+  function readLastBackupAt() {
+    try { return localStorage.getItem(LAST_BACKUP_KEY) || ""; } catch (e) { return ""; }
+  }
+  function writeLastBackupAt(iso) {
+    try { localStorage.setItem(LAST_BACKUP_KEY, iso); } catch (e) {}
+  }
+  function renderBackupHint() {
+    if (!els.lastBackupHint) return;
+    const last = readLastBackupAt();
+    if (!last) {
+      els.lastBackupHint.textContent = "生成 JSON 文件，换设备时可以恢复。";
+      return;
+    }
+    const diffMs = Date.now() - new Date(last).getTime();
+    const day = 86400000;
+    let rel;
+    if (diffMs < 60000) rel = "刚刚";
+    else if (diffMs < 3600000) rel = `${Math.floor(diffMs / 60000)} 分钟前`;
+    else if (diffMs < day) rel = `${Math.floor(diffMs / 3600000)} 小时前`;
+    else if (diffMs < day * 30) rel = `${Math.floor(diffMs / day)} 天前`;
+    else rel = formatDate(last);
+    els.lastBackupHint.textContent = `上次备份：${rel}`;
+  }
+
   async function exportBackup() {
+    const now = new Date().toISOString();
     const payload = {
       version: 1,
-      exportedAt: new Date().toISOString(),
+      exportedAt: now,
       records: state.records
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -842,6 +892,8 @@
     a.download = `lottery-backup-${formatDate(new Date())}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    writeLastBackupAt(now);
+    renderBackupHint();
     toast("备份文件已生成");
   }
 
@@ -1001,8 +1053,17 @@
   function renderRecordGroups(container, records, options = {}) {
     if (!container) return;
     if (!records.length) {
-      container.className = "record-list empty-state";
-      container.textContent = options.emptyText || "暂无保存记录";
+      /* B-C4: 空状态加"先去选几注"CTA */
+      container.className = "record-list empty empty-cta";
+      container.innerHTML = `
+        <div>${options.emptyText || "暂无保存记录"}</div>
+        <button class="mini-blue has-icon" type="button" data-empty-go-random>
+          <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
+          <span>先去选几注</span>
+        </button>
+      `;
+      const goBtn = container.querySelector("[data-empty-go-random]");
+      if (goBtn) goBtn.addEventListener("click", () => switchView("random"));
       return;
     }
     const groups = groupRecordsByGame(records);
@@ -1054,6 +1115,11 @@
     const prizeText = record.status === "prize_float"
       ? "中奖金额：浮动待定"
       : `中奖金额：${formatMoney(record.prizeAmount || 0)}`;
+    /* B-C3: 中奖时 chip 直接带金额，避免要展开才知中多少 */
+    let chipText = record.resultText || "待核对";
+    if (record.status === "won" && Number(record.prizeAmount) > 0) {
+      chipText = `中 ${formatCompactMoney(record.prizeAmount)}`;
+    }
     return `
       <article class="record-card random-ticket-${record.gameKey}">
         <div class="record-ticket-meta">
@@ -1062,7 +1128,7 @@
             <span>成本 ${formatMoney(cost)}</span>
             <span>${record.multiple || 1}倍</span>
           </div>
-          <span class="status-pill ${statusClass(record.status)}">${record.resultText || "待核对"}</span>
+          <span class="status-pill ${statusClass(record.status)}">${chipText}</span>
         </div>
         <div class="record-ticket-prize">${prizeText}</div>
         ${renderTicketBalls(record.gameKey, record.numbers, record.matched, resolved)}
@@ -1128,7 +1194,17 @@
         : "尚无完整数据";
     }
     if (!series.points.length) {
-      els.profitChartWrap.innerHTML = `<div class="profit-empty" id="profitEmpty">暂无数据，先去选号吧</div>`;
+      els.profitChartWrap.innerHTML = `
+        <div class="profit-empty empty-cta" id="profitEmpty">
+          <div>暂无数据，先去选号吧</div>
+          <button class="mini-blue has-icon" type="button" data-empty-go-random>
+            <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
+            <span>去选号</span>
+          </button>
+        </div>
+      `;
+      const goBtn = els.profitChartWrap.querySelector("[data-empty-go-random]");
+      if (goBtn) goBtn.addEventListener("click", () => switchView("random"));
       return;
     }
     els.profitChartWrap.innerHTML = buildProfitChartSvg(series);
@@ -1860,10 +1936,21 @@
     return Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("").slice(0, 8);
   }
 
-  function toast(message) {
-    els.toast.textContent = message;
+  function toast(message, options) {
+    const hasAction = options && options.label && typeof options.onClick === "function";
+    if (hasAction) {
+      els.toast.innerHTML = `<span class="toast-msg"></span><button class="toast-action" type="button"></button>`;
+      els.toast.querySelector(".toast-msg").textContent = message;
+      const btn = els.toast.querySelector(".toast-action");
+      btn.textContent = options.label;
+      btn.addEventListener("click", () => {
+        try { options.onClick(); } finally { els.toast.classList.remove("show"); }
+      });
+    } else {
+      els.toast.textContent = message;
+    }
     els.toast.classList.add("show");
     window.clearTimeout(toast.timer);
-    toast.timer = window.setTimeout(() => els.toast.classList.remove("show"), 2200);
+    toast.timer = window.setTimeout(() => els.toast.classList.remove("show"), hasAction ? 4200 : 2200);
   }
 })();

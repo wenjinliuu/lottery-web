@@ -296,6 +296,11 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .today-chip:active { transform: scale(0.94); filter: brightness(0.96); }
 
+/* 当前彩种激活态：白细环描边，不破色身份 */
+.today-chip.is-active {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92), 0 6px 14px rgba(0, 0, 0, 0.18);
+}
+
 /* 八彩种 chip 颜色（与球色一致） */
 .today-chip-ssq  { background: var(--red);       box-shadow: 0 4px 10px rgba(var(--c-red),       0.24); }
 .today-chip-dlt  { background: var(--blue);      box-shadow: 0 4px 10px rgba(var(--c-blue),      0.24); }
@@ -828,6 +833,19 @@ button { border: 0; cursor: pointer; background: transparent; }
   text-align: center;
   font-size: 14px;
   font-weight: 800;
+}
+
+/* 错误 / 引导型空状态：文字 + CTA 按钮纵向居中 */
+.empty-error,
+.empty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.empty-error > button,
+.empty-cta > button {
+  flex: 0 0 auto;
 }
 
 .ticket-card,
@@ -1904,6 +1922,23 @@ button { border: 0; cursor: pointer; background: transparent; }
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* toast 内 action chip：保存后"查看"等二级操作 */
+.toast-msg { margin-right: 4px; }
+.toast-action {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-glide), transform var(--dur-fast) var(--ease-glide);
+}
+.toast-action:hover { background: rgba(255, 255, 255, 0.28); }
+.toast-action:active { background: rgba(255, 255, 255, 0.36); transform: scale(.96); }
 
 /* ---------- 22. View Transitions ---------- */
 
