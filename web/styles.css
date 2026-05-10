@@ -677,7 +677,6 @@ button { border: 0; cursor: pointer; background: transparent; }
   gap: 6px 8px;
 }
 
-.draft-game-tag,
 .draft-draw-tag {
   display: inline-flex;
   align-items: center;
@@ -688,13 +687,6 @@ button { border: 0; cursor: pointer; background: transparent; }
   letter-spacing: 0.04em;
   white-space: nowrap;
   line-height: 1.45;
-}
-
-/* 彩种 chip：中性玻璃 */
-.draft-game-tag {
-  color: var(--text);
-  background: var(--glass-tint-soft);
-  box-shadow: inset 0 0 0 1px var(--glass-stroke);
 }
 
 /* 开奖日期 chip 三态：ok/warn/muted */
@@ -1071,6 +1063,22 @@ button { border: 0; cursor: pointer; background: transparent; }
   letter-spacing: 0.02em;
 }
 
+/* 单注卡 head 左侧：第 N 注 + 彩种·玩法 inline */
+.ticket-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ticket-meta-inline {
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 .ticket-right, .title-line, .record-actions {
   display: flex;
   align-items: center;
@@ -1237,46 +1245,50 @@ button { border: 0; cursor: pointer; background: transparent; }
   flex-wrap: wrap;
 }
 
-/* 兑奖 / 往期卡 head：标题 + 期号·日期 chip + 一等奖 chip + 往期按钮 同行
-   320px 屏 flex-wrap 兜底允许换行，避免硬撑横向滚动 */
+/* 兑奖 / 往期卡 head：标题 + 期号·日期 chip 同一行（左右对齐）
+   3 行总结构：head / 一等奖 / 球+往期按钮 */
 .draw-top {
   align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  gap: 6px 8px;
+  flex-wrap: nowrap;
+  margin-bottom: 4px;
+  gap: 8px;
 }
 
 .draw-top > .draw-title {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.draw-top > .draw-meta-tag,
-.draw-top > .draw-prize-tag {
+.draw-top > .draw-meta-tag {
   flex: 0 0 auto;
   margin-top: 0;
-  margin-bottom: 0;
-  max-width: 100%;
 }
 
-.draw-top > .draw-action-btn {
-  flex: 0 0 36px;
-  margin-left: auto; /* 推到行末 */
+/* 一等奖独占第二行：紧贴 head 和球行之间，间距收紧 */
+.draw-card > .draw-prize-tag,
+.history-card > .draw-prize-tag {
+  display: inline-flex;
+  margin: 0 0 4px 0;
 }
 
-/* 球独占一行 */
+/* 球行：球占满 + 往期按钮靠右 */
 .draw-number-row {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-top: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .draw-number-row .balls {
   flex: 1 1 auto;
   min-width: 0;
+}
+.draw-number-row .draw-action-btn {
+  flex: 0 0 36px;
+  margin-left: auto;
 }
 
 .record-group-head > div:first-child { min-width: 0; flex: 1 1 auto; }

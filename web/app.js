@@ -98,7 +98,7 @@
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
       "lastBackupHint",
-      "draftGameTag", "draftDrawTag"
+      "draftDrawTag"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -695,46 +695,68 @@
     renderRecords();
     const viewAction = { label: "查看", onClick: () => switchView("check") };
     if (copyAfter) {
-      toast(copyOk ? `已保存并复制 ${records.length} 注` : `已保存 ${records.length} 注（复制失败请长按号码手动复制）`, viewAction);
+      if (copyOk) {
+        toast(`已保存并复制 ${records.length} 注`, viewAction);
+      } else {
+        /* 第一次同步复制失败 — 让用户用 toast action 触发新的 user gesture 重试 */
+        toast(`已保存 ${records.length} 注 · 复制失败`, {
+          label: "重试复制",
+          onClick: () => {
+            const ok2 = copyToClipboard(buildClipboardBlock(state.draftTickets, state.gameKey));
+            toast(ok2 ? "号码已复制" : "复制仍失败，请长按号码块手动选择");
+          }
+        });
+      }
     } else {
       toast(`已保存 ${records.length} 注`, viewAction);
     }
   }
 
-  /* iOS Safari 兼容剪贴板：必须在用户手势同帧内同步执行，
-     不能放在 await 之后 — transient user activation 会失效，
-     现代 navigator.clipboard.writeText 会被静默拒绝。
-     这里同步走 execCommand 路径（execCommand 对 activation 检查更宽松）；
-     失败再 fallback 到 Clipboard API（fire-and-forget）。 */
+  /* iOS Safari 复制方案：
+     - 不能用 textarea + select() — iOS 不接受这种选区
+     - 不能用 contentEditable + Range API on textarea — 行为不一致
+     - 最稳：<pre> + Range + user-select:text + execCommand("copy") */
   function legacyCopy(text) {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    /* 16px 防 iOS 自动放大；fixed 偏屏外让用户看不见 */
-    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;outline:none;font-size:16px;opacity:0";
-    document.body.appendChild(ta);
-    /* iOS 需要 contentEditable + Range API 才能选中 textarea 内容 */
-    ta.contentEditable = "true";
-    ta.readOnly = false;
+    const yPos = window.pageYOffset || document.documentElement.scrollTop || 0;
+    const pre = document.createElement("pre");
+    pre.textContent = text;
+    pre.style.cssText = [
+      "position:absolute",
+      "top:" + yPos + "px",
+      "left:-9999px",
+      "white-space:pre",        /* 保留剪贴板格式的换行 */
+      "font-size:12pt",         /* 防 iOS 自动放大视口 */
+      "padding:0;border:0;margin:0",
+      "user-select:text",       /* 显式允许选中（CSS reset 可能禁用了）*/
+      "-webkit-user-select:text"
+    ].join(";");
+    document.body.appendChild(pre);
+
+    const selection = window.getSelection();
+    /* 备份用户当前选区，复制完还原 */
+    const previousRanges = [];
+    for (let i = 0; i < selection.rangeCount; i++) previousRanges.push(selection.getRangeAt(i));
+    selection.removeAllRanges();
+
     const range = document.createRange();
-    range.selectNodeContents(ta);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    ta.setSelectionRange(0, text.length);
+    range.selectNodeContents(pre);
+    selection.addRange(range);
+
     let ok = false;
     try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
-    sel.removeAllRanges();
-    document.body.removeChild(ta);
+
+    selection.removeAllRanges();
+    for (const r of previousRanges) selection.addRange(r);
+    document.body.removeChild(pre);
     return ok;
   }
 
   function copyToClipboard(text) {
-    /* 1. 同步 execCommand 路径（iOS Safari + 老浏览器友好）*/
+    /* 1. 同步 execCommand — iOS Safari 必走这条 */
     let ok = false;
     try { ok = legacyCopy(text); } catch (e) {}
     if (ok) return true;
-    /* 2. fallback：现代 Clipboard API（fire-and-forget，不阻塞调用方）*/
+    /* 2. fallback：现代 Clipboard API */
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         navigator.clipboard.writeText(text).catch(() => {});
@@ -1001,9 +1023,6 @@
   }
 
   function renderDraftHead() {
-    if (els.draftGameTag) {
-      els.draftGameTag.textContent = GAME_CONFIGS[state.gameKey]?.label || state.gameKey;
-    }
     if (els.draftDrawTag) {
       const hint = getDraftDrawHint(state.gameKey);
       els.draftDrawTag.textContent = hint.text;
@@ -1030,9 +1049,9 @@
     els.draftList.innerHTML = state.draftTickets.map((ticket, index) => `
       <article class="ticket-card random-ticket random-ticket-${state.gameKey}" style="--stagger-i:${index}">
         <div class="ticket-head">
-          <div>
-            <div class="ticket-no">第 ${index + 1} 注</div>
-            <div class="meta">${GAME_CONFIGS[state.gameKey].label}${ticket.playMode ? ` · ${formatPlayMode(ticket.playMode)}` : ""}</div>
+          <div class="ticket-head-left">
+            <span class="ticket-no">第 ${index + 1} 注</span>
+            <span class="ticket-meta-inline">${GAME_CONFIGS[state.gameKey].label}${ticket.playMode ? ` · ${formatPlayMode(ticket.playMode)}` : ""}</span>
           </div>
           <div class="ticket-right">
             ${multiplier > 1 ? `<span class="ticket-type">${multiplier}倍</span>` : ""}
@@ -1066,11 +1085,11 @@
           <div class="draw-top">
             <div class="draw-title">${config.label}</div>
             <span class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</span>
-            ${renderFirstPrize(draw)}
-            <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="往期">${ICON.chevronRight}</button>
           </div>
+          ${renderFirstPrize(draw)}
           <div class="draw-number-row">
             ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))}
+            <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="往期">${ICON.chevronRight}</button>
           </div>
         </article>
       `;
@@ -1103,8 +1122,8 @@
           <div class="draw-top">
             <div class="draw-title">${cfg.label || draw.gameKey}</div>
             <span class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</span>
-            ${renderFirstPrize(draw)}
           </div>
+          ${renderFirstPrize(draw)}
           <div class="draw-number-row">
             ${renderDrawBalls(draw.gameKey, draw.drawValues || parseOpenCodeToDrawValues(draw.gameKey, draw.openCode))}
           </div>
@@ -1203,10 +1222,7 @@
     const resolved = FINAL_RECORD_STATUSES.has(record.status) && record.matched;
     const cost = Number(record.price || 0) * Number(record.multiple || 1);
     const playText = formatPlayMode(record.playMode);
-    const prizeText = record.status === "prize_float"
-      ? "中奖金额：浮动待定"
-      : `中奖金额：${formatMoney(record.prizeAmount || 0)}`;
-    /* B-C3: 中奖时 chip 直接带金额，避免要展开才知中多少 */
+    /* 状态 chip 直接承载中奖金额：won → "中 X 元/万"；其他 → resultText */
     let chipText = record.resultText || "待核对";
     if (record.status === "won" && Number(record.prizeAmount) > 0) {
       chipText = `中 ${formatCompactMoney(record.prizeAmount)}`;
@@ -1221,7 +1237,6 @@
           </div>
           <span class="status-pill ${statusClass(record.status)}">${chipText}</span>
         </div>
-        <div class="record-ticket-prize">${prizeText}</div>
         ${renderTicketBalls(record.gameKey, record.numbers, record.matched, resolved)}
       </article>
     `;
