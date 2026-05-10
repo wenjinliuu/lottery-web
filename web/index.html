@@ -2,12 +2,27 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b0f1c" media="(prefers-color-scheme: dark)">
     <title>彩票号码备忘</title>
     <link rel="stylesheet" href="./styles.css">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%BD%A9%3C/text%3E%3C/svg%3E">
+    <script>
+      /* 主题预加载：避免暗色模式刷新闪烁 */
+      (function () {
+        try {
+          var saved = localStorage.getItem("lottery-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
+    <div class="bg-mesh" aria-hidden="true"></div>
+    <div class="bg-noise" aria-hidden="true"></div>
     <main class="page">
       <header class="hero">
         <div class="hero-main">
@@ -40,9 +55,16 @@
           </section>
 
           <section class="card action-card">
-            <div class="toolbar">
+            <div class="toolbar toolbar-primary">
               <button class="tool-btn tool-btn-light" id="randomBtn" type="button">重新随机</button>
-              <button class="tool-btn tool-btn-primary" id="saveBtn" type="button">保存记录</button>
+              <div class="multiplier-control" aria-label="倍数">
+                <button class="multiplier-btn" id="decreaseMultiplierBtn" type="button">-</button>
+                <span class="multiplier-value" id="multiplierText">1倍</span>
+                <button class="multiplier-btn" id="increaseMultiplierBtn" type="button">+</button>
+              </div>
+            </div>
+            <div class="toolbar toolbar-secondary">
+              <button class="tool-btn tool-btn-primary" id="saveBtn" type="button">保存记录复制</button>
             </div>
           </section>
 
@@ -55,14 +77,6 @@
             </div>
             <div class="meta meta-row ticket-meta-row">
               <div id="draftSummary">暂无号码</div>
-              <div class="ticket-summary-right">
-                <div class="multiplier-control" aria-label="倍数">
-                  <button class="multiplier-btn" id="decreaseMultiplierBtn" type="button">-</button>
-                  <span class="multiplier-value" id="multiplierText">1倍</span>
-                  <button class="multiplier-btn" id="increaseMultiplierBtn" type="button">+</button>
-                </div>
-                <button class="mini-green" id="copyBtn" type="button">复制号码</button>
-              </div>
             </div>
             <div id="draftList" class="ticket-list empty">点击“重新随机”生成号码</div>
           </section>
@@ -72,10 +86,13 @@
       <section class="view-section" data-view-panel="check" hidden>
         <div class="check-page">
           <div class="check-page-head">
-            <div class="section-title check-page-title">最新开奖号码</div>
+            <div>
+              <div class="section-title check-page-title">最新开奖号码</div>
+              <div class="draw-update-time" id="latestDrawsUpdated">暂无更新时间</div>
+            </div>
             <div class="check-title-actions">
               <button class="check-expand-btn" id="toggleDrawsBtn" type="button">展开</button>
-              <button class="check-expand-btn" id="reloadDrawsBtn" type="button">刷新</button>
+              <button class="check-expand-btn" id="reloadDrawsBtn" type="button">刷新开奖号码</button>
             </div>
           </div>
           <div id="latestDraws" class="check-card-list"></div>
@@ -85,9 +102,6 @@
             <button class="check-records-refresh" id="checkRecordsBtn" type="button">重新核对</button>
           </div>
           <section class="card check-records-card">
-            <div class="record-actions">
-              <button class="mini-clear" id="clearRecordsBtn" type="button">清空记录</button>
-            </div>
             <div id="recordList" class="record-list empty">暂无保存记录</div>
           </section>
         </div>
@@ -100,6 +114,7 @@
               <div class="history-title">往期开奖</div>
               <div class="history-sub" id="historySummary">读取本地开奖 JSON</div>
             </div>
+            <button class="mini-blue" id="historyBackBtn" type="button">返回</button>
           </div>
           <div id="historyList" class="history-list"></div>
         </div>
@@ -117,22 +132,44 @@
             </div>
             <div class="mine-stat-row">
               <div class="mine-stat">
-                <div class="mine-stat-value" id="mineRecordCount">0</div>
-                <div class="mine-stat-label">选号记录</div>
+                <div class="mine-stat-value" id="mineTotalCost">0元</div>
+                <div class="mine-stat-label">总花费</div>
               </div>
               <div class="mine-stat">
-                <div class="mine-stat-value" id="minePendingCount">0</div>
-                <div class="mine-stat-label">待核对</div>
+                <div class="mine-stat-value" id="minePrizeTotal">0元</div>
+                <div class="mine-stat-label">中奖金额</div>
               </div>
               <div class="mine-stat">
-                <div class="mine-stat-value">8</div>
-                <div class="mine-stat-label">支持彩种</div>
+                <div class="mine-stat-value" id="mineWinRate">0%</div>
+                <div class="mine-stat-label">中奖率</div>
+              </div>
+              <div class="mine-stat">
+                <div class="mine-stat-value" id="mineWonCount">0</div>
+                <div class="mine-stat-label">中奖记录</div>
               </div>
             </div>
           </section>
 
           <section class="card mine-section-card">
-            <div class="section-title section-title-no-margin">数据备份</div>
+            <div class="section-title section-title-no-margin">外观</div>
+            <div class="mine-menu-item mine-menu-item-last">
+              <div class="mine-menu-copy">
+                <div class="mine-menu-title">深色模式</div>
+                <div class="mine-menu-sub" id="themeToggleSub">跟随系统</div>
+              </div>
+              <button class="theme-toggle" id="themeToggleBtn" type="button" role="switch" aria-checked="false" aria-label="切换深色模式"></button>
+            </div>
+          </section>
+
+          <section class="card mine-section-card">
+            <div class="section-title section-title-no-margin">记录与备份</div>
+            <div class="mine-menu-item">
+              <div class="mine-menu-copy">
+                <div class="mine-menu-title">选号记录</div>
+                <div class="mine-menu-sub" id="mineRecordSummary">共 0 条记录</div>
+              </div>
+              <button class="mini-blue" id="mineRecordToggleBtn" type="button">查看</button>
+            </div>
             <div class="mine-menu-item">
               <div class="mine-menu-copy">
                 <div class="mine-menu-title">导出备份</div>
@@ -149,6 +186,14 @@
               <input id="importBackupInput" class="sr-only" type="file" accept="application/json">
             </label>
           </section>
+
+          <section class="card mine-section-card" id="mineRecordPanel" hidden>
+            <div class="title-row">
+              <div class="section-title section-title-no-margin">完整选号记录</div>
+              <button class="mini-blue" id="mineRecordCloseBtn" type="button">收起</button>
+            </div>
+            <div id="mineRecordList" class="record-list empty">暂无保存记录</div>
+          </section>
         </div>
       </section>
 
@@ -161,10 +206,6 @@
           <button class="dock-item" type="button" data-view="check">
             <span class="dock-icon">兑</span>
             <span class="dock-label">兑奖</span>
-          </button>
-          <button class="dock-item" type="button" data-view="history">
-            <span class="dock-icon">往</span>
-            <span class="dock-label">往期</span>
           </button>
           <button class="dock-item" type="button" data-view="mine">
             <span class="dock-icon">我</span>
