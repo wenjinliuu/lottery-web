@@ -1,3 +1,4 @@
+[WEB_VERSION.md](https://github.com/user-attachments/files/27561843/WEB_VERSION.md)
 # 网页版使用说明
 
 这是一个纯静态彩票号码备忘网页，适合个人使用。
