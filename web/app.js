@@ -49,7 +49,6 @@
     records: [],
     activeView: "random",
     showAllDraws: false,
-    showMineRecords: false,
     latestUpdatedAt: "",
     historyGameKey: "ssq"
   };
@@ -77,10 +76,11 @@
       "playModeTabs", "todayTitle", "weekTitle", "heroTitle", "decreaseMultiplierBtn",
       "increaseMultiplierBtn", "multiplierText", "toggleDrawsBtn",
       "mineTotalCost", "minePrizeTotal", "mineWinRate", "mineWonCount", "mineRecordSummary",
-      "mineRecordToggleBtn", "mineRecordCloseBtn", "mineRecordPanel", "mineRecordList",
+      "mineRecordToggleBtn", "mineRecordList",
       "latestDrawsUpdated", "historyBackBtn", "toast",
       "themeToggleBtn", "themeToggleSub",
-      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub"
+      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub",
+      "myRecordsBackBtn", "myRecordsSummary"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -143,6 +143,15 @@
     }
   }
 
+  /* ===== SVG icon library (SF Symbols 风) ===== */
+
+  const ICON = {
+    chevronUp:    '<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',
+    chevronDown:  '<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+    chevronRight: '<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+    trash:        '<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+  };
+
   function initControls() {
     els.gameSelect.innerHTML = GAME_ORDER.map((key) => `<option value="${key}">${GAME_CONFIGS[key].label}</option>`).join("");
     els.gameSelect.value = state.gameKey;
@@ -171,7 +180,7 @@
       state.playMode = els.playModeSelect.value;
       renderPlayModeTabs();
       syncCurrentPrice();
-      appendTickets(1);
+      applyPlayModeChange();
     });
     els.randomBtn.addEventListener("click", randomizeTickets);
     els.saveBtn.addEventListener("click", () => saveDraftRecords(true));
@@ -191,8 +200,8 @@
     els.increaseMultiplierBtn.addEventListener("click", () => updateMultiplier(1));
     els.checkRecordsBtn.addEventListener("click", checkAllRecords);
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
-    if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", toggleMineRecords);
-    if (els.mineRecordCloseBtn) els.mineRecordCloseBtn.addEventListener("click", () => toggleMineRecords(false));
+    if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
+    if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
     els.exportBackupBtn.addEventListener("click", exportBackup);
     els.importBackupInput.addEventListener("change", importBackup);
   }
@@ -278,9 +287,26 @@
         els.playModeSelect.value = state.playMode;
         renderPlayModeTabs();
         syncCurrentPrice();
-        appendTickets(1);
+        applyPlayModeChange();
       });
     });
+  }
+
+  /* 切换玩法时：
+     - dlt 普通/追加 仅切换 addOn 标志，不重新生成号码（保留原号）
+     - 其他彩种 玩法决定号码生成方式（如 fc3d 直选/组三/组六），追加 1 注新号 */
+  function applyPlayModeChange() {
+    if (state.gameKey === "dlt") {
+      const isAdd = state.playMode === "add";
+      state.draftTickets = state.draftTickets.map((t) => ({
+        ...t,
+        playMode: state.playMode,
+        addOn: isAdd
+      }));
+      renderDraft();
+    } else {
+      appendTickets(1);
+    }
   }
 
   function switchView(view) {
@@ -636,7 +662,7 @@
           </div>
           <div class="ticket-right">
             ${multiplier > 1 ? `<span class="ticket-type">${multiplier}倍</span>` : ""}
-            <button class="delete-btn" type="button" data-delete-draft="${index}">删除</button>
+            <button class="delete-btn has-icon" type="button" data-delete-draft="${index}" aria-label="删除">${ICON.trash}<span>删除</span></button>
           </div>
         </div>
         ${renderTicketBalls(state.gameKey, ticket)}
@@ -651,7 +677,9 @@
   }
 
   function renderDraws() {
-    els.toggleDrawsBtn.textContent = state.showAllDraws ? "收起" : "展开";
+    els.toggleDrawsBtn.innerHTML = state.showAllDraws
+      ? `${ICON.chevronUp}<span>收起</span>`
+      : `${ICON.chevronDown}<span>展开</span>`;
     const visibleGames = state.showAllDraws ? GAME_ORDER : GAME_ORDER.filter((gameKey) => DEFAULT_VISIBLE_DRAWS.has(gameKey));
     const latestCards = visibleGames.map((gameKey, idx) => {
       const draw = getLatestDraw(gameKey);
@@ -670,7 +698,7 @@
           </div>
           <div class="draw-number-row">
             ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))}
-            <button class="draw-action-btn" type="button" data-history-game="${gameKey}">往</button>
+            <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="往期">${ICON.chevronRight}</button>
           </div>
         </article>
       `;
@@ -696,18 +724,23 @@
     els.historySummary.textContent = `${config?.label || gameKey} · ${state.latestUpdatedAt ? `更新于 ${formatDateTime(state.latestUpdatedAt)}` : "暂无更新时间"}`;
     const title = document.querySelector(".history-title");
     if (title) title.textContent = `${config?.label || gameKey}往期开奖`;
-    els.historyList.innerHTML = history.length ? history.map((draw, idx) => `
-      <article class="history-card draw-card-${draw.gameKey}" style="--stagger-i:${idx}">
-        <div class="history-head">
-          <div>
-            <div class="expect">${GAME_CONFIGS[draw.gameKey]?.label || draw.gameKey} ${draw.expect || "未知期"}</div>
-            <div class="draw-date">${draw.openDate || draw.time || "未知日期"}</div>
+    els.historyList.innerHTML = history.length ? history.map((draw, idx) => {
+      const cfg = GAME_CONFIGS[draw.gameKey] || {};
+      return `
+        <article class="history-card draw-card-${draw.gameKey}" style="--stagger-i:${idx}">
+          <div class="draw-top">
+            <div class="draw-title">${cfg.label || draw.gameKey}</div>
+            <div class="draw-info">
+              <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
+              ${renderFirstPrize(draw)}
+            </div>
           </div>
-        </div>
-        ${renderFirstPrize(draw)}
-        ${renderDrawBalls(draw.gameKey, draw.drawValues || parseOpenCodeToDrawValues(draw.gameKey, draw.openCode))}
-      </article>
-    `).join("") : `<div class="empty-state">暂无${config?.label || ""}往期开奖数据</div>`;
+          <div class="draw-number-row">
+            ${renderDrawBalls(draw.gameKey, draw.drawValues || parseOpenCodeToDrawValues(draw.gameKey, draw.openCode))}
+          </div>
+        </article>
+      `;
+    }).join("") : `<div class="empty-state">暂无${config?.label || ""}往期开奖数据</div>`;
   }
 
   function renderRecords() {
@@ -717,30 +750,25 @@
       emptyText: "今日暂无选号记录，完整记录在“我的”页查看",
       deleteScope: "today"
     });
-    if (els.mineRecordList && state.showMineRecords) {
-      renderRecordGroups(els.mineRecordList, state.records, {
-        emptyText: "暂无保存记录",
-        deleteScope: "all"
-      });
-    }
-    renderMineRecordPanel();
+    renderMyRecordsList();
     renderMineStats();
   }
 
-  function toggleMineRecords(nextVisible = !state.showMineRecords) {
-    state.showMineRecords = Boolean(nextVisible);
-    renderMineRecordPanel();
-    if (state.showMineRecords && els.mineRecordList) {
+  function renderMyRecordsList() {
+    if (els.mineRecordList) {
       renderRecordGroups(els.mineRecordList, state.records, {
         emptyText: "暂无保存记录",
         deleteScope: "all"
       });
     }
+    if (els.myRecordsSummary) {
+      els.myRecordsSummary.textContent = `共 ${state.records.length} 条`;
+    }
   }
 
-  function renderMineRecordPanel() {
-    if (els.mineRecordPanel) els.mineRecordPanel.hidden = !state.showMineRecords;
-    if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.textContent = state.showMineRecords ? "收起" : "查看";
+  function openMyRecordsView() {
+    renderMyRecordsList();
+    switchView("myRecords");
   }
 
   function renderRecordGroups(container, records, options = {}) {
@@ -776,7 +804,7 @@
             </div>
             <div class="record-group-right">
               <div class="record-group-amount">中奖 ${amountText}</div>
-              <button class="delete-btn" type="button" data-delete-game="${gameKey}" data-delete-scope="${options.deleteScope || "all"}">删除</button>
+              <button class="delete-btn has-icon" type="button" data-delete-game="${gameKey}" data-delete-scope="${options.deleteScope || "all"}" aria-label="删除">${ICON.trash}<span>删除</span></button>
             </div>
           </div>
           <div class="record-group-list">
@@ -1005,7 +1033,15 @@
     const num = Number(draw.firstPrize.num || 0);
     const bonus = draw.firstPrize.singleBonus || "";
     if (!bonus && !num) return "";
-    return `<div class="draw-prize-tag">一等奖 ${num} 注 · ${formatMoney(bonus)}</div>`;
+    return `<div class="draw-prize-tag">一等奖 ${num} 注 · ${formatPrizeAmount(bonus)}</div>`;
+  }
+
+  /* 一等奖等大额奖金：≥1 万显示「X.XX 万」，否则按整数元 */
+  function formatPrizeAmount(value) {
+    const n = parseMoneyNumber(value);
+    if (!Number.isFinite(n) || n === 0) return "金额待定";
+    if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(2)}万`;
+    return `${Math.round(n).toLocaleString("zh-CN")}元`;
   }
 
   function evaluateRecord(record) {

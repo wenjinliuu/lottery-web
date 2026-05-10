@@ -159,6 +159,33 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .bg-mesh, .bg-noise { display: none; }
 
+/* ---------- 4b. 通用图标按钮 ---------- */
+
+.icn {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.has-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tool-btn.has-icon .icn { width: 16px; height: 16px; stroke-width: 2; }
+.mini-clear.has-icon .icn,
+.mini-blue.has-icon .icn,
+.mini-green.has-icon .icn,
+.check-expand-btn.has-icon .icn,
+.check-records-refresh.has-icon .icn { width: 13px; height: 13px; }
+
 /* ---------- 5. 页面骨架 ---------- */
 
 .page {
@@ -1611,12 +1638,16 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .dock-wrap {
   position: fixed;
-  left: 50%;
-  bottom: calc(6px + var(--safe-bottom));
+  left: 0;
+  right: 0;
+  bottom: calc(8px + var(--safe-bottom));
+  margin-inline: auto;
   z-index: 50;
   width: min(100% - 16px, 500px);
-  transform: translateX(-50%);
   pointer-events: none;
+  /* 独立合成层：防止滚动时 fixed 抖 / 跟随 */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .dock {
@@ -1624,21 +1655,21 @@ button { border: 0; cursor: pointer; background: transparent; }
   width: 100%;
   display: flex;
   align-items: stretch;
-  padding: 6px 4px;
-  border-radius: 22px;
-  background: rgba(247, 247, 247, 0.88);
-  border-top: 0.5px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.04), 0 12px 28px rgba(28, 40, 80, 0.10);
-  backdrop-filter: blur(22px) saturate(200%);
-  -webkit-backdrop-filter: blur(22px) saturate(200%);
+  padding: 7px 6px;
+  border-radius: 30px;
+  background: rgba(247, 247, 247, 0.86);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 16px rgba(28, 40, 80, 0.08), 0 14px 36px rgba(28, 40, 80, 0.12);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
   pointer-events: auto;
 }
 
 [data-theme="dark"] .dock,
 :root:not([data-theme="light"]) .dock {
   background: rgba(20, 24, 36, 0.82);
-  border-top-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 12px 28px rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 14px 36px rgba(0, 0, 0, 0.55);
 }
 
 .dock-item {
