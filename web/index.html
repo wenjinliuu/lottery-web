@@ -24,8 +24,14 @@
     <main class="page">
       <header class="hero">
         <div class="hero-main">
-          <div class="date" id="todayTitle">今日号码</div>
-          <div class="sub" id="weekTitle">本地网页 / IndexedDB</div>
+          <div class="date-row">
+            <span class="date" id="todayTitle">今日号码</span>
+            <span class="week-inline" id="weekTitle">星期</span>
+          </div>
+          <div class="today-recommend" id="todayRecommend">
+            <span class="today-recommend-label">今日推荐</span>
+            <div class="today-recommend-chips" id="todayRecommendChips"><span class="today-recommend-empty">加载中…</span></div>
+          </div>
           <div class="recommend" id="heroTitle">双色球 选号</div>
         </div>
       </header>
@@ -58,6 +64,7 @@
                 <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
                 <span>重新随机</span>
               </button>
+              <button class="dlt-addon-btn" id="dltAddOnBtn" type="button" aria-pressed="false" hidden>追加</button>
               <div class="multiplier-control" aria-label="倍数">
                 <button class="multiplier-btn" id="decreaseMultiplierBtn" type="button">-</button>
                 <span class="multiplier-value" id="multiplierText">1倍</span>
@@ -267,7 +274,7 @@
         </button>
         <button class="dock-item" type="button" data-view="check" aria-label="兑奖">
           <span class="dock-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.8 1.8 0 0 0 0 3.6V14.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.2a1.8 1.8 0 0 0 0-3.6Z"/><path d="M9.5 14.2 11.3 16l3.6-4"/></svg>
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="6.5" width="17" height="11" rx="2.5"/><path d="M9 12.4l1.9 1.9 4-4.4"/></svg>
           </span>
           <span class="dock-label">兑奖</span>
         </button>

@@ -200,10 +200,17 @@ button { border: 0; cursor: pointer; background: transparent; }
 .hero {
   display: flex;
   align-items: flex-start;
-  margin: 4px 4px 12px;
+  margin: 4px 4px 14px;
 }
 
 .hero-main { flex: 1; min-width: 0; }
+
+.date-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 .date {
   color: var(--ink);
@@ -213,13 +220,78 @@ button { border: 0; cursor: pointer; background: transparent; }
   letter-spacing: -0.02em;
 }
 
-.sub {
-  margin-top: 6px;
+.week-inline {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
+
+/* 今日推荐 — 横向滚动 chip 列表 */
+.today-recommend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.today-recommend-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.today-recommend-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.today-recommend-chips::-webkit-scrollbar { display: none; }
+
+.today-recommend-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.today-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform var(--dur-fast) var(--ease-glide), filter var(--dur-fast) var(--ease-glide);
+}
+
+.today-chip:active { transform: scale(0.94); filter: brightness(0.96); }
+
+/* 八彩种 chip 颜色（与球色一致） */
+.today-chip-ssq  { background: var(--red);       box-shadow: 0 4px 10px rgba(var(--c-red),       0.24); }
+.today-chip-dlt  { background: var(--blue);      box-shadow: 0 4px 10px rgba(var(--c-blue),      0.24); }
+.today-chip-k8   { background: var(--orange);    box-shadow: 0 4px 10px rgba(var(--c-orange),    0.24); }
+.today-chip-fc3d { background: var(--fc3d);      box-shadow: 0 4px 10px rgba(var(--c-fc3d),      0.24); }
+.today-chip-pl3,
+.today-chip-pl5  { background: var(--plum);      box-shadow: 0 4px 10px rgba(var(--c-plum),      0.24); }
+.today-chip-qlc  { background: var(--qlcyellow); box-shadow: 0 4px 10px rgba(var(--c-qlcyellow), 0.24); }
+.today-chip-qxc  { background: var(--indigo);    box-shadow: 0 4px 10px rgba(var(--c-indigo),    0.24); }
 
 .recommend { display: none; }
 
@@ -483,14 +555,53 @@ button { border: 0; cursor: pointer; background: transparent; }
   display: flex;
   gap: 10px;
 }
-.toolbar-primary { align-items: center; }
+.toolbar-primary { align-items: center; gap: 8px; }
 .toolbar-secondary { margin-top: 10px; }
 
-.toolbar-primary .tool-btn-light { flex: 1 1 auto; min-width: 0; }
-.toolbar-primary .multiplier-control { flex: 0 0 168px; min-height: 50px; }
+.toolbar-primary .tool-btn-light { flex: 1 1 0; min-width: 0; }
+.toolbar-primary .multiplier-control { flex: 0 0 152px; min-height: 50px; }
 
-@media (max-width: 360px) {
-  .toolbar-primary .multiplier-control { flex-basis: 152px; }
+/* 大乐透 追加 toggle —— 玻璃 pill；按下用大乐透后区球（--yellow）橙色填充 */
+.dlt-addon-btn {
+  flex: 0 0 auto;
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--glass-spec-soft), var(--glass-tint-soft);
+  box-shadow: inset 0 0 0 1px var(--glass-stroke), 0 4px 10px rgba(86, 101, 153, 0.06);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  transition: transform var(--dur-fast) var(--ease-glide),
+              background var(--dur-base) var(--ease-glide),
+              box-shadow var(--dur-base) var(--ease-glide),
+              color var(--dur-base) var(--ease-glide);
+}
+
+.dlt-addon-btn:active { transform: scale(0.96); }
+
+.dlt-addon-btn[aria-pressed="true"] {
+  color: #fff;
+  background: var(--yellow);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+              0 8px 16px rgba(var(--c-yellow), 0.32);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+}
+
+@media (max-width: 380px) {
+  .toolbar-primary .multiplier-control { flex-basis: 140px; }
+  .toolbar-primary { gap: 6px; }
+  .dlt-addon-btn { padding: 0 12px; font-size: 13px; }
+}
+
+@media (max-width: 340px) {
+  .toolbar-primary .multiplier-control { flex-basis: 128px; }
+  .dlt-addon-btn { padding: 0 10px; }
 }
 
 .tool-btn {
@@ -1053,23 +1164,39 @@ button { border: 0; cursor: pointer; background: transparent; }
   flex-wrap: wrap;
 }
 
+/* 标题和"期号·日期"在卡片头部一行内左右对齐，间距收紧 */
 .draw-top {
-  align-items: flex-start;
-  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: nowrap;
+  margin-bottom: 6px;
+  gap: 8px;
 }
 
-.draw-top > .draw-title { flex: 0 0 auto; }
-.draw-top > .draw-info {
-  flex: 1 1 100%;
+.draw-top > .draw-title {
+  flex: 1 1 auto;
   min-width: 0;
-  display: flex;
-  justify-content: flex-start;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: -2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.draw-number-row { flex-wrap: nowrap; }
+.draw-top > .draw-meta-tag {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+/* 一等奖标签独占一行，紧贴标题下方与号码球之间 */
+.draw-card > .draw-prize-tag,
+.history-card > .draw-prize-tag {
+  display: inline-flex;
+  margin: 0 0 8px 0;
+}
+
+.draw-number-row {
+  flex-wrap: nowrap;
+  margin-top: 0;
+}
+
 .draw-number-row .balls {
   flex: 1 1 auto;
   min-width: 0;

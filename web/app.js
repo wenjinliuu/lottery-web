@@ -50,7 +50,9 @@
     activeView: "random",
     showAllDraws: false,
     latestUpdatedAt: "",
-    historyGameKey: "ssq"
+    historyGameKey: "ssq",
+    dltAddOn: false,
+    calendar: null
   };
 
   const els = {};
@@ -62,6 +64,7 @@
     initTheme();
     initControls();
     bindEvents();
+    loadCalendar(); /* 不阻塞首屏，calendar 后台拉 */
     await loadDraws();
     await loadRecords();
     randomizeTickets();
@@ -80,7 +83,9 @@
       "latestDrawsUpdated", "historyBackBtn", "toast",
       "themeToggleBtn", "themeToggleSub",
       "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub",
-      "myRecordsBackBtn", "myRecordsSummary"
+      "myRecordsBackBtn", "myRecordsSummary",
+      "dltAddOnBtn",
+      "todayRecommend", "todayRecommendChips"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -202,18 +207,44 @@
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
     if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
     if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
+    if (els.dltAddOnBtn) {
+      els.dltAddOnBtn.addEventListener("click", () => {
+        state.dltAddOn = !state.dltAddOn;
+        state.playMode = state.dltAddOn ? "add" : "normal";
+        els.playModeSelect.value = state.playMode;
+        renderDltAddOnBtn();
+        syncCurrentPrice();
+        applyPlayModeChange();
+      });
+    }
     els.exportBackupBtn.addEventListener("click", exportBackup);
     els.importBackupInput.addEventListener("change", importBackup);
   }
 
   function syncPlayModeOptions() {
     const config = GAME_CONFIGS[state.gameKey];
-    const modes = config.playModes || [];
+    const isDlt = state.gameKey === "dlt";
+    /* dlt 不再走"普通/追加"两段 tab，改用 toolbar 上的独立 toggle 控制 */
+    const modes = isDlt ? [] : (config.playModes || []);
     els.playModeField.hidden = modes.length === 0;
     els.playModeSelect.innerHTML = modes.map((mode) => `<option value="${mode.key}">${mode.label}</option>`).join("");
-    state.playMode = config.defaultPlayMode || (modes[0] ? modes[0].key : "");
+    if (isDlt) {
+      state.playMode = state.dltAddOn ? "add" : "normal";
+    } else {
+      state.playMode = config.defaultPlayMode || (modes[0] ? modes[0].key : "");
+    }
     els.playModeSelect.value = state.playMode;
     renderPlayModeTabs();
+    renderDltAddOnBtn();
+  }
+
+  function renderDltAddOnBtn() {
+    if (!els.dltAddOnBtn) return;
+    const isDlt = state.gameKey === "dlt";
+    els.dltAddOnBtn.hidden = !isDlt;
+    const on = isDlt && state.dltAddOn;
+    els.dltAddOnBtn.setAttribute("aria-pressed", String(on));
+    els.dltAddOnBtn.classList.toggle("is-on", on);
   }
 
   function renderGameTabs() {
@@ -328,6 +359,73 @@
     els.todayTitle.textContent = `${now.getMonth() + 1}月${now.getDate()}日`;
     els.weekTitle.textContent = week;
     els.heroTitle.textContent = "";
+    renderTodayRecommend();
+  }
+
+  /* ===== 今日推荐：从 calendar.json 计算今日开奖彩种并渲染彩色 chip ===== */
+
+  async function loadCalendar() {
+    try {
+      const url = `${LOTTERY_DATA_BASE_URL}/calendar.json?t=${Date.now()}`;
+      state.calendar = await fetchJson(url);
+      renderTodayRecommend();
+    } catch (e) {
+      state.calendar = null;
+      renderTodayRecommend();
+    }
+  }
+
+  function getTodayOpenGames() {
+    const wd = new Date().getDay(); /* 0=Sun ~ 6=Sat */
+    if (state.calendar && state.calendar.lotteries) {
+      const list = state.calendar.lotteries;
+      return GAME_ORDER.filter((gameKey) => {
+        const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
+        const entry = list[remoteKey] || list[gameKey];
+        if (!entry || !Array.isArray(entry.draw_weekdays)) return false;
+        return entry.draw_weekdays.includes(wd);
+      });
+    }
+    /* 未拿到 calendar：用 fallback 周表 */
+    const FALLBACK = {
+      ssq: [0, 2, 4], dlt: [1, 3, 6], qlc: [1, 3, 5], qxc: [2, 5, 0],
+      fc3d: [0, 1, 2, 3, 4, 5, 6], pl3: [0, 1, 2, 3, 4, 5, 6],
+      pl5: [0, 1, 2, 3, 4, 5, 6], k8: [0, 1, 2, 3, 4, 5, 6]
+    };
+    return GAME_ORDER.filter((g) => (FALLBACK[g] || []).includes(wd));
+  }
+
+  function renderTodayRecommend() {
+    if (!els.todayRecommendChips) return;
+    const games = getTodayOpenGames();
+    if (!games.length) {
+      els.todayRecommendChips.innerHTML = `<span class="today-recommend-empty">今日无开奖</span>`;
+      return;
+    }
+    els.todayRecommendChips.innerHTML = games.map((g) => {
+      const cfg = GAME_CONFIGS[g] || {};
+      const label = cfg.label || g;
+      return `<button class="today-chip today-chip-${g}" type="button" data-today-game="${g}" aria-label="切换到 ${label}">${label}</button>`;
+    }).join("");
+    els.todayRecommendChips.querySelectorAll("[data-today-game]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const g = btn.dataset.todayGame;
+        if (!g || g === state.gameKey) {
+          if (state.activeView !== "random") switchView("random");
+          return;
+        }
+        state.gameKey = g;
+        els.gameSelect.value = g;
+        renderGameTabs();
+        syncPlayModeOptions();
+        syncDefaultPrice();
+        renderCountTabs();
+        state.draftTickets = [];
+        randomizeTickets();
+        renderAll();
+        if (state.activeView !== "random") switchView("random");
+      });
+    });
   }
 
   function syncDefaultPrice() {
@@ -553,13 +651,129 @@
       if (showToast) toast("暂无可复制号码");
       return;
     }
-    const text = state.draftTickets.map(formatTicket).join("\n");
+    const text = buildClipboardBlock(state.draftTickets, state.gameKey);
     try {
       await navigator.clipboard.writeText(text);
       if (showToast) toast("号码已复制");
     } catch (error) {
       if (showToast) toast("复制失败，请手动选择文本");
     }
+  }
+
+  /* ===== 剪贴板格式：标题｜投入｜分组号码 ===== */
+
+  function buildClipboardBlock(tickets, gameKey) {
+    const cfg = GAME_CONFIGS[gameKey] || {};
+    const name = cfg.label || gameKey;
+    const count = tickets.length;
+    const multiplier = clampInt(els.multipleInput.value, 1, 99);
+    const price = getCurrentTicketPrice();
+    const totalCost = price * count * multiplier;
+
+    /* —— 标题 —— */
+    const headParts = [name, `${count}注`];
+    if (multiplier > 1) headParts.push(`${multiplier}倍`);
+
+    if (gameKey === "dlt") {
+      if (state.dltAddOn) {
+        headParts.push("追加");
+      } else {
+        const md = getNextOpenDateMMDD(gameKey);
+        if (md) headParts.push(`开奖日 ${md}`);
+      }
+    } else if (gameKey === "ssq" || gameKey === "qlc" || gameKey === "qxc" || gameKey === "k8") {
+      const md = getNextOpenDateMMDD(gameKey);
+      if (md) headParts.push(`开奖日 ${md}`);
+    }
+    const title = headParts.join("｜");
+
+    const investLine = `投入：${totalCost}元`;
+
+    /* —— 号码区 —— */
+    let body = "";
+    if (gameKey === "fc3d" || gameKey === "pl3") {
+      const groups = groupTicketsByPlayMode(tickets);
+      body = groups.map((g) => {
+        const head = `${formatPlayModeForCopy(g.playMode)}｜${g.list.length}注`;
+        const lines = g.list.map((t) => formatTicketBody(gameKey, t)).join("\n");
+        return `${head}\n${lines}`;
+      }).join("\n\n");
+    } else {
+      body = tickets.map((t) => formatTicketBody(gameKey, t)).join("\n");
+    }
+
+    return `${title}\n${investLine}\n\n${body}`;
+  }
+
+  function formatTicketBody(gameKey, ticket) {
+    if (gameKey === "ssq") {
+      return `${(ticket.red || []).map((n) => pad(n)).join("  ")} + ${pad((ticket.blue || [])[0])}`;
+    }
+    if (gameKey === "dlt") {
+      return `${(ticket.front || []).map((n) => pad(n)).join("  ")} + ${(ticket.back || []).map((n) => pad(n)).join("  ")}`;
+    }
+    if (gameKey === "k8") {
+      return (ticket.nums || []).map((n) => pad(n)).join("  ");
+    }
+    if (gameKey === "fc3d" || gameKey === "pl3") {
+      return (ticket.nums3 || []).join(" ");
+    }
+    if (gameKey === "pl5") {
+      return (ticket.nums5 || []).join("  ");
+    }
+    if (gameKey === "qlc") {
+      return (ticket.nums7 || []).map((n) => pad(n)).join("  ");
+    }
+    if (gameKey === "qxc") {
+      return `${(ticket.nums6 || []).join(" ")} + ${ticket.tail}`;
+    }
+    return "";
+  }
+
+  function groupTicketsByPlayMode(tickets) {
+    const map = new Map();
+    tickets.forEach((t) => {
+      const key = t.playMode || "single";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(t);
+    });
+    const ORDER = ["single", "group3", "group6"];
+    const known = ORDER.filter((k) => map.has(k)).map((k) => ({ playMode: k, list: map.get(k) }));
+    const others = Array.from(map.keys()).filter((k) => !ORDER.includes(k)).map((k) => ({ playMode: k, list: map.get(k) }));
+    return known.concat(others);
+  }
+
+  function formatPlayModeForCopy(mode) {
+    if (mode === "single") return "直选";
+    if (mode === "group3") return "组3";
+    if (mode === "group6") return "组6";
+    if (mode === "normal") return "普通";
+    if (mode === "add") return "追加";
+    if (/^\d+$/.test(String(mode))) return `选${mode}`;
+    return mode || "";
+  }
+
+  function getNextOpenDateMMDD(gameKey) {
+    /* 优先从 calendar.json 取下次开奖日期 */
+    if (state.calendar && state.calendar.lotteries) {
+      const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
+      const entry = state.calendar.lotteries[remoteKey] || state.calendar.lotteries[gameKey];
+      const nt = entry && (entry.next_open_time || entry.nextopentime);
+      const md = nt ? extractMMDD(nt) : "";
+      if (md) return md;
+    }
+    /* 退而求其次：用最近开奖卡的 next 字段 */
+    const draw = getLatestDraw(gameKey);
+    if (draw) {
+      return extractMMDD(draw.nextOpenDate || draw.nextOpenTime || "");
+    }
+    return "";
+  }
+
+  function extractMMDD(value) {
+    const m = String(value || "").match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (!m) return "";
+    return `${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
   }
 
   async function checkAllRecords(showToast = true) {
@@ -691,11 +905,9 @@
         <article class="draw-card draw-card-${gameKey}" style="--stagger-i:${idx}">
           <div class="draw-top">
             <div class="draw-title">${config.label}</div>
-            <div class="draw-info">
-              <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
-              ${renderFirstPrize(draw)}
-            </div>
+            <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
           </div>
+          ${renderFirstPrize(draw)}
           <div class="draw-number-row">
             ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))}
             <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="往期">${ICON.chevronRight}</button>
@@ -730,11 +942,9 @@
         <article class="history-card draw-card-${draw.gameKey}" style="--stagger-i:${idx}">
           <div class="draw-top">
             <div class="draw-title">${cfg.label || draw.gameKey}</div>
-            <div class="draw-info">
-              <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
-              ${renderFirstPrize(draw)}
-            </div>
+            <div class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</div>
           </div>
+          ${renderFirstPrize(draw)}
           <div class="draw-number-row">
             ${renderDrawBalls(draw.gameKey, draw.drawValues || parseOpenCodeToDrawValues(draw.gameKey, draw.openCode))}
           </div>
