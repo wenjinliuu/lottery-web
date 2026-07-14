@@ -164,6 +164,24 @@
         </div>
       </section>
 
+      <section class="view-section" data-view-panel="wins" hidden>
+        <div class="history-page">
+          <div class="history-head">
+            <div class="history-title-wrap">
+              <div class="history-title">中奖记录</div>
+              <div class="history-sub" id="wonRecordsSummary">共 0 条</div>
+            </div>
+            <button class="mini-blue has-icon" id="wonRecordsBackBtn" type="button">
+              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+              <span>返回</span>
+            </button>
+          </div>
+          <section class="card check-records-card">
+            <div id="wonRecordList" class="record-list empty" aria-live="polite">暂无中奖记录</div>
+          </section>
+        </div>
+      </section>
+
       <section class="view-section" data-view-panel="mine" hidden>
         <div class="mine-page">
           <section class="card mine-hero-card">
@@ -175,22 +193,22 @@
               </div>
             </div>
             <div class="mine-stat-row">
-              <div class="mine-stat">
+              <button class="mine-stat" type="button" data-stat-details aria-label="查看各彩种花费明细">
                 <div class="mine-stat-value" id="mineTotalCost">0元</div>
                 <div class="mine-stat-label">总花费</div>
-              </div>
-              <div class="mine-stat">
+              </button>
+              <button class="mine-stat" type="button" data-stat-details aria-label="查看各彩种中奖金额明细">
                 <div class="mine-stat-value" id="minePrizeTotal">0元</div>
                 <div class="mine-stat-label">中奖金额</div>
-              </div>
-              <div class="mine-stat">
+              </button>
+              <button class="mine-stat" type="button" data-stat-details aria-label="查看各彩种中奖率明细">
                 <div class="mine-stat-value" id="mineWinRate">0%</div>
                 <div class="mine-stat-label">中奖率</div>
-              </div>
-              <div class="mine-stat">
+              </button>
+              <button class="mine-stat" id="mineWonRecordsBtn" type="button" aria-label="打开中奖记录">
                 <div class="mine-stat-value" id="mineWonCount">0</div>
                 <div class="mine-stat-label">中奖记录</div>
-              </div>
+              </button>
             </div>
           </section>
 
@@ -209,9 +227,9 @@
               <div class="profit-empty" id="profitEmpty">暂无数据，先去选号吧</div>
             </div>
             <div class="profit-legend">
-              <span class="profit-legend-item"><span class="profit-legend-dot is-cost"></span>累计花费</span>
-              <span class="profit-legend-item"><span class="profit-legend-dot is-prize"></span>累计中奖</span>
-              <span class="profit-legend-item"><span class="profit-legend-dot is-net"></span>净收益</span>
+              <span class="profit-legend-item"><span class="profit-legend-dot is-positive"></span>当日盈利</span>
+              <span class="profit-legend-item"><span class="profit-legend-dot is-negative"></span>当日亏损</span>
+              <span class="profit-legend-item">长按查看详情</span>
             </div>
           </section>
 
@@ -286,6 +304,20 @@
         </button>
       </div>
     </nav>
+
+    <div class="detail-sheet" id="detailSheet" hidden>
+      <button class="detail-sheet-backdrop" id="detailSheetBackdrop" type="button" aria-label="关闭详情"></button>
+      <section class="detail-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="detailSheetTitle">
+        <div class="detail-sheet-head">
+          <div>
+            <div class="detail-sheet-title" id="detailSheetTitle">彩种统计</div>
+            <div class="detail-sheet-sub" id="detailSheetSub">本地记录汇总</div>
+          </div>
+          <button class="detail-sheet-close" id="detailSheetCloseBtn" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="detail-sheet-body" id="detailSheetBody"></div>
+      </section>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./app.js"></script>

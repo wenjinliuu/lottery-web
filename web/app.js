@@ -84,6 +84,8 @@
       "themeToggleBtn", "themeToggleSub",
       "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub",
       "myRecordsBackBtn", "myRecordsSummary",
+      "wonRecordsBackBtn", "wonRecordsSummary", "wonRecordList", "mineWonRecordsBtn",
+      "detailSheet", "detailSheetBackdrop", "detailSheetCloseBtn", "detailSheetTitle", "detailSheetSub", "detailSheetBody",
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
       "lastBackupHint",
@@ -225,6 +227,14 @@
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
     if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
     if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
+    if (els.wonRecordsBackBtn) els.wonRecordsBackBtn.addEventListener("click", () => switchView("mine"));
+    if (els.mineWonRecordsBtn) els.mineWonRecordsBtn.addEventListener("click", openWonRecordsView);
+    document.querySelectorAll("[data-stat-details]").forEach((btn) => btn.addEventListener("click", openGameStatsSheet));
+    if (els.detailSheetBackdrop) els.detailSheetBackdrop.addEventListener("click", closeDetailSheet);
+    if (els.detailSheetCloseBtn) els.detailSheetCloseBtn.addEventListener("click", closeDetailSheet);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && els.detailSheet && !els.detailSheet.hidden) closeDetailSheet();
+    });
     if (els.dltAddOnBtn) {
       els.dltAddOnBtn.addEventListener("click", () => {
         state.dltAddOn = !state.dltAddOn;
@@ -1162,14 +1172,31 @@
   }
 
   function renderRecords() {
-    const today = formatDate(new Date());
-    const todayRecords = state.records.filter((record) => formatDate(record.createdAt) === today);
-    renderRecordGroups(els.recordList, todayRecords, {
-      emptyText: "今日暂无选号记录，完整记录在“我的”页查看",
-      deleteScope: "today"
+    const visibleRecords = getCheckVisibleRecords();
+    renderRecordGroups(els.recordList, visibleRecords, {
+      emptyText: "暂无本期或上期选号记录，完整记录在“我的”页查看",
+      deleteScope: "check"
     });
     renderMyRecordsList();
+    renderWonRecordsList();
     renderMineStats();
+  }
+
+  function getCheckVisibleRecords() {
+    return state.records.filter(isRecordVisibleInCheck);
+  }
+
+  function isRecordVisibleInCheck(record) {
+    if (!record) return false;
+    if (record.status === "pending" || !record.status) return true;
+    const latest = getLatestDraw(record.gameKey);
+    if (!latest) return Date.now() - new Date(record.createdAt || 0).getTime() < 3 * 86400000;
+    const targetExpect = String(record.targetExpect || record.expect || "");
+    if (targetExpect && String(latest.expect || "") === targetExpect) return true;
+    const targetTime = parseApiDate(record.targetOpenTime || record.openDate || record.targetOpenDate || "");
+    const latestTime = parseApiDate(latest.openDate || latest.time || "");
+    if (targetTime && latestTime) return latestTime <= targetTime;
+    return formatDate(record.createdAt) === formatDate(new Date());
   }
 
   function renderMyRecordsList() {
@@ -1184,9 +1211,28 @@
     }
   }
 
+  function renderWonRecordsList() {
+    const wonRecords = state.records.filter((record) => record.status === "won" || record.status === "prize_float");
+    if (els.wonRecordList) {
+      renderRecordGroups(els.wonRecordList, wonRecords, {
+        emptyText: "暂无中奖记录",
+        deleteScope: "won"
+      });
+    }
+    if (els.wonRecordsSummary) {
+      const total = wonRecords.reduce((sum, record) => sum + Number(record.prizeAmount || 0), 0);
+      els.wonRecordsSummary.textContent = `共 ${wonRecords.length} 注 · 累计 ${formatCompactMoney(total)}`;
+    }
+  }
+
   function openMyRecordsView() {
     renderMyRecordsList();
     switchView("myRecords");
+  }
+
+  function openWonRecordsView() {
+    renderWonRecordsList();
+    switchView("wins");
   }
 
   function renderRecordGroups(container, records, options = {}) {
@@ -1209,16 +1255,11 @@
     container.className = "record-list";
     container.innerHTML = groups.map(({ gameKey, gameRecords }, groupIdx) => {
       const config = GAME_CONFIGS[gameKey] || {};
-      const latest = gameRecords[0] || {};
-      const amount = gameRecords.reduce((sum, record) => sum + Number(record.prizeAmount || 0), 0);
-      const pending = gameRecords.filter((record) => record.status === "pending").length;
-      const floatCount = gameRecords.filter((record) => record.status === "prize_float").length;
-      const groupStatus = pending ? `${pending} 条待开奖` : floatCount ? `${floatCount} 条奖金浮动` : "已开奖";
-      const amountText = amount > 0 ? formatMoney(amount) : floatCount ? "浮动待定" : formatMoney(0);
-      const meta = [
-        latest.createdAt ? `选号时间 ${formatDateTime(latest.createdAt)}` : "",
-        groupStatus
-      ].filter(Boolean).join(" · ");
+      const stats = summarizeRecords(gameRecords);
+      const batches = groupRecordsByBatch(gameRecords);
+      const groupStatus = stats.pendingCount ? `${stats.pendingCount} 注待开奖` : stats.floatCount ? `${stats.floatCount} 注奖金待定` : "已开奖";
+      const amountText = stats.totalPrize > 0 ? formatMoney(stats.totalPrize) : stats.floatCount ? "浮动待定" : formatMoney(0);
+      const meta = `${batches.length} 次选号 · 花费 ${formatMoney(stats.totalCost)} · 中奖率 ${stats.winRate}% · ${groupStatus}`;
       return `
         <section class="record-game-group random-ticket-${gameKey}" style="--stagger-i:${groupIdx}">
           <div class="record-group-head">
@@ -1235,7 +1276,7 @@
             </div>
           </div>
           <div class="record-group-list">
-            ${gameRecords.map((record) => renderRecordItem(record)).join("")}
+            ${batches.map((batch) => renderRecordBatch(batch)).join("")}
           </div>
         </section>
       `;
@@ -1245,6 +1286,33 @@
         await deleteRecordsByGame(btn.dataset.deleteGame, btn.dataset.deleteScope);
       });
     });
+    container.querySelectorAll("[data-delete-batch]").forEach((btn) => {
+      btn.addEventListener("click", async () => deleteRecordsByBatch(btn.dataset.deleteBatch));
+    });
+  }
+
+  function renderRecordBatch(batch) {
+    const records = batch.records;
+    const stats = summarizeRecords(records);
+    const latest = records[0] || {};
+    const modes = Array.from(new Set(records.map((record) => formatPlayMode(record.playMode)).filter(Boolean))).join("/");
+    const issue = latest.targetExpect || latest.expect || "待定期号";
+    return `
+      <article class="record-batch-card">
+        <div class="record-batch-head">
+          <div>
+            <div class="record-batch-title">${formatDateTime(batch.createdAt)} · ${records.length} 注</div>
+            <div class="record-batch-sub">第 ${issue} 期${modes ? ` · ${modes}` : ""}</div>
+          </div>
+          <div class="record-batch-summary">
+            <div>花费 ${formatMoney(stats.totalCost)}</div>
+            <div>中奖 ${stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize)}</div>
+          </div>
+        </div>
+        <div class="record-batch-tickets">${records.map((record) => renderRecordItem(record)).join("")}</div>
+        <button class="delete-btn has-icon record-batch-delete" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本次选号">${ICON.trash}<span>删除本次选号</span></button>
+      </article>
+    `;
   }
 
   function renderRecordItem(record) {
@@ -1281,20 +1349,52 @@
     return Array.from(map.entries()).map(([gameKey, gameRecords]) => ({ gameKey, gameRecords }));
   }
 
+  function groupRecordsByBatch(records) {
+    const map = new Map();
+    records.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).forEach((record) => {
+      const key = record.batchId || record.id;
+      if (!map.has(key)) map.set(key, { batchId: key, createdAt: record.createdAt, records: [] });
+      map.get(key).records.push(record);
+    });
+    return Array.from(map.values());
+  }
+
+  function summarizeRecords(records) {
+    const list = records || [];
+    const totalCost = list.reduce((sum, record) => sum + Number(record.price || 0) * Number(record.multiple || 1), 0);
+    const totalPrize = list.reduce((sum, record) => sum + Number(record.prizeAmount || 0), 0);
+    const settled = list.filter((record) => FINAL_RECORD_STATUSES.has(record.status));
+    const wonCount = list.filter((record) => record.status === "won" || record.status === "prize_float").length;
+    const pendingCount = list.filter((record) => record.status === "pending" || !record.status).length;
+    const floatCount = list.filter((record) => record.status === "prize_float").length;
+    const winRate = settled.length ? Math.round((wonCount / settled.length) * 1000) / 10 : 0;
+    return { totalCost, totalPrize, settledCount: settled.length, wonCount, pendingCount, floatCount, winRate };
+  }
+
   async function deleteRecordsByGame(gameKey, scope = "all") {
-    const today = formatDate(new Date());
     const targets = state.records.filter((record) => {
       if (record.gameKey !== gameKey) return false;
-      return scope === "today" ? formatDate(record.createdAt) === today : true;
+      if (scope === "check") return isRecordVisibleInCheck(record);
+      if (scope === "won") return record.status === "won" || record.status === "prize_float";
+      return true;
     });
     if (!targets.length) return;
     const label = GAME_CONFIGS[gameKey]?.label || gameKey;
-    const scopeText = scope === "today" ? "今日" : "全部";
+    const scopeText = scope === "check" ? "当前显示的" : scope === "won" ? "中奖" : "全部";
     if (!window.confirm(`确定删除${label}${scopeText}选号记录吗？`)) return;
     for (const record of targets) await dbDelete(record.id);
     state.records = await dbGetAll();
     renderRecords();
     toast(`${label}记录已删除`);
+  }
+
+  async function deleteRecordsByBatch(batchId) {
+    const targets = state.records.filter((record) => (record.batchId || record.id) === batchId);
+    if (!targets.length || !window.confirm("确定删除这一次选号记录吗？")) return;
+    for (const record of targets) await dbDelete(record.id);
+    state.records = await dbGetAll();
+    renderRecords();
+    toast("本次选号记录已删除");
   }
 
   function renderMineStats() {
@@ -1309,26 +1409,59 @@
     renderProfitChart();
   }
 
-  /* ===== iOS 26 Liquid Glass — Profit-trend SVG line chart ===== */
+  function openGameStatsSheet() {
+    if (!els.detailSheet || !els.detailSheetBody) return;
+    const groups = groupRecordsByGame(state.records);
+    els.detailSheetTitle.textContent = "各彩种统计";
+    els.detailSheetSub.textContent = "按已保存的全部本地选号记录汇总";
+    els.detailSheetBody.innerHTML = groups.length ? groups.map(({ gameKey, gameRecords }) => {
+      const stats = summarizeRecords(gameRecords);
+      const batchCount = groupRecordsByBatch(gameRecords).length;
+      return `
+        <article class="game-stat-detail">
+          <div class="game-stat-detail-head">
+            <div class="game-stat-detail-name">${GAME_CONFIGS[gameKey]?.label || gameKey}</div>
+            <div class="game-stat-detail-count">${batchCount} 次选号 · ${gameRecords.length} 注</div>
+          </div>
+          <div class="game-stat-detail-grid">
+            <div><span>累计花费</span><strong>${formatCompactMoney(stats.totalCost)}</strong></div>
+            <div><span>累计中奖</span><strong>${stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize)}</strong></div>
+            <div><span>中奖率</span><strong>${stats.winRate}%</strong></div>
+          </div>
+        </article>
+      `;
+    }).join("") : `<div class="empty-state">暂无选号记录</div>`;
+    els.detailSheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    window.setTimeout(() => els.detailSheetCloseBtn?.focus(), 20);
+  }
+
+  function closeDetailSheet() {
+    if (!els.detailSheet) return;
+    els.detailSheet.hidden = true;
+    document.body.classList.remove("sheet-open");
+  }
+
+  /* ===== 日盈亏 K 线 ===== */
 
   function renderProfitChart() {
     if (!els.profitChartWrap) return;
-    const series = buildProfitSeries(state.records);
+    const series = buildDailyProfitSeries(state.records);
     if (els.profitNetValue && els.profitNetDelta) {
       const net = series.netTotal;
       const cls = net > 0 ? "is-positive" : net < 0 ? "is-negative" : "";
       els.profitNetValue.className = `profit-net-value ${cls}`;
       els.profitNetValue.textContent = `${net > 0 ? "+" : ""}${formatCompactMoney(net)}`;
-      els.profitNetDelta.textContent = series.points.length
-        ? `共 ${series.points.length} 期 · 投入 ${formatCompactMoney(series.costTotal)} / 中奖 ${formatCompactMoney(series.prizeTotal)}`
+      els.profitNetDelta.textContent = series.days.length
+        ? `投入 ${formatCompactMoney(series.costTotal)} / 中奖 ${formatCompactMoney(series.prizeTotal)}`
         : "总盈亏";
     }
     if (els.profitSub) {
-      els.profitSub.textContent = series.points.length
-        ? (series.spanDays >= 1 ? `最近 ${Math.min(series.spanDays, 90)} 天 · ${series.points.length} 期` : `${series.points.length} 期`)
+      els.profitSub.textContent = series.days.length
+        ? `最近 ${series.days.length} 个开奖日 · 日净盈亏`
         : "尚无完整数据";
     }
-    if (!series.points.length) {
+    if (!series.days.length) {
       els.profitChartWrap.innerHTML = `
         <div class="profit-empty empty-cta" id="profitEmpty">
           <div>暂无数据，先去选号吧</div>
@@ -1343,71 +1476,90 @@
       return;
     }
     els.profitChartWrap.innerHTML = buildProfitChartSvg(series);
+    bindProfitChartInteractions(series);
   }
 
-  function buildProfitSeries(records) {
+  function buildDailyProfitSeries(records) {
     const settled = (records || [])
       .filter((r) => r && (r.status === "won" || r.status === "lost") && r.createdAt)
       .slice()
       .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 
-    const points = [];
-    let cumCost = 0;
-    let cumPrize = 0;
-    for (const r of settled) {
-      const cost = Number(r.price || 0) * Number(r.multiple || 1);
-      const prize = Number(r.prizeAmount || 0);
-      cumCost += cost;
-      cumPrize += prize;
-      points.push({
-        t: new Date(r.createdAt).getTime(),
-        cost: cumCost,
-        prize: cumPrize,
-        net: cumPrize - cumCost
+    const dayMap = new Map();
+    settled.forEach((record) => {
+      const date = formatDate(record.targetOpenDate || record.openDate || record.createdAt);
+      if (!dayMap.has(date)) dayMap.set(date, []);
+      dayMap.get(date).push(record);
+    });
+
+    const allDays = Array.from(dayMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, dayRecords]) => {
+      let running = 0;
+      let high = 0;
+      let low = 0;
+      let cost = 0;
+      let prize = 0;
+      const games = new Map();
+      dayRecords.forEach((record) => {
+        const itemCost = Number(record.price || 0) * Number(record.multiple || 1);
+        const itemPrize = Number(record.prizeAmount || 0);
+        cost += itemCost;
+        prize += itemPrize;
+        running += itemPrize - itemCost;
+        high = Math.max(high, running);
+        low = Math.min(low, running);
+        const gameKey = record.gameKey || "unknown";
+        if (!games.has(gameKey)) games.set(gameKey, { cost: 0, prize: 0, count: 0 });
+        const game = games.get(gameKey);
+        game.cost += itemCost;
+        game.prize += itemPrize;
+        game.count += 1;
       });
-    }
-    const first = points[0]?.t || 0;
-    const last = points[points.length - 1]?.t || first;
-    const spanDays = first ? Math.max(1, Math.ceil((last - first) / 86400000)) : 0;
+      const settledCount = dayRecords.length;
+      const wonCount = dayRecords.filter((record) => record.status === "won").length;
+      return {
+        date,
+        t: new Date(`${date}T12:00:00`).getTime(),
+        open: 0,
+        close: prize - cost,
+        high,
+        low,
+        cost,
+        prize,
+        net: prize - cost,
+        count: dayRecords.length,
+        wonCount,
+        winRate: settledCount ? Math.round((wonCount / settledCount) * 1000) / 10 : 0,
+        games: Array.from(games.entries()).map(([gameKey, item]) => ({ gameKey, ...item }))
+      };
+    });
+    const days = allDays.slice(-30);
+    const costTotal = allDays.reduce((sum, day) => sum + day.cost, 0);
+    const prizeTotal = allDays.reduce((sum, day) => sum + day.prize, 0);
     return {
-      points,
-      costTotal: cumCost,
-      prizeTotal: cumPrize,
-      netTotal: cumPrize - cumCost,
-      spanDays
+      days,
+      costTotal,
+      prizeTotal,
+      netTotal: prizeTotal - costTotal
     };
   }
 
   function buildProfitChartSvg(series) {
     const W = 320, H = 168;
-    const padL = 36, padR = 12, padT = 14, padB = 22;
+    const padL = 36, padR = 10, padT = 12, padB = 22;
     const innerW = W - padL - padR;
     const innerH = H - padT - padB;
-    const pts = series.points;
-
-    const minT = pts[0].t;
-    const maxT = pts[pts.length - 1].t;
-    const tRange = maxT - minT || 1;
-
-    const allVals = pts.flatMap((p) => [p.cost, p.prize, p.net]);
+    const days = series.days;
+    const allVals = days.flatMap((day) => [day.high, day.low, day.open, day.close]);
     const yMin = Math.min(0, ...allVals);
     const yMax = Math.max(0, ...allVals);
     const yRange = (yMax - yMin) || 1;
-
-    const xOf = (t) => padL + ((t - minT) / tRange) * innerW;
     const yOf = (v) => padT + (1 - (v - yMin) / yRange) * innerH;
-
-    const buildPath = (key) => pts.map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.t).toFixed(1)} ${yOf(p[key]).toFixed(1)}`).join(" ");
-    const buildArea = (key) => {
-      if (pts.length < 2) return "";
-      const top = pts.map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.t).toFixed(1)} ${yOf(p[key]).toFixed(1)}`).join(" ");
-      const baseY = yOf(yMin).toFixed(1);
-      const bottom = `L${xOf(pts[pts.length - 1].t).toFixed(1)} ${baseY} L${xOf(pts[0].t).toFixed(1)} ${baseY} Z`;
-      return top + " " + bottom;
-    };
+    const slot = innerW / Math.max(days.length, 1);
+    const bodyW = Math.max(4, Math.min(12, slot * 0.48));
 
     const gridYs = [0.0, 0.5, 1.0].map((p) => padT + p * innerH);
     const grid = gridYs.map((y) => `<line class="profit-grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}"/>`).join("");
+    const zeroLine = `<line class="profit-zero-line" x1="${padL}" y1="${yOf(0).toFixed(1)}" x2="${W - padR}" y2="${yOf(0).toFixed(1)}"/>`;
 
     const yLabels = [yMax, yMin + yRange / 2, yMin].map((v, i) => {
       const y = padT + (i * innerH) / 2;
@@ -1415,36 +1567,94 @@
     }).join("");
 
     const xLabels = (() => {
-      const fmt = (t) => {
-        const d = new Date(t);
+      const fmt = (value) => {
+        const d = new Date(value);
         return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
       };
-      const labels = [fmt(minT)];
-      if (pts.length > 1) labels.push(fmt(maxT));
+      const labels = [fmt(days[0].t)];
+      if (days.length > 1) labels.push(fmt(days[days.length - 1].t));
       return [
         `<text class="profit-axis-label" x="${padL}" y="${(H - 6).toFixed(1)}" text-anchor="start">${labels[0]}</text>`,
         labels[1] ? `<text class="profit-axis-label" x="${(W - padR).toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="end">${labels[1]}</text>` : ""
       ].join("");
     })();
 
-    const last = pts[pts.length - 1];
-    const dot = (key, cls) => `<circle class="profit-dot ${cls}" cx="${xOf(last.t).toFixed(1)}" cy="${yOf(last[key]).toFixed(1)}" r="3.4"/>`;
+    const candles = days.map((day, index) => {
+      const x = padL + slot * (index + 0.5);
+      const openY = yOf(day.open);
+      const closeY = yOf(day.close);
+      const top = Math.min(openY, closeY);
+      const height = Math.max(2, Math.abs(closeY - openY));
+      const cls = day.close > day.open ? "is-positive" : day.close < day.open ? "is-negative" : "is-flat";
+      return `
+        <g class="profit-candle ${cls}" data-candle="${index}">
+          <line class="profit-candle-wick" x1="${x.toFixed(1)}" y1="${yOf(day.high).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yOf(day.low).toFixed(1)}"/>
+          <rect class="profit-candle-body" x="${(x - bodyW / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bodyW.toFixed(1)}" height="${height.toFixed(1)}"/>
+          <rect class="profit-candle-hit" data-candle-index="${index}" x="${(x - slot / 2).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，净盈亏${formatMoney(day.net)}"/>
+        </g>
+      `;
+    }).join("");
 
     return `
-      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="收益趋势折线图">
+      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="每日盈亏K线图">
         ${grid}
-        <path class="profit-area-cost"  d="${buildArea("cost")}"/>
-        <path class="profit-area-prize" d="${buildArea("prize")}"/>
-        <path class="profit-line-cost"  d="${buildPath("cost")}"/>
-        <path class="profit-line-prize" d="${buildPath("prize")}"/>
-        <path class="profit-line-net"   d="${buildPath("net")}"/>
-        ${dot("cost", "is-cost")}
-        ${dot("prize", "is-prize")}
-        ${dot("net", "is-net")}
+        ${zeroLine}
+        ${candles}
         ${yLabels}
         ${xLabels}
       </svg>
     `;
+  }
+
+  function bindProfitChartInteractions(series) {
+    const wrap = els.profitChartWrap;
+    if (!wrap) return;
+    let pressTimer = 0;
+    let hideTimer = 0;
+    const show = (index, clientX) => {
+      const day = series.days[index];
+      if (!day) return;
+      wrap.querySelectorAll(".profit-candle").forEach((item) => item.classList.toggle("is-active", item.dataset.candle === String(index)));
+      let tooltip = wrap.querySelector(".profit-tooltip");
+      if (!tooltip) {
+        tooltip = document.createElement("div");
+        tooltip.className = "profit-tooltip";
+        wrap.appendChild(tooltip);
+      }
+      const games = day.games.map((game) => `${GAME_CONFIGS[game.gameKey]?.label || game.gameKey} ${game.count}注`).join(" · ");
+      tooltip.innerHTML = `
+        <div class="profit-tooltip-date">${day.date}</div>
+        <div class="profit-tooltip-grid">
+          <span>花费</span><span>${formatMoney(day.cost)}</span>
+          <span>中奖</span><span>${formatMoney(day.prize)}</span>
+          <span>净盈亏</span><span>${day.net > 0 ? "+" : ""}${formatMoney(day.net)}</span>
+          <span>中奖率</span><span>${day.winRate}%</span>
+        </div>
+        <div class="profit-tooltip-games">${games || "无彩种明细"}</div>
+      `;
+      const rect = wrap.getBoundingClientRect();
+      const fallbackX = rect.left + ((index + 0.5) / series.days.length) * rect.width;
+      const x = Number.isFinite(clientX) ? clientX : fallbackX;
+      const width = tooltip.offsetWidth || 160;
+      tooltip.style.left = `${Math.max(6, Math.min(rect.width - width - 6, x - rect.left - width / 2))}px`;
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => {
+        tooltip.remove();
+        wrap.querySelectorAll(".profit-candle").forEach((item) => item.classList.remove("is-active"));
+      }, 5000);
+    };
+    wrap.querySelectorAll("[data-candle-index]").forEach((hit) => {
+      const index = Number(hit.dataset.candleIndex);
+      hit.addEventListener("pointerdown", (event) => {
+        window.clearTimeout(pressTimer);
+        pressTimer = window.setTimeout(() => show(index, event.clientX), 380);
+      });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((name) => hit.addEventListener(name, () => window.clearTimeout(pressTimer)));
+      hit.addEventListener("click", (event) => show(index, event.clientX));
+      hit.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); show(index); }
+      });
+    });
   }
 
   function formatChartTick(value) {
@@ -1455,15 +1665,8 @@
   }
 
   function getMineStats() {
-    const totalRecords = state.records.length;
-    const totalCost = state.records.reduce((sum, record) => sum + Number(record.price || 0) * Number(record.multiple || 1), 0);
-    const totalPrize = state.records.reduce((sum, record) => sum + Number(record.prizeAmount || 0), 0);
     const settledRecords = state.records.filter((record) => record.status === "won" || record.status === "lost" || record.status === "prize_float");
-    const wonCount = state.records.filter((record) => record.status === "won" || record.status === "prize_float").length;
-    const pendingCount = state.records.filter((record) => record.status === "pending").length;
-    const floatCount = state.records.filter((record) => record.status === "prize_float").length;
-    const winRate = settledRecords.length ? Math.round((wonCount / settledRecords.length) * 1000) / 10 : 0;
-    return { totalRecords, totalCost, totalPrize, settledRecords, wonCount, pendingCount, floatCount, winRate };
+    return { totalRecords: state.records.length, settledRecords, ...summarizeRecords(state.records) };
   }
 
   function renderFirstPrize(draw) {
