@@ -23,19 +23,6 @@
     k8: { label: "快乐8", accent: "k8orange", price: 2, defaultPlayMode: "10", playModes: Array.from({ length: 10 }, (_, i) => ({ key: String(i + 1), label: `选${["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"][i]}` })), sections: [{ key: "nums", label: "号码", count: 20, color: "k8orange" }] }
   };
 
-  const K8_PRIZE_TABLE = {
-    10: { 10: 5000000, 9: 8000, 8: 720, 7: 80, 6: 5, 5: 3, 0: 2 },
-    9: { 9: 250000, 8: 2000, 7: 225, 6: 22, 5: 5, 4: 3, 0: 2 },
-    8: { 8: 50000, 7: 800, 6: 80, 5: 10, 4: 3, 0: 2 },
-    7: { 7: 8500, 6: 300, 5: 30, 4: 4, 0: 2 },
-    6: { 6: 2880, 5: 30, 4: 10, 3: 3 },
-    5: { 5: 1000, 4: 20, 3: 3 },
-    4: { 4: 93, 3: 5, 2: 3 },
-    3: { 3: 52, 2: 3 },
-    2: { 2: 19 },
-    1: { 1: 4.5 }
-  };
-
   const DB_NAME = "lottery-personal-web";
   const DB_VERSION = 1;
   const RECORD_STORE = "records";
@@ -52,7 +39,9 @@
     latestUpdatedAt: "",
     historyGameKey: "ssq",
     dltAddOn: false,
-    calendar: null
+    calendar: null,
+    loadedHistoryGames: new Set(),
+    historyLoadingGames: new Set()
   };
 
   const els = {};
@@ -187,7 +176,14 @@
 
   function bindEvents() {
     document.querySelectorAll("[data-view]").forEach((btn) => {
-      btn.addEventListener("click", () => switchView(btn.dataset.view));
+      btn.addEventListener("click", async () => {
+        const view = btn.dataset.view;
+        switchView(view);
+        if (view === "check") {
+          await ensurePendingRecordDraws();
+          await checkAllRecords(false);
+        }
+      });
     });
     els.gameSelect.addEventListener("change", () => {
       state.gameKey = els.gameSelect.value;
@@ -213,6 +209,7 @@
     });
     els.reloadDrawsBtn.addEventListener("click", async () => {
       await loadDraws(true);
+      await ensurePendingRecordDraws();
       await checkAllRecords();
     });
     els.toggleDrawsBtn.addEventListener("click", () => {
@@ -221,7 +218,10 @@
     });
     els.decreaseMultiplierBtn.addEventListener("click", () => updateMultiplier(-1));
     els.increaseMultiplierBtn.addEventListener("click", () => updateMultiplier(1));
-    els.checkRecordsBtn.addEventListener("click", checkAllRecords);
+    els.checkRecordsBtn.addEventListener("click", async () => {
+      await ensurePendingRecordDraws();
+      await checkAllRecords();
+    });
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
     if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
     if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
@@ -512,20 +512,44 @@
     const cacheBust = `t=${Date.now()}`;
     const latest = await fetchJson(`${LOTTERY_DATA_BASE_URL}/latest.json?${cacheBust}`);
     const latestByLocalKey = normalizeRemoteLatest(latest.draws || {});
-    const recentGroups = await Promise.all(GAME_ORDER.map(async (gameKey) => {
-      const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
-      try {
-        const payload = await fetchJson(`${LOTTERY_DATA_BASE_URL}/draws/${remoteKey}.json?${cacheBust}`);
-        return Array.isArray(payload.draws) ? payload.draws.map((draw) => convertRemoteDraw(draw, gameKey)) : [];
-      } catch (error) {
-        return latestByLocalKey[gameKey] ? [latestByLocalKey[gameKey]] : [];
-      }
-    }));
-    const draws = dedupeDraws(recentGroups.flat().concat(Object.values(latestByLocalKey)));
+    /* 首屏只读取 latest.json。各彩种近 50 期在用户打开往期或核对旧记录时按需加载。 */
+    const previousHistory = state.draws.filter((draw) => state.loadedHistoryGames.has(draw.gameKey));
+    const draws = dedupeDraws(previousHistory.concat(Object.values(latestByLocalKey)));
     return {
       updatedAt: latest.updated_at || latest.updatedAt || "",
       draws
     };
+  }
+
+  async function loadGameHistory(gameKey, showError = true) {
+    if (!GAME_CONFIGS[gameKey] || state.loadedHistoryGames.has(gameKey)) return true;
+    if (state.historyLoadingGames.has(gameKey)) return false;
+    state.historyLoadingGames.add(gameKey);
+    renderHistory();
+    try {
+      const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
+      const payload = await fetchJson(`${LOTTERY_DATA_BASE_URL}/draws/${remoteKey}.json?t=${Date.now()}`);
+      const history = Array.isArray(payload.draws) ? payload.draws.map((draw) => convertRemoteDraw(draw, gameKey)) : [];
+      state.draws = dedupeDraws(state.draws.concat(history));
+      state.loadedHistoryGames.add(gameKey);
+      return true;
+    } catch (error) {
+      if (showError) toast(`${GAME_CONFIGS[gameKey].label}往期数据加载失败`);
+      return false;
+    } finally {
+      state.historyLoadingGames.delete(gameKey);
+      renderDraws();
+    }
+  }
+
+  async function ensurePendingRecordDraws() {
+    const neededGames = new Set();
+    state.records.forEach((record) => {
+      if (shouldEvaluateRecord(record) && !findDrawForRecord(record) && GAME_CONFIGS[record.gameKey]) {
+        neededGames.add(record.gameKey);
+      }
+    });
+    await Promise.all(Array.from(neededGames, (gameKey) => loadGameHistory(gameKey, false)));
   }
 
   async function fetchJson(url) {
@@ -606,7 +630,7 @@
       num: Number(item.winning_count || 0),
       singleBonus: String(item.prize_amount || ""),
       prize: String(item.prize_amount || ""),
-      addBonus: String(item.additional_prize_amount || item.add_prize_amount || item.append_prize_amount || item.addition_amount || "")
+      addBonus: String(item.additional_amount || item.additional_prize_amount || item.add_prize_amount || item.append_prize_amount || item.addition_amount || "")
     }));
   }
 
@@ -1102,10 +1126,11 @@
     renderHistory();
   }
 
-  function openGameHistory(gameKey) {
+  async function openGameHistory(gameKey) {
     state.historyGameKey = gameKey;
-    renderHistory();
     switchView("history");
+    renderHistory();
+    await loadGameHistory(gameKey);
   }
 
   function renderHistory() {
@@ -1115,6 +1140,10 @@
     els.historySummary.textContent = `${config?.label || gameKey} · ${state.latestUpdatedAt ? `更新于 ${formatDateTime(state.latestUpdatedAt)}` : "暂无更新时间"}`;
     const title = document.querySelector(".history-title");
     if (title) title.textContent = `${config?.label || gameKey}往期开奖`;
+    if (state.historyLoadingGames.has(gameKey)) {
+      els.historyList.innerHTML = `<div class="empty-state">正在加载${config?.label || ""}往期开奖…</div>`;
+      return;
+    }
     els.historyList.innerHTML = history.length ? history.map((draw, idx) => {
       const cfg = GAME_CONFIGS[draw.gameKey] || {};
       return `
@@ -1561,7 +1590,7 @@
     if (gameKey === "fc3d" || gameKey === "pl3") return Array.from({ length: count }, () => ({ nums3: generateDigit(playMode), playMode }));
     if (gameKey === "pl5") return Array.from({ length: count }, () => ({ nums5: pickDigits(5) }));
     if (gameKey === "qlc") return Array.from({ length: count }, () => ({ nums7: pickUnique(30, 7) }));
-    if (gameKey === "qxc") return Array.from({ length: count }, () => ({ nums6: pickDigits(6), tail: randomInt(0, 9) }));
+    if (gameKey === "qxc") return Array.from({ length: count }, () => ({ nums6: pickDigits(6), tail: randomInt(0, 14) }));
     return [];
   }
 
@@ -1663,9 +1692,9 @@
 
   function evaluateTicket(gameKey, ticket, draw, multiple = 1, drawMeta = null, record = null) {
     let result = noPrize({});
-    if (gameKey === "ssq") result = evaluateSSQ(ticket, draw);
-    if (gameKey === "dlt") result = evaluateDLT(ticket, draw, drawMeta);
-    if (gameKey === "k8") result = evaluateK8(ticket, draw);
+    if (gameKey === "ssq") result = evaluateSSQ(ticket, draw, drawMeta);
+    if (gameKey === "dlt") result = evaluateDLT(ticket, draw);
+    if (gameKey === "k8") result = evaluateK8(ticket, draw, drawMeta);
     if (gameKey === "fc3d" || gameKey === "pl3") result = evaluateDigit(ticket, draw);
     if (gameKey === "pl5") result = evaluatePL5(ticket, draw);
     if (gameKey === "qlc") result = evaluateQLC(ticket, draw);
@@ -1678,58 +1707,56 @@
     return { ...result, amount: result.float ? 0 : result.amount * multiplier };
   }
 
-  function evaluateSSQ(ticket, draw) {
+  function evaluateSSQ(ticket, draw, drawMeta) {
     const red = countMatches(ticket.red, draw.red);
     const blue = Number(ticket.blue?.[0]) === Number(draw.blue?.[0]) ? 1 : 0;
     const matched = { red: markMatches(ticket.red, draw.red), blue: [blue === 1] };
     if (red === 6 && blue) return floatPrize("一等奖", matched);
     if (red === 6) return floatPrize("二等奖", matched);
-    if (red === 5 && blue) return fixedPrize("三等奖", 3000, matched);
-    if ((red === 5 && !blue) || (red === 4 && blue)) return fixedPrize("四等奖", 200, matched);
-    if ((red === 4 && !blue) || (red === 3 && blue)) return fixedPrize("五等奖", 10, matched);
-    if ([0, 1, 2].includes(red) && blue) return fixedPrize("六等奖", 5, matched);
-    if (red === 3 && !blue) return fixedPrize("福运奖", 5, matched);
+    if (red === 5 && blue) return floatPrize("三等奖", matched);
+    if ((red === 5 && !blue) || (red === 4 && blue)) return floatPrize("四等奖", matched);
+    if ((red === 4 && !blue) || (red === 3 && blue)) return floatPrize("五等奖", matched);
+    if ([0, 1, 2].includes(red) && blue) return floatPrize("六等奖", matched);
+    /* 福运奖只在当期开奖数据明确包含该奖项时启用。3+1 已命中更高的五等奖。 */
+    if (red === 3 && !blue && hasPrizeByName(drawMeta, "福运奖")) return floatPrize("福运奖", matched);
     return noPrize(matched);
   }
 
-  function evaluateDLT(ticket, draw, drawMeta = null) {
+  function evaluateDLT(ticket, draw) {
     const front = countMatches(ticket.front, draw.front);
     const back = countMatches(ticket.back, draw.back);
     const matched = { front: markMatches(ticket.front, draw.front), back: markMatches(ticket.back, draw.back) };
     if (front === 5 && back === 2) return floatPrize("一等奖", matched);
     if (front === 5 && back === 1) return floatPrize("二等奖", matched);
-    if ((front === 5 && back === 0) || (front === 4 && back === 2)) return fixedPrize("三等奖", dltTierAmount(drawMeta, 5000, 6666), matched);
-    if (front === 4 && back === 1) return fixedPrize("四等奖", dltTierAmount(drawMeta, 300, 380), matched);
-    if ((front === 4 && back === 0) || (front === 3 && back === 2)) return fixedPrize("五等奖", dltTierAmount(drawMeta, 150, 200), matched);
-    if ((front === 3 && back === 1) || (front === 2 && back === 2)) return fixedPrize("六等奖", dltTierAmount(drawMeta, 15, 18), matched);
-    if ((front === 3 && back === 0) || (front === 2 && back === 1) || (front === 1 && back === 2) || (front === 0 && back === 2)) return fixedPrize("七等奖", dltTierAmount(drawMeta, 5, 7), matched);
+    if ((front === 5 && back === 0) || (front === 4 && back === 2)) return floatPrize("三等奖", matched);
+    if (front === 4 && back === 1) return floatPrize("四等奖", matched);
+    if ((front === 4 && back === 0) || (front === 3 && back === 2)) return floatPrize("五等奖", matched);
+    if ((front === 3 && back === 1) || (front === 2 && back === 2)) return floatPrize("六等奖", matched);
+    if ((front === 3 && back === 0) || (front === 2 && back === 1) || (front === 1 && back === 2) || (front === 0 && back === 2)) return floatPrize("七等奖", matched);
     return noPrize(matched);
   }
 
-  function evaluateK8(ticket, draw) {
+  function evaluateK8(ticket, draw, drawMeta) {
     const matches = countMatches(ticket.nums, draw.nums);
-    if ((Number(ticket.playCount) === 10 && matches === 10) || (Number(ticket.playCount) === 9 && matches === 9)) {
-      return floatPrize(`选${ticket.playCount}中${matches}`, { nums: markMatches(ticket.nums, draw.nums) });
-    }
-    const amount = (K8_PRIZE_TABLE[ticket.playCount] || {})[matches] || 0;
     const matched = { nums: markMatches(ticket.nums, draw.nums) };
-    return amount ? fixedPrize(`中${matches}`, amount, matched) : noPrize(matched);
+    const prize = findK8PrizeEntry(drawMeta?.prizeList || [], Number(ticket.playCount), matches);
+    return prize ? floatPrize(prize.prizeName, matched) : noPrize(matched);
   }
 
   function evaluateDigit(ticket, draw) {
     const nums = ticket.nums3 || [];
     if (ticket.playMode === "single") {
       const matched = { nums3: nums.map((n, i) => n === draw.nums[i]) };
-      return matched.nums3.every(Boolean) ? fixedPrize("直选", 1040, matched) : noPrize(matched);
+      return matched.nums3.every(Boolean) ? floatPrize("直选", matched) : noPrize(matched);
     }
     const matched = { nums3: markMatches(nums, draw.nums) };
-    if (ticket.playMode === "group3") return isGroup3(draw.nums) && multisetEqual(nums, draw.nums) ? fixedPrize("组三", 346, matched) : noPrize(matched);
-    return new Set(draw.nums).size === 3 && multisetEqual(nums, draw.nums) ? fixedPrize("组六", 173, matched) : noPrize(matched);
+    if (ticket.playMode === "group3") return isGroup3(draw.nums) && multisetEqual(nums, draw.nums) ? floatPrize("组三", matched) : noPrize(matched);
+    return new Set(draw.nums).size === 3 && multisetEqual(nums, draw.nums) ? floatPrize("组六", matched) : noPrize(matched);
   }
 
   function evaluatePL5(ticket, draw) {
     const matched = { nums5: (ticket.nums5 || []).map((n, i) => n === draw.nums[i]) };
-    return matched.nums5.every(Boolean) ? fixedPrize("一等奖", 100000, matched) : noPrize(matched);
+    return matched.nums5.every(Boolean) ? floatPrize("一等奖", matched) : noPrize(matched);
   }
 
   function evaluateQLC(ticket, draw) {
@@ -1739,10 +1766,10 @@
     if (front === 7) return floatPrize("一等奖", matched);
     if (front === 6 && special) return floatPrize("二等奖", matched);
     if (front === 6) return floatPrize("三等奖", matched);
-    if (front === 5 && special) return fixedPrize("四等奖", 200, matched);
-    if (front === 5) return fixedPrize("五等奖", 50, matched);
-    if (front === 4 && special) return fixedPrize("六等奖", 10, matched);
-    if (front === 4) return fixedPrize("七等奖", 5, matched);
+    if (front === 5 && special) return floatPrize("四等奖", matched);
+    if (front === 5) return floatPrize("五等奖", matched);
+    if (front === 4 && special) return floatPrize("六等奖", matched);
+    if (front === 4) return floatPrize("七等奖", matched);
     return noPrize(matched);
   }
 
@@ -1753,15 +1780,25 @@
     const matched = { nums6: mainMatched, tail: [tailMatched] };
     if (mainCount === 6 && tailMatched) return floatPrize("一等奖", matched);
     if (mainCount === 6) return floatPrize("二等奖", matched);
-    if (mainCount === 5 && tailMatched) return fixedPrize("三等奖", 3000, matched);
-    if (mainCount === 5 || (mainCount === 4 && tailMatched)) return fixedPrize("四等奖", 500, matched);
-    if (mainCount === 4 || (mainCount === 3 && tailMatched)) return fixedPrize("五等奖", 30, matched);
-    if (mainCount === 3 || tailMatched) return fixedPrize("六等奖", 5, matched);
+    if (mainCount === 5 && tailMatched) return floatPrize("三等奖", matched);
+    if (mainCount === 5 || (mainCount === 4 && tailMatched)) return floatPrize("四等奖", matched);
+    if (mainCount === 4 || (mainCount === 3 && tailMatched)) return floatPrize("五等奖", matched);
+    if (mainCount === 3 || tailMatched) return floatPrize("六等奖", matched);
     return noPrize(matched);
   }
 
-  function dltTierAmount(draw, lowAmount, highAmount) {
-    return parseMoneyNumber(draw?.totalMoney) >= 800000000 ? highAmount : lowAmount;
+  function hasPrizeByName(draw, prizeName) {
+    return Boolean(draw?.prizeList?.some((prize) => canonicalPrizeName(prize.prizeName) === canonicalPrizeName(prizeName)));
+  }
+
+  function findK8PrizeEntry(prizeList, playCount, hits) {
+    const playChinese = toChineseNumber(playCount);
+    const hitsChinese = toChineseNumber(hits);
+    return prizeList.find((prize) => {
+      const name = String(prize.prizeName || prize.require || "");
+      return (name.includes(`选${playCount}`) || name.includes(`选${playChinese}`))
+        && (name.includes(`中${hits}`) || name.includes(`中${hitsChinese}`));
+    }) || null;
   }
 
   function resolveFloatingPrizeAmount(draw, prizeName, gameKey, record) {
@@ -1772,7 +1809,8 @@
       || findPrizeAmount(draw.prizeList, `追加${prizeName}`, gameKey, record)
       || findDltInlineAddOnPrizeAmount(draw.prizeList, prizeName)
       || findDltAddOnPrizeAmount(draw.prizeList, prizeName);
-    return base + (addOn || (base ? base * 0.8 : 0));
+    /* 不在前端推算“80%”；当期追加奖金缺失时保留为金额待定。 */
+    return addOn > 0 ? base + addOn : 0;
   }
 
   function findPrizeAmount(prizeList, prizeName, gameKey, record) {
@@ -1784,7 +1822,9 @@
         return (name.includes(`选${playCount}`) || name.includes(`选${toChineseNumber(playCount)}`))
           && (name.includes(`中${hits}`) || name.includes(`中${toChineseNumber(Number(hits))}`));
       }
-      return name.includes(prizeName) && (String(prizeName).includes("追加") || !name.includes("追加"));
+      const normalizedName = canonicalPrizeName(name);
+      const normalizedTarget = canonicalPrizeName(prizeName);
+      return normalizedName.includes(normalizedTarget) && (String(prizeName).includes("追加") || !name.includes("追加"));
     });
     return candidates.reduce((amount, prize) => amount || parseMoneyNumber(prize.singleBonus || prize.prize), 0);
   }
@@ -1800,6 +1840,14 @@
   function findDltInlineAddOnPrizeAmount(prizeList, prizeName) {
     const prize = prizeList.find((item) => String(item.prizeName || item.require || "").includes(prizeName) && item.addBonus);
     return prize ? parseMoneyNumber(prize.addBonus) : 0;
+  }
+
+  function canonicalPrizeName(value) {
+    return String(value || "")
+      .replace(/组选[3三]奖?/g, "组三")
+      .replace(/组选[6六]奖?/g, "组六")
+      .replace(/直选奖/g, "直选")
+      .replace(/\s+/g, "");
   }
 
   function isDltAddOn(record) {
@@ -1869,10 +1917,6 @@
 
   function noPrize(matched) {
     return { prizeName: "未中奖", amount: 0, float: false, matched };
-  }
-
-  function fixedPrize(prizeName, amount, matched) {
-    return { prizeName, amount, float: false, matched };
   }
 
   function floatPrize(prizeName, matched) {
