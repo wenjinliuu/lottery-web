@@ -46,7 +46,9 @@
     profitRange: "30",
     ticketScanResult: null,
     ticketScanPreview: "",
-    ticketScanBusy: false
+    ticketScanBusy: false,
+    nextDrawRefreshing: false,
+    nextDrawRefreshAvailableAt: 0
   };
 
   const els = {};
@@ -58,9 +60,9 @@
     initTheme();
     initControls();
     bindEvents();
-    loadCalendar(); /* 不阻塞首屏，calendar 后台拉 */
-    await loadDraws();
+    await Promise.all([loadCalendar(), loadDraws()]);
     await loadRecords();
+    await reconcileInferredRecords(false);
     /* 首屏默认 ssq；若今日不开 ssq，自动切到今日开奖列表第一个 */
     const todayGames = getTodayOpenGames();
     if (todayGames.length && !todayGames.includes(state.gameKey)) {
@@ -97,7 +99,7 @@
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
       "lastBackupHint",
-      "draftDrawTag"
+      "draftDrawTag", "draftDrawRefreshBtn"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -218,9 +220,10 @@
       renderDraft();
     });
     els.reloadDrawsBtn.addEventListener("click", async () => {
-      await loadDraws(true);
+      await refreshNextDrawData(false);
       await ensurePendingRecordDraws();
       await checkAllRecords();
+      toast("开奖与日历数据已刷新");
     });
     els.toggleDrawsBtn.addEventListener("click", () => {
       state.showAllDraws = !state.showAllDraws;
@@ -229,9 +232,11 @@
     els.decreaseMultiplierBtn.addEventListener("click", () => updateMultiplier(-1));
     els.increaseMultiplierBtn.addEventListener("click", () => updateMultiplier(1));
     els.checkRecordsBtn.addEventListener("click", async () => {
+      await refreshNextDrawData(false);
       await ensurePendingRecordDraws();
       await checkAllRecords();
     });
+    if (els.draftDrawRefreshBtn) els.draftDrawRefreshBtn.addEventListener("click", () => refreshNextDrawData(true));
     if (els.scanTicketBtn) els.scanTicketBtn.addEventListener("click", openTicketScan);
     if (els.ticketScanBackdrop) els.ticketScanBackdrop.addEventListener("click", closeTicketScan);
     if (els.ticketScanCloseBtn) els.ticketScanCloseBtn.addEventListener("click", closeTicketScan);
@@ -432,9 +437,11 @@
       const url = `${LOTTERY_DATA_BASE_URL}/calendar.json?t=${Date.now()}`;
       state.calendar = await fetchJson(url);
       renderTodayRecommend();
+      return true;
     } catch (e) {
       state.calendar = null;
       renderTodayRecommend();
+      return false;
     }
   }
 
@@ -519,12 +526,49 @@
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无更新时间";
       renderDraws();
       if (showToast) toast("开奖数据已刷新");
+      return true;
     } catch (error) {
       state.draws = [];
       state.latestUpdatedAt = "";
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = "暂无更新时间";
       renderDrawsError();
       if (showToast) toast("读取开奖 JSON 失败");
+      return false;
+    }
+  }
+
+  async function refreshNextDrawData(showToast = true) {
+    const now = Date.now();
+    if (state.nextDrawRefreshing) return false;
+    if (now < state.nextDrawRefreshAvailableAt) {
+      if (showToast) toast("刚刚已经刷新，请稍后再试");
+      return false;
+    }
+    state.nextDrawRefreshing = true;
+    state.nextDrawRefreshAvailableAt = now + 10000;
+    renderDraftHead();
+    try {
+      const [calendarOk, drawsOk] = await Promise.all([loadCalendar(), loadDraws(false)]);
+      if (!calendarOk && !drawsOk) {
+        if (showToast) toast("刷新失败，请检查网络后重试");
+        return false;
+      }
+      const reconciliation = await reconcileInferredRecords(false);
+      renderAll();
+      if (showToast) {
+        if (reconciliation.corrected) {
+          toast(`已按官方日历修正 ${reconciliation.corrected} 注记录`);
+        } else if (reconciliation.confirmed) {
+          toast(`已确认 ${reconciliation.confirmed} 注预测记录`);
+        } else {
+          const target = getNextDrawTarget(state.gameKey);
+          toast(target.status === "inferred" ? "已是最新数据，下一期仍为预计状态" : "下一期开奖数据已刷新");
+        }
+      }
+      return true;
+    } finally {
+      state.nextDrawRefreshing = false;
+      renderDraftHead();
     }
   }
 
@@ -628,6 +672,11 @@
       nextOpenDate: String(remoteDraw.next_draw_date || ""),
       nextOpenTime: String(remoteDraw.next_open_time || ""),
       nextBuyEndTime: String(remoteDraw.next_buy_end_time || ""),
+      nextStatus: String(remoteDraw.next_status || (remoteDraw.next_confirmed === false ? "inferred" : "confirmed")),
+      nextSource: String(remoteDraw.next_source || "class_api"),
+      nextConfirmed: remoteDraw.next_confirmed !== false,
+      nextBasisIssue: String(remoteDraw.next_basis_issue || remoteDraw.issue || ""),
+      nextResolutionReason: String(remoteDraw.next_resolution_reason || ""),
       classLastExpect: String(remoteDraw.class_last_issue || ""),
       dataSource: "lottery-data-repo",
       fetchedAt: String(remoteDraw.fetched_at || remoteDraw.source?.fetched_at || "")
@@ -688,6 +737,81 @@
     await checkAllRecords(false);
   }
 
+  async function reconcileInferredRecords(showToast = true) {
+    let confirmed = 0;
+    let corrected = 0;
+    let review = 0;
+    let changed = false;
+    for (const record of state.records) {
+      if (FINAL_RECORD_STATUSES.has(record.status) || record.targetStatus !== "inferred") continue;
+      const targetExpect = String(record.targetExpect || record.expect || "");
+      const targetDrawAlreadyExists = state.draws.some((draw) => (
+        draw.gameKey === record.gameKey && String(draw.expect || "") === targetExpect
+      ));
+      if (targetDrawAlreadyExists) continue;
+
+      const official = getNextDrawMetadata(record.gameKey);
+      if (!official || official.status !== "confirmed" || !official.confirmed) continue;
+      const basisIssue = String(record.targetBasisIssue || "");
+      if (!basisIssue || !official.basisIssue || basisIssue !== official.basisIssue) {
+        const reviewRecord = {
+          ...record,
+          targetStatus: "review",
+          targetReviewReason: "official_basis_issue_changed",
+          updatedAt: new Date().toISOString()
+        };
+        await dbPut(reviewRecord);
+        review += 1;
+        changed = true;
+        continue;
+      }
+
+      const targetChanged = (
+        targetExpect !== official.expect
+        || String(record.targetOpenDate || record.openDate || "") !== official.openDate
+        || String(record.targetOpenTime || "") !== official.openTime
+      );
+      const nextRecord = {
+        ...record,
+        expect: official.expect,
+        openDate: official.openDate,
+        targetExpect: official.expect,
+        targetOpenDate: official.openDate,
+        targetOpenTime: official.openTime,
+        targetBuyEndTime: official.buyEndTime,
+        targetSourceDrawId: official.sourceDrawId,
+        targetStatus: "confirmed",
+        targetSource: official.source,
+        targetConfirmed: true,
+        targetBasisIssue: official.basisIssue,
+        targetResolutionReason: official.resolutionReason,
+        targetConfirmedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      if (targetChanged) {
+        nextRecord.originalTargetExpect = record.originalTargetExpect || targetExpect;
+        nextRecord.originalTargetOpenDate = record.originalTargetOpenDate || record.targetOpenDate || record.openDate || "";
+        nextRecord.targetCorrectedAt = new Date().toISOString();
+        nextRecord.targetCorrectionReason = "class_api_confirmed";
+        corrected += 1;
+      } else {
+        confirmed += 1;
+      }
+      await dbPut(nextRecord);
+      changed = true;
+    }
+    if (changed) {
+      state.records = await dbGetAll();
+      renderRecords();
+    }
+    if (showToast) {
+      if (corrected) toast(`已按官方日历修正 ${corrected} 注记录`);
+      else if (confirmed) toast(`已确认 ${confirmed} 注预测记录`);
+      else if (review) toast(`${review} 注记录需要确认目标期号`);
+    }
+    return { confirmed, corrected, review };
+  }
+
   function randomizeTickets() {
     const count = clampInt(els.countInput.value, 1, 20);
     state.draftTickets = generateTickets(state.gameKey, count, state.playMode);
@@ -739,6 +863,13 @@
         targetOpenTime: targetDraw.openTime,
         targetBuyEndTime: targetDraw.buyEndTime,
         targetSourceDrawId: targetDraw.sourceDrawId,
+        targetStatus: targetDraw.status,
+        targetSource: targetDraw.source,
+        targetConfirmed: targetDraw.confirmed,
+        targetBasisIssue: targetDraw.basisIssue,
+        targetResolutionReason: targetDraw.resolutionReason,
+        originalTargetExpect: targetDraw.status === "inferred" ? targetDraw.expect : "",
+        originalTargetOpenDate: targetDraw.status === "inferred" ? targetDraw.openDate : "",
         numbers: ticket,
         price,
         multiple,
@@ -1067,13 +1198,18 @@
     if (target.available) {
       const md = formatDrawMD(target.openTime) || formatDrawMD(target.openDate);
       const expectShort = target.expect ? `第 ${target.expect} 期` : "";
-      return { tone: "ok", text: md ? `${md} 开奖${expectShort ? ` · ${expectShort}` : ""}` : (expectShort || "下期开奖") };
+      const prefix = target.status === "inferred" ? "预计 " : "";
+      return {
+        tone: target.status === "inferred" ? "inferred" : "ok",
+        text: md ? `${prefix}${md} 开奖${expectShort ? ` · ${expectShort}` : ""}` : `${prefix}${expectShort || "下期开奖"}`,
+        refreshable: target.status === "inferred"
+      };
     }
     const fallbackMD = getNextOpenDateMMDD(gameKey);
     if (fallbackMD && /截止/.test(target.message || "")) {
-      return { tone: "warn", text: `已截止 · 下期 ${fallbackMD.replace("/", "月") + "日"}` };
+      return { tone: "warn", text: `已截止 · 下期 ${fallbackMD.replace("/", "月") + "日"}`, refreshable: true };
     }
-    return { tone: "muted", text: target.message || "等待开奖数据" };
+    return { tone: "muted", text: target.message || "等待开奖数据", refreshable: true };
   }
 
   function formatDrawMD(value) {
@@ -1083,10 +1219,15 @@
   }
 
   function renderDraftHead() {
+    const hint = getDraftDrawHint(state.gameKey);
     if (els.draftDrawTag) {
-      const hint = getDraftDrawHint(state.gameKey);
       els.draftDrawTag.textContent = hint.text;
       els.draftDrawTag.dataset.tone = hint.tone;
+    }
+    if (els.draftDrawRefreshBtn) {
+      els.draftDrawRefreshBtn.hidden = !hint.refreshable;
+      els.draftDrawRefreshBtn.disabled = state.nextDrawRefreshing;
+      els.draftDrawRefreshBtn.classList.toggle("is-loading", state.nextDrawRefreshing);
     }
   }
 
@@ -1372,12 +1513,17 @@
     const gameLabel = GAME_CONFIGS[latest.gameKey]?.label || latest.gameKey || "未知彩种";
     const modes = Array.from(new Set(records.map((record) => formatPlayMode(record.playMode)).filter(Boolean))).join("/");
     const issue = latest.targetExpect || latest.expect || "待定期号";
+    const targetState = latest.targetStatus === "inferred"
+      ? `<span class="record-target-state is-inferred">预计</span>`
+      : latest.targetStatus === "review"
+        ? `<span class="record-target-state is-review">需确认</span>`
+        : "";
     return `
       <article class="record-batch-card">
         <div class="record-batch-head">
           <div>
             <div class="record-batch-title"><span class="record-batch-game">${gameLabel}</span>${formatDateTime(batch.createdAt)} · ${records.length} 注</div>
-            <div class="record-batch-sub">第 ${issue} 期${modes ? ` · ${modes}` : ""}${latest.source === "ocr" ? " · 扫描导入" : ""}</div>
+            <div class="record-batch-sub">第 ${issue} 期 ${targetState}${modes ? ` · ${modes}` : ""}${latest.source === "ocr" ? " · 扫描导入" : ""}</div>
           </div>
           <div class="record-batch-summary">
             <div>花费 ${formatMoney(stats.totalCost)}</div>
@@ -2179,38 +2325,53 @@
       .sort(sortDrawAsc)[0] || null;
   }
 
-  function getNextDrawTarget(gameKey) {
+  function getNextDrawMetadata(gameKey) {
     const latest = getLatestDraw(gameKey);
     if (!latest) {
-      return { available: false, message: "暂无下期开奖数据，请稍后刷新" };
+      return null;
     }
-    const expect = String(latest.nextExpect || "");
-    const openTime = String(latest.nextOpenTime || "");
-    const buyEndTime = String(latest.nextBuyEndTime || "");
+    return {
+      latest,
+      expect: String(latest.nextExpect || ""),
+      openDate: String(latest.nextOpenDate || normalizeDate(latest.nextOpenTime) || ""),
+      openTime: String(latest.nextOpenTime || ""),
+      buyEndTime: String(latest.nextBuyEndTime || ""),
+      status: String(latest.nextStatus || "confirmed"),
+      source: String(latest.nextSource || "class_api"),
+      confirmed: latest.nextConfirmed !== false,
+      basisIssue: String(latest.nextBasisIssue || latest.expect || ""),
+      resolutionReason: String(latest.nextResolutionReason || ""),
+      sourceDrawId: latest.id || ""
+    };
+  }
+
+  function getNextDrawTarget(gameKey) {
+    const metadata = getNextDrawMetadata(gameKey);
+    if (!metadata) {
+      return { available: false, status: "unavailable", message: "暂无下期开奖数据，请稍后刷新" };
+    }
+    const { expect, openTime, buyEndTime } = metadata;
     if (!expect || !openTime || !buyEndTime) {
-      return { available: false, message: "下期信息不完整，请稍后刷新" };
+      return { ...metadata, available: false, message: "下期信息不完整，请稍后刷新" };
     }
 
     const now = new Date();
     const openDateValue = parseApiDate(openTime);
     const buyEndDateValue = parseApiDate(buyEndTime);
     if (!openDateValue || !buyEndDateValue) {
-      return { available: false, message: "下期时间格式异常，请稍后刷新" };
+      return { ...metadata, available: false, message: "下期时间格式异常，请稍后刷新" };
     }
     if (now >= openDateValue) {
-      return { available: false, message: "开奖数据待更新，请稍后刷新" };
+      return { ...metadata, available: false, message: "开奖数据待更新，请稍后刷新" };
     }
     if (now >= buyEndDateValue) {
-      return { available: false, message: "本期已截止，请等待下一期数据更新" };
+      return { ...metadata, available: false, message: "本期已截止，请等待下一期数据更新" };
     }
 
     return {
+      ...metadata,
       available: true,
-      expect,
-      openDate: String(latest.nextOpenDate || normalizeDate(openTime) || ""),
-      openTime,
-      buyEndTime,
-      sourceDrawId: latest.id || ""
+      message: ""
     };
   }
 
