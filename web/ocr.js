@@ -1,0 +1,526 @@
+(function (global) {
+  "use strict";
+
+  const TESSERACT_URLS = [
+    "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js",
+    "https://unpkg.com/tesseract.js@7.0.0/dist/tesseract.min.js"
+  ];
+
+  let loaderPromise = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function normalizeText(value) {
+    return String(value || "")
+      .replace(/\r/g, "\n")
+      .replace(/[：﹕]/g, ":")
+      .replace(/[＋﹢]/g, "+")
+      .replace(/[—–−﹣]/g, "-")
+      .replace(/[（]/g, "(")
+      .replace(/[）]/g, ")")
+      .replace(/[，,]/g, " ")
+      .replace(/[\t\f\v]+/g, " ")
+      .replace(/\n{2,}/g, "\n")
+      .trim();
+  }
+
+  function normalizeDigitToken(token) {
+    const normalized = String(token || "")
+      .replace(/[OoQqDd]/g, "0")
+      .replace(/[Il|!]/g, "1")
+      .replace(/[^0-9]/g, "");
+    if (!normalized || normalized.length > 2) return null;
+    return Number(normalized);
+  }
+
+  function extractNumberTokens(value) {
+    const source = String(value || "");
+    const matches = source.match(/[0-9OQDIloq|!]{2}/g) || [];
+    return matches.map(normalizeDigitToken).filter((item) => Number.isFinite(item));
+  }
+
+  function extractCompactNumberSequence(value, count, max) {
+    const map = { O: 0, o: 0, Q: 0, q: 0, D: 0, d: 0, I: 1, i: 1, l: 1, "|": 1, "!": 1, Z: 2, z: 2, S: 5, s: 5, G: 6, B: 8 };
+    const digits = [];
+    String(value || "").split("").forEach((char, position) => {
+      if (/\d/.test(char)) digits.push({ value: Number(char), position });
+      else if (Object.prototype.hasOwnProperty.call(map, char)) digits.push({ value: map[char], position });
+    });
+    if (digits.length < count * 2) return [];
+    let best = null;
+    const search = (cursor, numbers, last, score) => {
+      if (numbers.length === count) {
+        const finalScore = score + Math.max(0, digits.length - cursor) * 0.18;
+        if (!best || finalScore <= best.score) best = { values: numbers.slice(), score: finalScore };
+        return;
+      }
+      const needed = (count - numbers.length) * 2;
+      for (let first = cursor; first <= digits.length - needed; first += 1) {
+        for (let second = first + 1; second <= Math.min(first + 2, digits.length - needed + 1); second += 1) {
+          const number = digits[first].value * 10 + digits[second].value;
+          if (number < 1 || number > max || number <= last) continue;
+          const gapPenalty = first - cursor + (second - first - 1);
+          search(second + 1, numbers.concat(number), number, score + gapPenalty);
+        }
+      }
+    };
+    search(0, [], 0, 0);
+    return best ? best.values : [];
+  }
+
+  function isAscendingUnique(values) {
+    return values.every((value, index) => !index || value > values[index - 1]);
+  }
+
+  function parseSsqLines(text) {
+    const tickets = [];
+    normalizeText(text).split("\n").forEach((rawLine) => {
+      const line = rawLine.trim();
+      const separator = line.search(/\s[-]\s*|[0-9OQDIloq|!]\s*[-]\s*[0-9OQDIloq|!]/);
+      if (separator < 0) return;
+      const dash = line.indexOf("-", separator);
+      if (dash < 0) return;
+      const left = extractNumberTokens(line.slice(0, dash));
+      const right = extractNumberTokens(line.slice(dash + 1));
+      const red = left.slice(-6);
+      const blue = right[0];
+      if (red.length !== 6 || !Number.isFinite(blue)) return;
+      if (!red.every((n) => n >= 1 && n <= 33) || blue < 1 || blue > 16) return;
+      if (!isAscendingUnique(red)) return;
+      const multipleMatch = line.match(/\(\s*([0-9OQDIloq|!]{1,2})(?:\s*\))?/);
+      const multiple = multipleMatch ? normalizeDigitToken(multipleMatch[1]) : null;
+      tickets.push({ red, blue: [blue], multiple: multiple || null });
+    });
+    return uniqueTickets(tickets, (ticket) => `${ticket.red.join(",")}|${ticket.blue[0]}`);
+  }
+
+  function parseDltLines(text) {
+    const tickets = [];
+    normalizeText(text).split("\n").forEach((rawLine) => {
+      const line = rawLine.trim();
+      const plus = line.search(/[+*]/);
+      if (plus < 0) return;
+      const leftSource = line.slice(0, plus);
+      const rightSource = line.slice(plus + 1);
+      const left = extractNumberTokens(leftSource);
+      const right = extractNumberTokens(rightSource);
+      let front = left.slice(-5);
+      let back = right.slice(0, 2);
+      if (/[0-9OQDIloq|!ZzSsGB]{3,}/.test(leftSource) || front.length !== 5 || !front.every((n) => n >= 1 && n <= 35) || !isAscendingUnique(front)) {
+        front = extractCompactNumberSequence(leftSource, 5, 35);
+      }
+      if (/[0-9OQDIloq|!ZzSsGB]{3,}/.test(rightSource) || back.length !== 2 || !back.every((n) => n >= 1 && n <= 12) || !isAscendingUnique(back)) {
+        back = extractCompactNumberSequence(rightSource, 2, 12);
+      }
+      if (front.length !== 5 || back.length !== 2) return;
+      if (!front.every((n) => n >= 1 && n <= 35) || !back.every((n) => n >= 1 && n <= 12)) return;
+      if (!isAscendingUnique(front) || !isAscendingUnique(back)) return;
+      tickets.push({ front, back, multiple: null });
+    });
+    return uniqueTickets(tickets, (ticket) => `${ticket.front.join(",")}|${ticket.back.join(",")}`);
+  }
+
+  function uniqueTickets(tickets, keyOf) {
+    const seen = new Map();
+    tickets.forEach((ticket) => {
+      const key = keyOf(ticket);
+      const existing = seen.get(key);
+      if (!existing || (!existing.multiple && ticket.multiple)) seen.set(key, ticket);
+    });
+    return Array.from(seen.values());
+  }
+
+  function mergeMultipleTicketPasses(passes, gameKey) {
+    const keyOf = (ticket) => gameKey === "dlt"
+      ? `${ticket.front.join(",")}|${ticket.back.join(",")}`
+      : `${ticket.red.join(",")}|${ticket.blue.join(",")}`;
+    const clusters = [];
+    passes.forEach((tickets, passIndex) => {
+      tickets.forEach((ticket) => {
+        let cluster = clusters.find((item) => !item.passIndexes.has(passIndex)
+          && item.variants.some((variant) => areTicketsSimilar(ticket, variant.ticket, gameKey)));
+        if (!cluster) {
+          cluster = { variants: [], passIndexes: new Set(), order: clusters.length };
+          clusters.push(cluster);
+        }
+        cluster.passIndexes.add(passIndex);
+        const key = keyOf(ticket);
+        const variant = cluster.variants.find((item) => item.key === key);
+        if (variant) {
+          variant.votes += 1;
+          if (!variant.ticket.multiple && ticket.multiple) variant.ticket.multiple = ticket.multiple;
+        } else {
+          cluster.variants.push({ key, ticket: { ...ticket }, votes: 1, firstPass: passIndex });
+        }
+      });
+    });
+    return clusters.map((cluster) => {
+      const winner = cluster.variants.slice().sort((a, b) => b.votes - a.votes || a.firstPass - b.firstPass)[0];
+      if (!winner.ticket.multiple) {
+        const withMultiple = cluster.variants.find((variant) => variant.ticket.multiple);
+        if (withMultiple) winner.ticket.multiple = withMultiple.ticket.multiple;
+      }
+      return winner.ticket;
+    });
+  }
+
+  function areTicketsSimilar(a, b, gameKey) {
+    const differences = (left = [], right = []) => left.length === right.length
+      ? left.reduce((sum, value, index) => sum + (value === right[index] ? 0 : 1), 0)
+      : 99;
+    if (gameKey === "dlt") {
+      const frontDiff = differences(a.front, b.front);
+      const backDiff = differences(a.back, b.back);
+      return (frontDiff === 0 && backDiff <= 1) || (backDiff === 0 && frontDiff <= 1);
+    }
+    const redDiff = differences(a.red, b.red);
+    const blueDiff = differences(a.blue, b.blue);
+    return (redDiff === 0 && blueDiff <= 1) || (blueDiff === 0 && redDiff <= 1);
+  }
+
+  function detectGame(text, ssqTickets, dltTickets) {
+    if (/双色球|福利彩|WELFARE/i.test(text)) return "ssq";
+    if (/大乐透|体育彩票|体彩|LOTTO|SPORT/i.test(text)) return "dlt";
+    if (ssqTickets.length && !dltTickets.length) return "ssq";
+    if (dltTickets.length && !ssqTickets.length) return "dlt";
+    return ssqTickets.length >= dltTickets.length ? "ssq" : "dlt";
+  }
+
+  function extractIssue(text, gameKey) {
+    const lines = normalizeText(text).split("\n");
+    if (gameKey === "ssq") {
+      for (const line of lines) {
+        const preferred = line.match(/(?:开奖期|开奖|期)\D{0,8}(20\d{5})/);
+        if (preferred) return preferred[1];
+      }
+      const match = text.match(/\b(20\d{5})\b/);
+      return match ? match[1] : "";
+    }
+    for (const line of lines.slice(0, Math.max(8, Math.ceil(lines.length / 2)))) {
+      const preferred = line.match(/(?:第\s*)?(2\d{4})\s*(?:期|H|84|H8|$)/i);
+      if (preferred) return preferred[1];
+      const merged = line.match(/\b(26\d{3})(?=\d{0,2}(?:期|H|84|H8|\D))/i);
+      if (merged) return merged[1];
+    }
+    return "";
+  }
+
+  function isoDate(year, month, day) {
+    const y = Number(year), m = Number(month), d = Number(day);
+    if (y < 2020 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) return "";
+    return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  function extractDates(text) {
+    const source = normalizeText(text);
+    const dates = [];
+    const fullYear = /\b(20\d{2})\D{1,4}(\d{1,2})\D{1,4}(\d{1,2})(?:\D|$)/g;
+    let match;
+    while ((match = fullYear.exec(source))) {
+      const value = isoDate(match[1], match[2], match[3]);
+      if (value) dates.push({ value, index: match.index, hasTime: false, time: "" });
+    }
+    const shortYear = /(?:^|\D)(2\d)[-\/]([01]?\d)[-\/]([0-3]?\d)(?:\s+([0-2]?\d:[0-5]\d:[0-5]\d))?/g;
+    while ((match = shortYear.exec(source))) {
+      const value = isoDate(`20${match[1]}`, match[2], match[3]);
+      if (value) dates.push({ value, index: match.index, hasTime: Boolean(match[4]), time: match[4] || "" });
+    }
+    return dates.sort((a, b) => a.index - b.index);
+  }
+
+  function extractTotal(text) {
+    const lines = normalizeText(text).split("\n");
+    for (const line of lines) {
+      const match = line.match(/(?:合计|共计|总计|计)\D{0,8}(\d{1,4})\s*元/);
+      if (match) return Number(match[1]);
+    }
+    const fallback = text.match(/\b(\d{1,4})\s*元/);
+    return fallback ? Number(fallback[1]) : null;
+  }
+
+  function extractDltMode(text) {
+    const add = text.match(/追加\s*(?:投注)?\D{0,5}([0-9OQDIloq|!]{1,2})\s*[倍信]/);
+    if (add) return { addOn: true, multiple: normalizeDigitToken(add[1]) || null };
+    const normal = text.match(/(?:普通|基本)\s*(?:投注)?\D{0,5}([0-9OQDIloq|!]{1,2})\s*[倍信]/);
+    if (normal) return { addOn: false, multiple: normalizeDigitToken(normal[1]) || null };
+    if (/追加/.test(text)) return { addOn: true, multiple: null };
+    return { addOn: null, multiple: null };
+  }
+
+  function parseLotteryTicketText(rawText, ocrConfidence) {
+    const text = normalizeText(rawText);
+    const passes = text.split("---NUMBER-RECHECK---");
+    const ssqTickets = mergeMultipleTicketPasses(passes.map(parseSsqLines), "ssq");
+    const dltTickets = mergeMultipleTicketPasses(passes.map(parseDltLines), "dlt");
+    const gameKey = detectGame(text, ssqTickets, dltTickets);
+    const tickets = gameKey === "dlt" ? dltTickets : ssqTickets;
+    const dates = extractDates(text);
+    const timedDate = dates.find((item) => item.hasTime);
+    const drawDateItem = dates.find((item) => !item.hasTime) || dates[0];
+    const totalAmount = extractTotal(text);
+    const dltMode = gameKey === "dlt" ? extractDltMode(text) : { addOn: false, multiple: null };
+    let multiple = dltMode.multiple || null;
+
+    if (gameKey === "ssq") {
+      const values = tickets.map((ticket) => ticket.multiple).filter(Number.isFinite);
+      if (values.length && values.every((value) => value === values[0])) multiple = values[0];
+    }
+
+    if (!multiple && totalAmount && tickets.length) {
+      const price = gameKey === "ssq" ? 2 : dltMode.addOn === true ? 3 : dltMode.addOn === false ? 2 : 0;
+      const inferred = price ? totalAmount / tickets.length / price : 0;
+      if (Number.isInteger(inferred) && inferred >= 1 && inferred <= 99) multiple = inferred;
+    }
+    tickets.forEach((ticket) => { if (!ticket.multiple) ticket.multiple = multiple || 1; });
+
+    return validateTicketResult({
+      gameKey,
+      issue: extractIssue(text, gameKey),
+      drawDate: drawDateItem?.value || "",
+      saleDateTime: timedDate ? `${timedDate.value}T${timedDate.time}` : "",
+      totalAmount,
+      addOn: gameKey === "dlt" ? dltMode.addOn : false,
+      multiple: multiple || 1,
+      tickets,
+      confidence: Math.round(Number(ocrConfidence) || 0),
+      rawText: text
+    });
+  }
+
+  function validateTicketResult(input) {
+    const result = { ...input, tickets: (input.tickets || []).map((ticket) => ({ ...ticket })) };
+    const errors = [];
+    const warnings = [];
+    if (!result.gameKey || !["ssq", "dlt"].includes(result.gameKey)) errors.push("未能确认彩票类型");
+    if (!result.tickets.length) errors.push("没有识别到有效投注号码");
+    if (!result.issue) warnings.push("期号未识别，请手动填写");
+    if (!result.drawDate) warnings.push("开奖日期未识别，请手动填写");
+    if (result.gameKey === "dlt" && result.addOn === null) warnings.push("未能确认是否追加，请手动选择");
+    if (!Number.isInteger(Number(result.multiple)) || Number(result.multiple) < 1) errors.push("投注倍数无效");
+    if (Number(result.confidence) > 0 && Number(result.confidence) < 70) warnings.push("照片识别可信度较低，请逐个核对号码");
+
+    result.tickets.forEach((ticket, index) => {
+      const prefix = `第${index + 1}注`;
+      if (result.gameKey === "ssq") {
+        if (!Array.isArray(ticket.red) || ticket.red.length !== 6) errors.push(`${prefix}红球数量不正确`);
+        else if (!ticket.red.every((n) => n >= 1 && n <= 33) || !isAscendingUnique(ticket.red)) errors.push(`${prefix}红球范围或顺序不正确`);
+        if (!Array.isArray(ticket.blue) || ticket.blue.length !== 1 || ticket.blue[0] < 1 || ticket.blue[0] > 16) errors.push(`${prefix}蓝球不正确`);
+      } else if (result.gameKey === "dlt") {
+        if (!Array.isArray(ticket.front) || ticket.front.length !== 5) errors.push(`${prefix}前区数量不正确`);
+        else if (!ticket.front.every((n) => n >= 1 && n <= 35) || !isAscendingUnique(ticket.front)) errors.push(`${prefix}前区范围或顺序不正确`);
+        if (!Array.isArray(ticket.back) || ticket.back.length !== 2) errors.push(`${prefix}后区数量不正确`);
+        else if (!ticket.back.every((n) => n >= 1 && n <= 12) || !isAscendingUnique(ticket.back)) errors.push(`${prefix}后区范围或顺序不正确`);
+      }
+    });
+
+    const unitPrice = result.gameKey === "dlt" && result.addOn === true ? 3 : 2;
+    const calculatedAmount = result.tickets.reduce((sum, ticket) => sum + unitPrice * Number(ticket.multiple || result.multiple || 1), 0);
+    if (Number.isFinite(Number(result.totalAmount)) && Number(result.totalAmount) > 0 && calculatedAmount !== Number(result.totalAmount)) {
+      errors.push(`按号码计算为${calculatedAmount}元，与票面${result.totalAmount}元不一致`);
+    }
+    result.calculatedAmount = calculatedAmount;
+    result.totalAmount = Number(result.totalAmount) || calculatedAmount || null;
+    result.errors = Array.from(new Set(errors));
+    result.warnings = Array.from(new Set(warnings));
+    return result;
+  }
+
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[data-ocr-src="${url}"]`);
+      if (existing) {
+        existing.addEventListener("load", resolve, { once: true });
+        existing.addEventListener("error", reject, { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = url;
+      script.async = true;
+      script.dataset.ocrSrc = url;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function ensureTesseract() {
+    if (global.Tesseract) return global.Tesseract;
+    if (!loaderPromise) {
+      loaderPromise = (async () => {
+        let lastError;
+        for (const url of TESSERACT_URLS) {
+          try {
+            await loadScript(url);
+            if (global.Tesseract) return global.Tesseract;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError || new Error("OCR 引擎加载失败");
+      })();
+    }
+    return loaderPromise;
+  }
+
+  async function decodeImage(file) {
+    if (global.createImageBitmap) {
+      try {
+        return await global.createImageBitmap(file, { imageOrientation: "from-image" });
+      } catch (error) {
+        /* HEIC 或旧版 Safari 解码失败时退回原生 Image。 */
+      }
+    }
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("图片读取失败")); };
+      image.src = url;
+    });
+  }
+
+  function findTicketBounds(image) {
+    const width = 180;
+    const height = Math.max(180, Math.round(width * image.height / image.width));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(image, 0, 0, width, height);
+    const pixels = ctx.getImageData(0, 0, width, height).data;
+    const mask = new Uint8Array(width * height);
+    for (let i = 0; i < mask.length; i += 1) {
+      const r = pixels[i * 4], g = pixels[i * 4 + 1], b = pixels[i * 4 + 2];
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      mask[i] = luma > 145 && chroma < 72 ? 1 : 0;
+    }
+    const seen = new Uint8Array(mask.length);
+    let best = null;
+    for (let start = 0; start < mask.length; start += 1) {
+      if (!mask[start] || seen[start]) continue;
+      const queue = [start];
+      seen[start] = 1;
+      let head = 0, count = 0, minX = width, minY = height, maxX = 0, maxY = 0;
+      while (head < queue.length) {
+        const index = queue[head++];
+        const x = index % width, y = Math.floor(index / width);
+        count += 1;
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        const neighbors = [index - 1, index + 1, index - width, index + width];
+        neighbors.forEach((next, direction) => {
+          if (next < 0 || next >= mask.length || seen[next] || !mask[next]) return;
+          if (direction === 0 && x === 0) return;
+          if (direction === 1 && x === width - 1) return;
+          seen[next] = 1;
+          queue.push(next);
+        });
+      }
+      const boxW = maxX - minX + 1, boxH = maxY - minY + 1;
+      const score = count * Math.min(1.4, boxH / Math.max(boxW, 1));
+      if (count > mask.length * 0.025 && boxH > height * 0.28 && (!best || score > best.score)) {
+        best = { minX, minY, maxX, maxY, score };
+      }
+    }
+    if (!best) return { x: 0, y: 0, width: image.width, height: image.height };
+    const scaleX = image.width / width, scaleY = image.height / height;
+    const marginX = (best.maxX - best.minX) * 0.04;
+    const marginY = (best.maxY - best.minY) * 0.025;
+    const x = clamp((best.minX - marginX) * scaleX, 0, image.width);
+    const y = clamp((best.minY - marginY) * scaleY, 0, image.height);
+    const right = clamp((best.maxX + marginX) * scaleX, 0, image.width);
+    const bottom = clamp((best.maxY + marginY) * scaleY, 0, image.height);
+    return { x, y, width: right - x, height: bottom - y };
+  }
+
+  async function prepareImage(file) {
+    const image = await decodeImage(file);
+    const bounds = findTicketBounds(image);
+    const maxHeight = 1900;
+    const scale = Math.min(2, maxHeight / bounds.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(600, Math.round(bounds.width * scale));
+    canvas.height = Math.round(bounds.height * canvas.width / bounds.width);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, canvas.width, canvas.height);
+    if (typeof image.close === "function") image.close();
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < data.data.length; i += 4) {
+      const gray = 0.299 * data.data[i] + 0.587 * data.data[i + 1] + 0.114 * data.data[i + 2];
+      const value = clamp((gray - 128) * 1.28 + 138, 0, 255);
+      data.data[i] = value;
+      data.data[i + 1] = value;
+      data.data[i + 2] = value;
+    }
+    ctx.putImageData(data, 0, 0);
+    return canvas;
+  }
+
+  async function recognizeFile(file, onProgress) {
+    const canvas = await prepareImage(file);
+    onProgress?.({ progress: 0.04, label: "正在加载本地识别模型" });
+    const Tesseract = await ensureTesseract();
+    let phaseStart = 0.15;
+    let phaseSpan = 0.50;
+    const worker = await Tesseract.createWorker(["chi_sim", "eng"], 1, {
+      logger(message) {
+        const rawProgress = Number(message.progress) || 0;
+        const labels = {
+          "loading tesseract core": "正在加载识别引擎",
+          "initializing tesseract": "正在初始化识别引擎",
+          "loading language traineddata": "正在加载中英文模型",
+          "initializing api": "正在准备票面识别",
+          "recognizing text": "正在识别票面信息"
+        };
+        const progress = message.status === "recognizing text"
+          ? phaseStart + rawProgress * phaseSpan
+          : Math.min(0.14, rawProgress * 0.14);
+        onProgress?.({ progress, label: labels[message.status] || "正在本地识别" });
+      }
+    });
+    try {
+      await worker.setParameters({ preserve_interword_spaces: "1" });
+      const result = await worker.recognize(canvas);
+      let mergedText = result.data.text;
+      let confidence = result.data.confidence;
+      try {
+        await worker.reinitialize("eng");
+        phaseStart = 0.67;
+        phaseSpan = 0.15;
+        onProgress?.({ progress: phaseStart, label: "正在复核号码排列" });
+        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+        const blockPass = await worker.recognize(canvas);
+        phaseStart = 0.84;
+        phaseSpan = 0.14;
+        onProgress?.({ progress: phaseStart, label: "正在复核模糊号码" });
+        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+        const sparsePass = await worker.recognize(canvas);
+        mergedText += `\n---NUMBER-RECHECK---\n${blockPass.data.text}\n---NUMBER-RECHECK---\n${sparsePass.data.text}`;
+        confidence = Math.max(confidence, blockPass.data.confidence, sparsePass.data.confidence);
+      } catch (error) {
+        /* 中文主识别已成功时，号码复核失败不阻断用户手动确认。 */
+      }
+      onProgress?.({ progress: 1, label: "识别完成，正在校验" });
+      return {
+        parsed: parseLotteryTicketText(mergedText, confidence),
+        previewUrl: canvas.toDataURL("image/jpeg", 0.88)
+      };
+    } finally {
+      await worker.terminate();
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+  }
+
+  global.LotteryOCR = {
+    recognizeFile,
+    parseLotteryTicketText,
+    validateTicketResult,
+    normalizeText
+  };
+})(window);

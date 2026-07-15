@@ -119,10 +119,16 @@
 
           <div class="check-records-head">
             <div class="section-title check-page-title check-records-title-fixed">选号记录</div>
-            <button class="check-records-refresh has-icon" id="checkRecordsBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
-              <span>重新核对</span>
-            </button>
+            <div class="check-records-actions">
+              <button class="check-records-scan has-icon" id="scanTicketBtn" type="button">
+                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
+                <span>扫描彩票</span>
+              </button>
+              <button class="check-records-refresh has-icon" id="checkRecordsBtn" type="button">
+                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
+                <span>重新核对</span>
+              </button>
+            </div>
           </div>
           <section class="card check-records-card">
             <div id="recordList" class="record-list empty" aria-live="polite">暂无保存记录</div>
@@ -323,7 +329,23 @@
       </section>
     </div>
 
+    <div class="ticket-scan" id="ticketScan" hidden>
+      <button class="ticket-scan-backdrop" id="ticketScanBackdrop" type="button" aria-label="关闭扫描彩票"></button>
+      <section class="ticket-scan-panel" role="dialog" aria-modal="true" aria-labelledby="ticketScanTitle">
+        <header class="ticket-scan-head">
+          <div>
+            <div class="ticket-scan-title" id="ticketScanTitle">扫描彩票</div>
+            <div class="ticket-scan-sub" id="ticketScanSub">图片只在本机识别，不会上传</div>
+          </div>
+          <button class="ticket-scan-close" id="ticketScanCloseBtn" type="button" aria-label="关闭">×</button>
+        </header>
+        <div class="ticket-scan-body" id="ticketScanBody"></div>
+        <input id="ticketScanInput" type="file" accept="image/*" hidden>
+      </section>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./ocr.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

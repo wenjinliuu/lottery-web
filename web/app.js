@@ -43,7 +43,10 @@
     loadedHistoryGames: new Set(),
     historyLoadingGames: new Set(),
     recordFilterGame: "all",
-    profitRange: "30"
+    profitRange: "30",
+    ticketScanResult: null,
+    ticketScanPreview: "",
+    ticketScanBusy: false
   };
 
   const els = {};
@@ -90,6 +93,7 @@
       "myRecordsBackBtn", "myRecordsSummary", "recordFilterChips", "recordFilterSummary",
       "wonRecordsBackBtn", "wonRecordsSummary", "wonRecordList", "mineWonRecordsBtn",
       "detailSheet", "detailSheetBackdrop", "detailSheetCloseBtn", "detailSheetTitle", "detailSheetSub", "detailSheetBody",
+      "scanTicketBtn", "ticketScan", "ticketScanBackdrop", "ticketScanCloseBtn", "ticketScanTitle", "ticketScanSub", "ticketScanBody", "ticketScanInput",
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
       "lastBackupHint",
@@ -228,6 +232,10 @@
       await ensurePendingRecordDraws();
       await checkAllRecords();
     });
+    if (els.scanTicketBtn) els.scanTicketBtn.addEventListener("click", openTicketScan);
+    if (els.ticketScanBackdrop) els.ticketScanBackdrop.addEventListener("click", closeTicketScan);
+    if (els.ticketScanCloseBtn) els.ticketScanCloseBtn.addEventListener("click", closeTicketScan);
+    if (els.ticketScanInput) els.ticketScanInput.addEventListener("change", handleTicketScanFile);
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
     if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
     if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
@@ -238,6 +246,7 @@
     if (els.detailSheetCloseBtn) els.detailSheetCloseBtn.addEventListener("click", closeDetailSheet);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && els.detailSheet && !els.detailSheet.hidden) closeDetailSheet();
+      if (event.key === "Escape" && els.ticketScan && !els.ticketScan.hidden) closeTicketScan();
     });
     if (els.dltAddOnBtn) {
       els.dltAddOnBtn.addEventListener("click", () => {
@@ -1368,7 +1377,7 @@
         <div class="record-batch-head">
           <div>
             <div class="record-batch-title"><span class="record-batch-game">${gameLabel}</span>${formatDateTime(batch.createdAt)} · ${records.length} 注</div>
-            <div class="record-batch-sub">第 ${issue} 期${modes ? ` · ${modes}` : ""}</div>
+            <div class="record-batch-sub">第 ${issue} 期${modes ? ` · ${modes}` : ""}${latest.source === "ocr" ? " · 扫描导入" : ""}</div>
           </div>
           <div class="record-batch-summary">
             <div>花费 ${formatMoney(stats.totalCost)}</div>
@@ -1506,6 +1515,302 @@
     if (!els.detailSheet) return;
     els.detailSheet.hidden = true;
     document.body.classList.remove("sheet-open");
+  }
+
+  /* ===== 本地 OCR 扫描彩票 ===== */
+
+  function openTicketScan() {
+    if (!els.ticketScan || !els.ticketScanBody) return;
+    state.ticketScanResult = null;
+    state.ticketScanPreview = "";
+    state.ticketScanBusy = false;
+    els.ticketScan.hidden = false;
+    document.body.classList.add("scan-open");
+    renderTicketScanIntro();
+    window.setTimeout(() => els.ticketScanBody.querySelector("[data-scan-choose]")?.focus(), 20);
+  }
+
+  function closeTicketScan() {
+    if (!els.ticketScan || state.ticketScanBusy) return;
+    els.ticketScan.hidden = true;
+    document.body.classList.remove("scan-open");
+    state.ticketScanResult = null;
+    state.ticketScanPreview = "";
+    if (els.ticketScanInput) els.ticketScanInput.value = "";
+  }
+
+  function renderTicketScanIntro(errorText = "") {
+    if (!els.ticketScanBody) return;
+    els.ticketScanTitle.textContent = "扫描彩票";
+    els.ticketScanSub.textContent = "图片只在本机识别，不会上传或保存";
+    els.ticketScanBody.innerHTML = `
+      <div class="scan-intro">
+        <div class="scan-illustration" aria-hidden="true">
+          <svg viewBox="0 0 64 64"><path d="M18 8h28a4 4 0 0 1 4 4v40a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4Z"/><path d="M22 21h20M22 29h20M22 37h8M35 37h7"/><path d="M8 22V12a4 4 0 0 1 4-4h6M56 22V12a4 4 0 0 0-4-4h-6M8 42v10a4 4 0 0 0 4 4h6M56 42v10a4 4 0 0 1-4 4h-6"/></svg>
+        </div>
+        <div class="scan-intro-title">拍摄完整、清晰的彩票正面</div>
+        <div class="scan-intro-copy">当前支持双色球、大乐透普通单式票；可识别期号、开奖日期、号码、倍数、追加和金额。</div>
+        ${errorText ? `<div class="scan-error">${escapeScanText(errorText)}</div>` : ""}
+        <button class="scan-primary-btn" type="button" data-scan-choose>拍照或选择图片</button>
+        <div class="scan-privacy">本地 OCR · 原图识别结束后立即释放</div>
+      </div>
+    `;
+    els.ticketScanBody.querySelector("[data-scan-choose]")?.addEventListener("click", () => els.ticketScanInput?.click());
+  }
+
+  async function handleTicketScanFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      renderTicketScanIntro("请选择 JPG、PNG 或 HEIC 图片");
+      return;
+    }
+    if (!window.LotteryOCR) {
+      renderTicketScanIntro("OCR 模块没有正确加载，请刷新页面后重试");
+      return;
+    }
+    state.ticketScanBusy = true;
+    els.ticketScanCloseBtn.disabled = true;
+    renderTicketScanProgress(0.02, "正在读取彩票图片");
+    try {
+      const { parsed, previewUrl } = await window.LotteryOCR.recognizeFile(file, ({ progress, label }) => {
+        renderTicketScanProgress(progress, label);
+      });
+      state.ticketScanResult = parsed;
+      state.ticketScanPreview = previewUrl || "";
+      renderTicketScanProgress(0.98, "正在核对开奖期号");
+      await loadGameHistory(parsed.gameKey, false);
+      renderTicketScanReview();
+    } catch (error) {
+      renderTicketScanIntro(`识别失败：${error?.message || "请检查网络后重试"}`);
+    } finally {
+      state.ticketScanBusy = false;
+      els.ticketScanCloseBtn.disabled = false;
+      els.ticketScanInput.value = "";
+    }
+  }
+
+  function renderTicketScanProgress(progress = 0, label = "正在本地识别") {
+    if (!els.ticketScanBody) return;
+    const value = Math.max(2, Math.min(100, Math.round((Number(progress) || 0) * 100)));
+    els.ticketScanTitle.textContent = "正在识别彩票";
+    els.ticketScanSub.textContent = "首次使用需要下载识别模型，之后会自动缓存";
+    els.ticketScanBody.innerHTML = `
+      <div class="scan-progress-state">
+        <div class="scan-progress-ring" style="--scan-progress:${value * 3.6}deg"><span>${value}%</span></div>
+        <div class="scan-progress-label">${escapeScanText(label)}</div>
+        <div class="scan-progress-copy">请保持页面打开，图片始终只在当前设备处理</div>
+      </div>
+    `;
+  }
+
+  function renderTicketScanReview() {
+    if (!els.ticketScanBody || !state.ticketScanResult) return;
+    const result = state.ticketScanResult;
+    const gameLabel = result.gameKey === "dlt" ? "大乐透" : "双色球";
+    const drawCheck = getScanDrawCheck(result);
+    const statusTone = result.errors.length || drawCheck?.status === "error" ? "error" : result.warnings.length ? "warning" : "ok";
+    const statusText = result.errors.length ? `${result.errors.length}项需要修改` : drawCheck?.status === "error" ? "开奖日期需要修改" : result.warnings.length ? `${result.warnings.length}项请确认` : "规则校验通过";
+    els.ticketScanTitle.textContent = "确认识别结果";
+    els.ticketScanSub.textContent = `本地识别可信度 ${result.confidence || 0}% · 请核对后导入`;
+    els.ticketScanBody.innerHTML = `
+      <form class="scan-review" id="ticketScanForm">
+        <div class="scan-review-preview">
+          ${state.ticketScanPreview ? `<img src="${state.ticketScanPreview}" alt="裁剪后的彩票预览">` : ""}
+          <div><strong>${gameLabel}</strong><span class="scan-validation is-${statusTone}">${statusText}</span></div>
+        </div>
+        <div class="scan-meta-grid">
+          <label><span>彩种</span><select name="gameKey"><option value="ssq"${result.gameKey === "ssq" ? " selected" : ""}>双色球</option><option value="dlt"${result.gameKey === "dlt" ? " selected" : ""}>大乐透</option></select></label>
+          <label><span>期号</span><input name="issue" inputmode="numeric" value="${escapeScanText(result.issue)}" placeholder="请输入期号"></label>
+          <label><span>开奖日期</span><input name="drawDate" type="date" value="${escapeScanText(result.drawDate)}"></label>
+          <label><span>购买时间</span><input name="saleDateTime" type="datetime-local" step="1" value="${escapeScanText(result.saleDateTime)}"></label>
+          ${result.gameKey === "dlt" ? `<label><span>投注方式</span><select name="addOn"><option value=""${result.addOn === null ? " selected" : ""}>请选择</option><option value="false"${result.addOn === false ? " selected" : ""}>普通投注</option><option value="true"${result.addOn === true ? " selected" : ""}>追加投注</option></select></label>` : ""}
+          <label><span>倍数</span><input name="multiple" type="number" inputmode="numeric" min="1" max="99" value="${result.multiple || 1}"></label>
+          <label><span>票面金额</span><div class="scan-money-input"><input name="totalAmount" type="number" inputmode="decimal" min="0" value="${result.totalAmount || ""}"><em>元</em></div></label>
+        </div>
+        <div class="scan-ticket-list">
+          ${result.tickets.map((ticket, index) => renderScanTicketEditor(result.gameKey, ticket, index, result.tickets.length)).join("")}
+        </div>
+        <button class="scan-add-ticket" type="button" data-scan-add>＋ 新增一注</button>
+        ${renderScanValidationMessages(result)}
+        <div class="scan-cost-check"><span>${result.tickets.length}注 · 按号码计算</span><strong>${formatMoney(result.calculatedAmount)}</strong></div>
+        <div class="scan-review-actions">
+          <button class="scan-secondary-btn" type="button" data-scan-again>重新选择</button>
+          <button class="scan-primary-btn" type="submit"${canImportScanResult(result) ? "" : " disabled"}>确认导入 ${result.tickets.length} 注</button>
+        </div>
+      </form>
+    `;
+    bindTicketScanReview();
+  }
+
+  function renderScanTicketEditor(gameKey, ticket, index, count) {
+    const main = gameKey === "dlt" ? ticket.front || [] : ticket.red || [];
+    const extra = gameKey === "dlt" ? ticket.back || [] : ticket.blue || [];
+    const mainMax = gameKey === "dlt" ? 35 : 33;
+    const extraMax = gameKey === "dlt" ? 12 : 16;
+    return `
+      <article class="scan-ticket-editor" data-scan-ticket="${index}">
+        <div class="scan-ticket-editor-head"><strong>第 ${index + 1} 注</strong>${count > 1 ? `<button type="button" data-scan-delete="${index}">删除</button>` : ""}</div>
+        <div class="scan-number-row">
+          <div class="scan-number-group">${main.map((value, numberIndex) => scanNumberInput("main", index, numberIndex, value, mainMax, gameKey === "dlt" ? "blue" : "red")).join("")}</div>
+          <span class="scan-number-plus">＋</span>
+          <div class="scan-number-group">${extra.map((value, numberIndex) => scanNumberInput("extra", index, numberIndex, value, extraMax, gameKey === "dlt" ? "yellow" : "blue")).join("")}</div>
+        </div>
+      </article>
+    `;
+  }
+
+  function scanNumberInput(zone, ticketIndex, numberIndex, value, max, tone) {
+    return `<input class="scan-number-input is-${tone}" data-scan-zone="${zone}" data-ticket-index="${ticketIndex}" data-number-index="${numberIndex}" type="number" inputmode="numeric" min="1" max="${max}" value="${String(Number(value) || "").padStart(2, "0")}" aria-label="第${ticketIndex + 1}注第${numberIndex + 1}个号码">`;
+  }
+
+  function renderScanValidationMessages(result) {
+    const messages = result.errors.map((text) => `<li class="is-error">${escapeScanText(text)}</li>`)
+      .concat(result.warnings.map((text) => `<li class="is-warning">${escapeScanText(text)}</li>`));
+    const drawCheck = getScanDrawCheck(result);
+    if (drawCheck) messages.push(`<li class="${drawCheck.status === "error" ? "is-error" : "is-ok"}">${escapeScanText(drawCheck.text)}</li>`);
+    return messages.length ? `<ul class="scan-validation-list">${messages.join("")}</ul>` : `<div class="scan-validation-ok">号码、倍数和金额校验通过</div>`;
+  }
+
+  function getScanDrawCheck(result) {
+    if (!result?.issue || !result?.gameKey) return null;
+    const draw = state.draws.find((item) => item.gameKey === result.gameKey && String(item.expect) === String(result.issue));
+    if (!draw) return null;
+    const repositoryDate = normalizeDate(draw.openDate || draw.time || "");
+    if (result.drawDate && repositoryDate && result.drawDate !== repositoryDate) {
+      return { status: "error", text: `开奖仓库显示第${result.issue}期日期为${repositoryDate}` };
+    }
+    return { status: "ok", text: `已匹配开奖仓库第${result.issue}期` };
+  }
+
+  function bindTicketScanReview() {
+    const form = els.ticketScanBody.querySelector("#ticketScanForm");
+    if (!form) return;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      state.ticketScanResult = readTicketScanForm(form);
+      if (!canImportScanResult(state.ticketScanResult)) {
+        renderTicketScanReview();
+        return;
+      }
+      await importScannedTicket(state.ticketScanResult);
+    });
+    form.addEventListener("change", (event) => {
+      const changedGame = event.target.name === "gameKey";
+      state.ticketScanResult = readTicketScanForm(form, changedGame);
+      renderTicketScanReview();
+    });
+    form.querySelector("[data-scan-again]")?.addEventListener("click", () => els.ticketScanInput?.click());
+    form.querySelector("[data-scan-add]")?.addEventListener("click", () => {
+      const result = readTicketScanForm(form);
+      result.tickets.push(result.gameKey === "dlt"
+        ? { front: [1, 2, 3, 4, 5], back: [1, 2], multiple: result.multiple }
+        : { red: [1, 2, 3, 4, 5, 6], blue: [1], multiple: result.multiple });
+      state.ticketScanResult = window.LotteryOCR.validateTicketResult(result);
+      renderTicketScanReview();
+    });
+    form.querySelectorAll("[data-scan-delete]").forEach((btn) => btn.addEventListener("click", () => {
+      const result = readTicketScanForm(form);
+      result.tickets.splice(Number(btn.dataset.scanDelete), 1);
+      state.ticketScanResult = window.LotteryOCR.validateTicketResult(result);
+      renderTicketScanReview();
+    }));
+  }
+
+  function readTicketScanForm(form, resetTickets = false) {
+    const data = new FormData(form);
+    const gameKey = data.get("gameKey") === "dlt" ? "dlt" : "ssq";
+    const multiple = clampInt(data.get("multiple"), 1, 99);
+    let tickets;
+    if (resetTickets || gameKey !== state.ticketScanResult?.gameKey) {
+      tickets = [gameKey === "dlt"
+        ? { front: [1, 2, 3, 4, 5], back: [1, 2], multiple }
+        : { red: [1, 2, 3, 4, 5, 6], blue: [1], multiple }];
+    } else {
+      const ticketCount = form.querySelectorAll("[data-scan-ticket]").length;
+      tickets = Array.from({ length: ticketCount }, (_, ticketIndex) => {
+        const values = (zone) => Array.from(form.querySelectorAll(`[data-ticket-index="${ticketIndex}"][data-scan-zone="${zone}"]`), (input) => Number(input.value));
+        return gameKey === "dlt"
+          ? { front: values("main"), back: values("extra"), multiple }
+          : { red: values("main"), blue: values("extra"), multiple };
+      });
+    }
+    const addOnValue = data.get("addOn");
+    return window.LotteryOCR.validateTicketResult({
+      ...state.ticketScanResult,
+      gameKey,
+      issue: String(data.get("issue") || "").trim(),
+      drawDate: String(data.get("drawDate") || ""),
+      saleDateTime: String(data.get("saleDateTime") || ""),
+      totalAmount: Number(data.get("totalAmount")) || null,
+      addOn: gameKey === "dlt" ? addOnValue === "true" ? true : addOnValue === "false" ? false : null : false,
+      multiple,
+      tickets,
+      errors: [],
+      warnings: []
+    });
+  }
+
+  function canImportScanResult(result) {
+    const drawCheck = getScanDrawCheck(result);
+    return Boolean(result && !result.errors.length && drawCheck?.status !== "error" && result.tickets.length && result.issue && result.drawDate && (result.gameKey !== "dlt" || result.addOn !== null));
+  }
+
+  async function importScannedTicket(result) {
+    const now = new Date().toISOString();
+    const createdAt = parseScanLocalDateTime(result.saleDateTime) || now;
+    const batchId = `ocr_${compactDate(now)}_${randomId()}`;
+    const price = result.gameKey === "dlt" && result.addOn ? 3 : 2;
+    const records = result.tickets.map((ticket, index) => {
+      const numbers = result.gameKey === "dlt"
+        ? { front: ticket.front, back: ticket.back, addOn: Boolean(result.addOn), playMode: result.addOn ? "add" : "normal" }
+        : { red: ticket.red, blue: ticket.blue };
+      return {
+        id: `${batchId}_${String(index + 1).padStart(3, "0")}`,
+        batchId,
+        gameKey: result.gameKey,
+        gameName: GAME_CONFIGS[result.gameKey].label,
+        playMode: result.gameKey === "dlt" ? result.addOn ? "add" : "normal" : "单式",
+        addOn: result.gameKey === "dlt" ? Boolean(result.addOn) : false,
+        expect: result.issue,
+        openDate: result.drawDate,
+        targetExpect: result.issue,
+        targetOpenDate: result.drawDate,
+        numbers,
+        price,
+        multiple: Number(ticket.multiple || result.multiple || 1),
+        status: "pending",
+        resultText: "待核对",
+        prizeAmount: 0,
+        source: "ocr",
+        ocrConfidence: result.confidence || 0,
+        scannedTicketAmount: result.totalAmount,
+        createdAt,
+        updatedAt: now
+      };
+    });
+    for (const record of records) await dbPut(record);
+    state.records = await dbGetAll();
+    state.ticketScanBusy = false;
+    closeTicketScan();
+    await ensurePendingRecordDraws();
+    await checkAllRecords(false);
+    toast(`已从彩票导入 ${records.length} 注`);
+  }
+
+  function parseScanLocalDateTime(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  }
+
+  function escapeScanText(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   /* ===== 连续累计盈亏折线 ===== */
