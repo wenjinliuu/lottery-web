@@ -41,7 +41,9 @@
     dltAddOn: false,
     calendar: null,
     loadedHistoryGames: new Set(),
-    historyLoadingGames: new Set()
+    historyLoadingGames: new Set(),
+    recordFilterGame: "all",
+    profitRange: "30"
   };
 
   const els = {};
@@ -82,8 +84,8 @@
       "mineRecordToggleBtn", "mineRecordList",
       "latestDrawsUpdated", "historyBackBtn", "toast",
       "themeToggleBtn", "themeToggleSub",
-      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub",
-      "myRecordsBackBtn", "myRecordsSummary",
+      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub", "profitRangeTabs",
+      "myRecordsBackBtn", "myRecordsSummary", "recordFilterChips", "recordFilterSummary",
       "wonRecordsBackBtn", "wonRecordsSummary", "wonRecordList", "mineWonRecordsBtn",
       "detailSheet", "detailSheetBackdrop", "detailSheetCloseBtn", "detailSheetTitle", "detailSheetSub", "detailSheetBody",
       "dltAddOnBtn",
@@ -247,6 +249,19 @@
     }
     els.exportBackupBtn.addEventListener("click", exportBackup);
     els.importBackupInput.addEventListener("change", importBackup);
+    if (els.profitRangeTabs) {
+      els.profitRangeTabs.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-profit-range]");
+        if (!btn) return;
+        state.profitRange = btn.dataset.profitRange || "30";
+        els.profitRangeTabs.querySelectorAll("[data-profit-range]").forEach((item) => {
+          const active = item.dataset.profitRange === state.profitRange;
+          item.classList.toggle("is-active", active);
+          item.setAttribute("aria-pressed", String(active));
+        });
+        renderProfitChart();
+      });
+    }
   }
 
   function syncPlayModeOptions() {
@@ -399,7 +414,7 @@
     renderTodayRecommend();
   }
 
-  /* ===== 今日推荐：从 calendar.json 计算今日开奖彩种并渲染彩色 chip ===== */
+  /* ===== 今日开奖：从 calendar.json 计算当日开奖彩种并渲染彩色 chip ===== */
 
   async function loadCalendar() {
     try {
@@ -1200,15 +1215,63 @@
   }
 
   function renderMyRecordsList() {
+    renderRecordFilters();
+    const filteredRecords = state.recordFilterGame === "all"
+      ? state.records
+      : state.records.filter((record) => record.gameKey === state.recordFilterGame);
     if (els.mineRecordList) {
-      renderRecordGroups(els.mineRecordList, state.records, {
-        emptyText: "暂无保存记录",
-        deleteScope: "all"
-      });
+      renderRecordTimeline(els.mineRecordList, filteredRecords);
     }
     if (els.myRecordsSummary) {
-      els.myRecordsSummary.textContent = `共 ${state.records.length} 条`;
+      const label = state.recordFilterGame === "all" ? "全部彩种" : (GAME_CONFIGS[state.recordFilterGame]?.label || state.recordFilterGame);
+      els.myRecordsSummary.textContent = `${label} · ${groupRecordsByBatch(filteredRecords).length} 次选号`;
     }
+    if (els.recordFilterSummary) {
+      const stats = summarizeRecords(filteredRecords);
+      const batchCount = groupRecordsByBatch(filteredRecords).length;
+      const label = state.recordFilterGame === "all" ? "全部彩种" : (GAME_CONFIGS[state.recordFilterGame]?.label || state.recordFilterGame);
+      const prize = stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize);
+      els.recordFilterSummary.textContent = `${label} · ${batchCount} 次选号 · ${filteredRecords.length} 注 · 花费 ${formatCompactMoney(stats.totalCost)} · 中奖 ${prize} · 中奖率 ${stats.winRate}%`;
+    }
+  }
+
+  function renderRecordFilters() {
+    if (!els.recordFilterChips) return;
+    const options = [{ key: "all", label: "全部" }].concat(GAME_ORDER.map((key) => ({ key, label: GAME_CONFIGS[key]?.label || key })));
+    els.recordFilterChips.innerHTML = options.map((option) => {
+      const active = option.key === state.recordFilterGame;
+      return `<button class="record-filter-btn${active ? " is-active" : ""}" type="button" data-record-filter="${option.key}" aria-pressed="${active}">${option.label}</button>`;
+    }).join("");
+    els.recordFilterChips.querySelectorAll("[data-record-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.recordFilterGame = btn.dataset.recordFilter || "all";
+        renderMyRecordsList();
+      });
+    });
+  }
+
+  function renderRecordTimeline(container, records) {
+    if (!records.length) {
+      container.className = "record-list empty empty-cta";
+      container.innerHTML = `
+        <div>当前筛选下暂无选号记录</div>
+        <button class="mini-blue has-icon" type="button" data-empty-go-random>
+          <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
+          <span>先去选几注</span>
+        </button>
+      `;
+      container.querySelector("[data-empty-go-random]")?.addEventListener("click", () => switchView("random"));
+      return;
+    }
+    const batches = groupRecordsByBatch(records);
+    container.className = "record-list record-timeline";
+    container.innerHTML = batches.map((batch, index) => {
+      const gameKey = batch.records[0]?.gameKey || "unknown";
+      return `<section class="record-timeline-item random-ticket-${gameKey}" style="--stagger-i:${index}">${renderRecordBatch(batch)}</section>`;
+    }).join("");
+    container.querySelectorAll("[data-delete-batch]").forEach((btn) => {
+      btn.addEventListener("click", async () => deleteRecordsByBatch(btn.dataset.deleteBatch));
+    });
   }
 
   function renderWonRecordsList() {
@@ -1295,13 +1358,14 @@
     const records = batch.records;
     const stats = summarizeRecords(records);
     const latest = records[0] || {};
+    const gameLabel = GAME_CONFIGS[latest.gameKey]?.label || latest.gameKey || "未知彩种";
     const modes = Array.from(new Set(records.map((record) => formatPlayMode(record.playMode)).filter(Boolean))).join("/");
     const issue = latest.targetExpect || latest.expect || "待定期号";
     return `
       <article class="record-batch-card">
         <div class="record-batch-head">
           <div>
-            <div class="record-batch-title">${formatDateTime(batch.createdAt)} · ${records.length} 注</div>
+            <div class="record-batch-title"><span class="record-batch-game">${gameLabel}</span>${formatDateTime(batch.createdAt)} · ${records.length} 注</div>
             <div class="record-batch-sub">第 ${issue} 期${modes ? ` · ${modes}` : ""}</div>
           </div>
           <div class="record-batch-summary">
@@ -1442,23 +1506,23 @@
     document.body.classList.remove("sheet-open");
   }
 
-  /* ===== 日盈亏 K 线 ===== */
+  /* ===== 连续累计盈亏 K 线 ===== */
 
   function renderProfitChart() {
     if (!els.profitChartWrap) return;
-    const series = buildDailyProfitSeries(state.records);
+    const series = buildDailyProfitSeries(state.records, state.profitRange);
     if (els.profitNetValue && els.profitNetDelta) {
-      const net = series.netTotal;
+      const net = series.closingBalance;
       const cls = net > 0 ? "is-positive" : net < 0 ? "is-negative" : "";
       els.profitNetValue.className = `profit-net-value ${cls}`;
       els.profitNetValue.textContent = `${net > 0 ? "+" : ""}${formatCompactMoney(net)}`;
       els.profitNetDelta.textContent = series.days.length
-        ? `投入 ${formatCompactMoney(series.costTotal)} / 中奖 ${formatCompactMoney(series.prizeTotal)}`
-        : "总盈亏";
+        ? `区间 ${series.netTotal > 0 ? "+" : ""}${formatCompactMoney(series.netTotal)} · 投入 ${formatCompactMoney(series.costTotal)}`
+        : "累计盈亏";
     }
     if (els.profitSub) {
       els.profitSub.textContent = series.days.length
-        ? `最近 ${series.days.length} 个开奖日 · 日净盈亏`
+        ? `${series.rangeLabel} · 每日收盘延续前一日`
         : "尚无完整数据";
     }
     if (!series.days.length) {
@@ -1479,23 +1543,49 @@
     bindProfitChartInteractions(series);
   }
 
-  function buildDailyProfitSeries(records) {
+  function buildDailyProfitSeries(records, range = "30") {
     const settled = (records || [])
       .filter((r) => r && (r.status === "won" || r.status === "lost") && r.createdAt)
       .slice()
-      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+      .sort((a, b) => {
+        const dateCompare = getRecordProfitDate(a).localeCompare(getRecordProfitDate(b));
+        return dateCompare || String(a.createdAt).localeCompare(String(b.createdAt));
+      });
 
     const dayMap = new Map();
     settled.forEach((record) => {
-      const date = formatDate(record.targetOpenDate || record.openDate || record.createdAt);
+      const date = getRecordProfitDate(record);
       if (!dayMap.has(date)) dayMap.set(date, []);
       dayMap.get(date).push(record);
     });
+    const availableDates = Array.from(dayMap.keys()).sort();
+    if (!availableDates.length) {
+      return { days: [], costTotal: 0, prizeTotal: 0, netTotal: 0, openingBalance: 0, closingBalance: 0, rangeLabel: range === "all" ? "全部" : `最近${range}天` };
+    }
 
-    const allDays = Array.from(dayMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, dayRecords]) => {
-      let running = 0;
-      let high = 0;
-      let low = 0;
+    const endDate = availableDates[availableDates.length - 1];
+    let startDate = availableDates[0];
+    if (range !== "all") {
+      const date = new Date(`${endDate}T12:00:00`);
+      date.setDate(date.getDate() - Math.max(0, Number(range) - 1));
+      startDate = formatDate(date);
+    }
+    const openingBalance = settled.reduce((sum, record) => {
+      if (getRecordProfitDate(record) >= startDate) return sum;
+      return sum + Number(record.prizeAmount || 0) - Number(record.price || 0) * Number(record.multiple || 1);
+    }, 0);
+
+    const dates = [];
+    for (let cursor = new Date(`${startDate}T12:00:00`), end = new Date(`${endDate}T12:00:00`); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      dates.push(formatDate(cursor));
+    }
+
+    let balance = openingBalance;
+    const days = dates.map((date) => {
+      const dayRecords = dayMap.get(date) || [];
+      const open = balance;
+      let high = open;
+      let low = open;
       let cost = 0;
       let prize = 0;
       const games = new Map();
@@ -1504,9 +1594,9 @@
         const itemPrize = Number(record.prizeAmount || 0);
         cost += itemCost;
         prize += itemPrize;
-        running += itemPrize - itemCost;
-        high = Math.max(high, running);
-        low = Math.min(low, running);
+        balance += itemPrize - itemCost;
+        high = Math.max(high, balance);
+        low = Math.min(low, balance);
         const gameKey = record.gameKey || "unknown";
         if (!games.has(gameKey)) games.set(gameKey, { cost: 0, prize: 0, count: 0 });
         const game = games.get(gameKey);
@@ -1519,8 +1609,8 @@
       return {
         date,
         t: new Date(`${date}T12:00:00`).getTime(),
-        open: 0,
-        close: prize - cost,
+        open,
+        close: balance,
         high,
         low,
         cost,
@@ -1532,15 +1622,23 @@
         games: Array.from(games.entries()).map(([gameKey, item]) => ({ gameKey, ...item }))
       };
     });
-    const days = allDays.slice(-30);
-    const costTotal = allDays.reduce((sum, day) => sum + day.cost, 0);
-    const prizeTotal = allDays.reduce((sum, day) => sum + day.prize, 0);
+    const costTotal = days.reduce((sum, day) => sum + day.cost, 0);
+    const prizeTotal = days.reduce((sum, day) => sum + day.prize, 0);
     return {
       days,
       costTotal,
       prizeTotal,
-      netTotal: prizeTotal - costTotal
+      netTotal: prizeTotal - costTotal,
+      openingBalance,
+      closingBalance: balance,
+      rangeLabel: range === "all" ? "全部记录" : `最近${range}天`
     };
+  }
+
+  function getRecordProfitDate(record) {
+    const value = record.targetOpenDate || record.openDate || record.createdAt;
+    const normalized = normalizeDate(value);
+    return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : formatDate(value);
   }
 
   function buildProfitChartSvg(series) {
@@ -1550,16 +1648,21 @@
     const innerH = H - padT - padB;
     const days = series.days;
     const allVals = days.flatMap((day) => [day.high, day.low, day.open, day.close]);
-    const yMin = Math.min(0, ...allVals);
-    const yMax = Math.max(0, ...allVals);
-    const yRange = (yMax - yMin) || 1;
+    const rawMin = Math.min(...allVals);
+    const rawMax = Math.max(...allVals);
+    const rawRange = (rawMax - rawMin) || Math.max(10, Math.abs(rawMax) * 0.12);
+    const yMin = rawMin - rawRange * 0.08;
+    const yMax = rawMax + rawRange * 0.08;
+    const yRange = yMax - yMin;
     const yOf = (v) => padT + (1 - (v - yMin) / yRange) * innerH;
     const slot = innerW / Math.max(days.length, 1);
-    const bodyW = Math.max(4, Math.min(12, slot * 0.48));
+    const bodyW = Math.max(1.2, Math.min(10, slot * 0.54));
 
     const gridYs = [0.0, 0.5, 1.0].map((p) => padT + p * innerH);
     const grid = gridYs.map((y) => `<line class="profit-grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}"/>`).join("");
-    const zeroLine = `<line class="profit-zero-line" x1="${padL}" y1="${yOf(0).toFixed(1)}" x2="${W - padR}" y2="${yOf(0).toFixed(1)}"/>`;
+    const zeroLine = yMin <= 0 && yMax >= 0
+      ? `<line class="profit-zero-line" x1="${padL}" y1="${yOf(0).toFixed(1)}" x2="${W - padR}" y2="${yOf(0).toFixed(1)}"/>`
+      : "";
 
     const yLabels = [yMax, yMin + yRange / 2, yMin].map((v, i) => {
       const y = padT + (i * innerH) / 2;
@@ -1579,26 +1682,37 @@
       ].join("");
     })();
 
+    const points = days.map((day, index) => `${(padL + slot * (index + 0.5)).toFixed(1)},${yOf(day.close).toFixed(1)}`).join(" ");
+    const trendSegments = days.slice(1).map((day, index) => {
+      const previous = days[index];
+      const x1 = padL + slot * (index + 0.5);
+      const x2 = padL + slot * (index + 1.5);
+      const cls = day.net > 0 ? "is-positive" : day.net < 0 ? "is-negative" : "is-flat";
+      return `<line class="profit-trend-segment ${cls}" x1="${x1.toFixed(1)}" y1="${yOf(previous.close).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${yOf(day.close).toFixed(1)}"/>`;
+    }).join("");
+
     const candles = days.map((day, index) => {
       const x = padL + slot * (index + 0.5);
       const openY = yOf(day.open);
       const closeY = yOf(day.close);
       const top = Math.min(openY, closeY);
       const height = Math.max(2, Math.abs(closeY - openY));
-      const cls = day.close > day.open ? "is-positive" : day.close < day.open ? "is-negative" : "is-flat";
+      const cls = day.net > 0 ? "is-positive" : day.net < 0 ? "is-negative" : "is-flat";
       return `
         <g class="profit-candle ${cls}" data-candle="${index}">
           <line class="profit-candle-wick" x1="${x.toFixed(1)}" y1="${yOf(day.high).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yOf(day.low).toFixed(1)}"/>
           <rect class="profit-candle-body" x="${(x - bodyW / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bodyW.toFixed(1)}" height="${height.toFixed(1)}"/>
-          <rect class="profit-candle-hit" data-candle-index="${index}" x="${(x - slot / 2).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，净盈亏${formatMoney(day.net)}"/>
+          <rect class="profit-candle-hit" data-candle-index="${index}" x="${Math.max(padL, x - slot / 2).toFixed(1)}" y="${padT}" width="${Math.max(1, slot).toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，当日盈亏${formatMoney(day.net)}，累计${formatMoney(day.close)}"/>
         </g>
       `;
     }).join("");
 
     return `
-      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="每日盈亏K线图">
+      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="累计盈亏K线图">
         ${grid}
         ${zeroLine}
+        <polyline class="profit-trend-line" points="${points}"/>
+        ${trendSegments}
         ${candles}
         ${yLabels}
         ${xLabels}
@@ -1627,7 +1741,8 @@
         <div class="profit-tooltip-grid">
           <span>花费</span><span>${formatMoney(day.cost)}</span>
           <span>中奖</span><span>${formatMoney(day.prize)}</span>
-          <span>净盈亏</span><span>${day.net > 0 ? "+" : ""}${formatMoney(day.net)}</span>
+          <span>当日盈亏</span><span>${day.net > 0 ? "+" : ""}${formatMoney(day.net)}</span>
+          <span>累计盈亏</span><span>${day.close > 0 ? "+" : ""}${formatMoney(day.close)}</span>
           <span>中奖率</span><span>${day.winRate}%</span>
         </div>
         <div class="profit-tooltip-games">${games || "无彩种明细"}</div>

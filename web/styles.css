@@ -240,7 +240,7 @@ button { border: 0; cursor: pointer; background: transparent; }
   letter-spacing: 0.04em;
 }
 
-/* 今日推荐 — 横向滚动 chip 列表 */
+/* 今日开奖 — 透明按钮行 */
 .today-recommend {
   display: flex;
   flex-direction: column;
@@ -264,20 +264,17 @@ button { border: 0; cursor: pointer; background: transparent; }
 .today-recommend-chips {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: 3px 3px 7px;
-  margin: 0 -3px;
+  overflow: visible;
+  padding: 4px 0 3px;
+  margin: 0;
   background: transparent;
   border: 0;
   box-shadow: none;
 }
-
-.today-recommend-chips::-webkit-scrollbar { display: none; }
 
 .today-recommend-empty {
   color: var(--muted-strong);
@@ -306,11 +303,11 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 .today-chip:active { transform: scale(0.94); filter: brightness(0.96); }
 
-/* 当前彩种激活态：同色外发光与轻微上浮，不占用按钮内部空间 */
+/* 当前彩种激活态：只放大并上浮，不使用描边或外圈 */
 .today-chip.is-active {
-  transform: translateY(-1px) scale(1.035);
-  filter: saturate(1.12) brightness(1.04);
-  box-shadow: 0 0 0 3px rgba(var(--chip-rgb), 0.20), 0 8px 18px rgba(var(--chip-rgb), 0.34);
+  transform: translateY(-3px) scale(1.085);
+  filter: saturate(1.12) brightness(1.06);
+  box-shadow: 0 9px 17px rgba(var(--chip-rgb), 0.30);
 }
 
 /* 八彩种 chip 颜色（与球色一致） */
@@ -1554,6 +1551,111 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 /* ---------- 18. 历史 ---------- */
 
+.record-filter-panel {
+  padding: 12px 13px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+}
+
+[data-theme="dark"] .record-filter-panel,
+:root:not([data-theme="light"]) .record-filter-panel {
+  background: rgba(15, 23, 42, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.10);
+}
+
+.record-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.record-filter-btn,
+.profit-range-btn {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--muted-strong);
+  background: rgba(241, 245, 249, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-glide), background var(--dur-fast) var(--ease-glide), color var(--dur-fast) var(--ease-glide);
+}
+
+[data-theme="dark"] .record-filter-btn,
+[data-theme="dark"] .profit-range-btn,
+:root:not([data-theme="light"]) .record-filter-btn,
+:root:not([data-theme="light"]) .profit-range-btn {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.14);
+}
+
+.record-filter-btn:active,
+.profit-range-btn:active { transform: scale(0.95); }
+
+.record-filter-btn.is-active,
+.profit-range-btn.is-active {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.28), 0 5px 12px rgba(71, 85, 105, 0.10);
+}
+
+[data-theme="dark"] .record-filter-btn.is-active,
+[data-theme="dark"] .profit-range-btn.is-active,
+:root:not([data-theme="light"]) .record-filter-btn.is-active,
+:root:not([data-theme="light"]) .profit-range-btn.is-active {
+  color: #f8fafc;
+  background: rgba(203, 213, 225, 0.18);
+}
+
+.record-filter-summary {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.record-timeline-item {
+  position: relative;
+  padding: 1px;
+  border-radius: 19px;
+  box-shadow: var(--shadow-l1);
+  overflow: hidden;
+  animation: card-in var(--dur-slow) var(--ease-spring) both;
+  animation-delay: calc(var(--stagger-i, 0) * 36ms);
+}
+
+.record-timeline-item .record-batch-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+[data-theme="dark"] .record-timeline-item .record-batch-card,
+:root:not([data-theme="light"]) .record-timeline-item .record-batch-card { background: rgba(15, 23, 42, 0.54); }
+
+.record-batch-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.record-batch-game {
+  padding: 3px 7px;
+  border-radius: var(--r-pill);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 0 0 1px var(--glass-stroke);
+  font-size: 11px;
+}
+
 .history-title {
   color: var(--ink);
   font-size: 26px;
@@ -1732,7 +1834,7 @@ button { border: 0; cursor: pointer; background: transparent; }
 
 #mineRecordPanel[hidden] { display: none; }
 
-/* === 日盈亏 K 线 === */
+/* === 连续累计盈亏 K 线 === */
 
 .profit-card { padding: 16px 16px 14px; }
 
@@ -1836,6 +1938,31 @@ button { border: 0; cursor: pointer; background: transparent; }
 .profit-candle.is-active .profit-candle-body {
   filter: drop-shadow(0 0 4px rgba(74, 108, 247, 0.58));
 }
+
+.profit-trend-line {
+  fill: none;
+  stroke: rgba(71, 85, 105, 0.30);
+  stroke-width: 3.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.profit-trend-segment {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.profit-trend-segment.is-positive { stroke: #10b981; }
+.profit-trend-segment.is-negative { stroke: #ef4444; }
+.profit-trend-segment.is-flat { stroke: #94a3b8; }
+
+.profit-range-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.profit-range-btn { min-width: 58px; }
 .profit-axis-label {
   fill: var(--muted);
   font-size: 10px;
@@ -1903,6 +2030,12 @@ button { border: 0; cursor: pointer; background: transparent; }
 }
 .profit-legend-dot.is-positive { background: #10b981; }
 .profit-legend-dot.is-negative { background: #ef4444; }
+.profit-legend-line {
+  width: 14px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ef4444, #10b981);
+}
 
 .profit-tooltip {
   position: absolute;

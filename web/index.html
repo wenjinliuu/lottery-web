@@ -29,7 +29,7 @@
             <span class="week-inline" id="weekTitle">星期</span>
           </div>
           <div class="today-recommend" id="todayRecommend">
-            <span class="today-recommend-label">今日推荐</span>
+            <span class="today-recommend-label">今日开奖</span>
             <div class="today-recommend-chips" id="todayRecommendChips"><span class="today-recommend-empty">加载中…</span></div>
           </div>
         </div>
@@ -158,6 +158,10 @@
               <span>返回</span>
             </button>
           </div>
+          <section class="record-filter-panel" aria-label="按彩种筛选选号记录">
+            <div class="record-filter-chips" id="recordFilterChips"></div>
+            <div class="record-filter-summary" id="recordFilterSummary">全部彩种 · 暂无记录</div>
+          </section>
           <section class="card check-records-card">
             <div id="mineRecordList" class="record-list empty" aria-live="polite">暂无保存记录</div>
           </section>
@@ -226,9 +230,15 @@
             <div class="profit-chart-wrap" id="profitChartWrap">
               <div class="profit-empty" id="profitEmpty">暂无数据，先去选号吧</div>
             </div>
+            <div class="profit-range-tabs" id="profitRangeTabs" aria-label="收益趋势时间范围">
+              <button class="profit-range-btn is-active" type="button" data-profit-range="30" aria-pressed="true">30天</button>
+              <button class="profit-range-btn" type="button" data-profit-range="90" aria-pressed="false">90天</button>
+              <button class="profit-range-btn" type="button" data-profit-range="all" aria-pressed="false">全部</button>
+            </div>
             <div class="profit-legend">
               <span class="profit-legend-item"><span class="profit-legend-dot is-positive"></span>当日盈利</span>
               <span class="profit-legend-item"><span class="profit-legend-dot is-negative"></span>当日亏损</span>
+              <span class="profit-legend-item"><span class="profit-legend-line"></span>累计走势</span>
               <span class="profit-legend-item">长按查看详情</span>
             </div>
           </section>
