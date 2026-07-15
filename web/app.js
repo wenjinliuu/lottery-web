@@ -68,6 +68,8 @@
       syncDefaultPrice();
       renderCountTabs();
     }
+    /* 自动确定首屏彩种后，再同步一次今日开奖 chip 的激活态。 */
+    renderTodayRecommend();
     randomizeTickets();
     renderBackupHint();
   }
@@ -84,7 +86,7 @@
       "mineRecordToggleBtn", "mineRecordList",
       "latestDrawsUpdated", "historyBackBtn", "toast",
       "themeToggleBtn", "themeToggleSub",
-      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitNetDelta", "profitSub", "profitRangeTabs",
+      "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitSub", "profitRangeTabs",
       "myRecordsBackBtn", "myRecordsSummary", "recordFilterChips", "recordFilterSummary",
       "wonRecordsBackBtn", "wonRecordsSummary", "wonRecordList", "mineWonRecordsBtn",
       "detailSheet", "detailSheetBackdrop", "detailSheetCloseBtn", "detailSheetTitle", "detailSheetSub", "detailSheetBody",
@@ -1506,23 +1508,20 @@
     document.body.classList.remove("sheet-open");
   }
 
-  /* ===== 连续累计盈亏 K 线 ===== */
+  /* ===== 连续累计盈亏折线 ===== */
 
   function renderProfitChart() {
     if (!els.profitChartWrap) return;
     const series = buildDailyProfitSeries(state.records, state.profitRange);
-    if (els.profitNetValue && els.profitNetDelta) {
+    if (els.profitNetValue) {
       const net = series.closingBalance;
       const cls = net > 0 ? "is-positive" : net < 0 ? "is-negative" : "";
       els.profitNetValue.className = `profit-net-value ${cls}`;
       els.profitNetValue.textContent = `${net > 0 ? "+" : ""}${formatCompactMoney(net)}`;
-      els.profitNetDelta.textContent = series.days.length
-        ? `区间 ${series.netTotal > 0 ? "+" : ""}${formatCompactMoney(series.netTotal)} · 投入 ${formatCompactMoney(series.costTotal)}`
-        : "累计盈亏";
     }
     if (els.profitSub) {
       els.profitSub.textContent = series.days.length
-        ? `${series.rangeLabel} · 每日收盘延续前一日`
+        ? `${series.rangeLabel} · 累计走势`
         : "尚无完整数据";
     }
     if (!series.days.length) {
@@ -1647,7 +1646,7 @@
     const innerW = W - padL - padR;
     const innerH = H - padT - padB;
     const days = series.days;
-    const allVals = days.flatMap((day) => [day.high, day.low, day.open, day.close]);
+    const allVals = days.map((day) => day.close);
     const rawMin = Math.min(...allVals);
     const rawMax = Math.max(...allVals);
     const rawRange = (rawMax - rawMin) || Math.max(10, Math.abs(rawMax) * 0.12);
@@ -1655,8 +1654,9 @@
     const yMax = rawMax + rawRange * 0.08;
     const yRange = yMax - yMin;
     const yOf = (v) => padT + (1 - (v - yMin) / yRange) * innerH;
-    const slot = innerW / Math.max(days.length, 1);
-    const bodyW = Math.max(1.2, Math.min(10, slot * 0.54));
+    const xOf = (index) => days.length === 1
+      ? padL + innerW / 2
+      : padL + (innerW * index) / (days.length - 1);
 
     const gridYs = [0.0, 0.5, 1.0].map((p) => padT + p * innerH);
     const grid = gridYs.map((y) => `<line class="profit-grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}"/>`).join("");
@@ -1682,38 +1682,55 @@
       ].join("");
     })();
 
-    const points = days.map((day, index) => `${(padL + slot * (index + 0.5)).toFixed(1)},${yOf(day.close).toFixed(1)}`).join(" ");
-    const trendSegments = days.slice(1).map((day, index) => {
-      const previous = days[index];
-      const x1 = padL + slot * (index + 0.5);
-      const x2 = padL + slot * (index + 1.5);
-      const cls = day.net > 0 ? "is-positive" : day.net < 0 ? "is-negative" : "is-flat";
-      return `<line class="profit-trend-segment ${cls}" x1="${x1.toFixed(1)}" y1="${yOf(previous.close).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${yOf(day.close).toFixed(1)}"/>`;
+    const RED = "#ef4444", GREEN = "#10b981";
+    const directions = days.slice(1).map((day, index) => Math.sign(day.close - days[index].close));
+    const segmentColors = directions.map((direction, index) => {
+      if (direction > 0) return GREEN;
+      if (direction < 0) return RED;
+      for (let i = index - 1; i >= 0; i -= 1) {
+        if (directions[i] !== 0) return directions[i] > 0 ? GREEN : RED;
+      }
+      for (let i = index + 1; i < directions.length; i += 1) {
+        if (directions[i] !== 0) return directions[i] > 0 ? GREEN : RED;
+      }
+      return RED;
+    });
+    const gradients = segmentColors.map((color, index) => {
+      const previousColor = index ? segmentColors[index - 1] : color;
+      if (previousColor === color) return "";
+      return `<linearGradient id="profit-gradient-${index}" gradientUnits="userSpaceOnUse" x1="${xOf(index).toFixed(1)}" y1="${yOf(days[index].close).toFixed(1)}" x2="${xOf(index + 1).toFixed(1)}" y2="${yOf(days[index + 1].close).toFixed(1)}"><stop offset="0%" stop-color="${previousColor}"/><stop offset="45%" stop-color="${color}"/><stop offset="100%" stop-color="${color}"/></linearGradient>`;
+    }).join("");
+    const lineSegments = days.slice(1).map((day, index) => {
+      const color = segmentColors[index];
+      const previousColor = index ? segmentColors[index - 1] : color;
+      const stroke = previousColor === color ? color : `url(#profit-gradient-${index})`;
+      return `<line class="profit-line-segment" x1="${xOf(index).toFixed(1)}" y1="${yOf(days[index].close).toFixed(1)}" x2="${xOf(index + 1).toFixed(1)}" y2="${yOf(day.close).toFixed(1)}" stroke="${stroke}"/>`;
     }).join("");
 
-    const candles = days.map((day, index) => {
-      const x = padL + slot * (index + 0.5);
-      const openY = yOf(day.open);
-      const closeY = yOf(day.close);
-      const top = Math.min(openY, closeY);
-      const height = Math.max(2, Math.abs(closeY - openY));
-      const cls = day.net > 0 ? "is-positive" : day.net < 0 ? "is-negative" : "is-flat";
+    const points = days.map((day, index) => {
+      const x = xOf(index);
+      const left = index === 0 ? padL : (xOf(index - 1) + x) / 2;
+      const right = index === days.length - 1 ? W - padR : (x + xOf(index + 1)) / 2;
+      const markerColor = index && segmentColors[index - 1] ? segmentColors[index - 1] : RED;
       return `
-        <g class="profit-candle ${cls}" data-candle="${index}">
-          <line class="profit-candle-wick" x1="${x.toFixed(1)}" y1="${yOf(day.high).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yOf(day.low).toFixed(1)}"/>
-          <rect class="profit-candle-body" x="${(x - bodyW / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bodyW.toFixed(1)}" height="${height.toFixed(1)}"/>
-          <rect class="profit-candle-hit" data-candle-index="${index}" x="${Math.max(padL, x - slot / 2).toFixed(1)}" y="${padT}" width="${Math.max(1, slot).toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，当日盈亏${formatMoney(day.net)}，累计${formatMoney(day.close)}"/>
+        <g class="profit-point" data-profit-point="${index}">
+          <circle class="profit-point-marker" cx="${x.toFixed(1)}" cy="${yOf(day.close).toFixed(1)}" r="4" stroke="${markerColor}"/>
+          <rect class="profit-point-hit" data-profit-point-index="${index}" x="${left.toFixed(1)}" y="${padT}" width="${Math.max(1, right - left).toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，累计盈亏${formatMoney(day.close)}"/>
         </g>
       `;
     }).join("");
+    const singlePoint = days.length === 1
+      ? `<circle class="profit-single-point" cx="${xOf(0).toFixed(1)}" cy="${yOf(days[0].close).toFixed(1)}" r="2.5"/>`
+      : "";
 
     return `
-      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="累计盈亏K线图">
+      <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="累计盈亏折线图">
+        <defs>${gradients}</defs>
         ${grid}
         ${zeroLine}
-        <polyline class="profit-trend-line" points="${points}"/>
-        ${trendSegments}
-        ${candles}
+        ${lineSegments}
+        ${singlePoint}
+        ${points}
         ${yLabels}
         ${xLabels}
       </svg>
@@ -1728,24 +1745,18 @@
     const show = (index, clientX) => {
       const day = series.days[index];
       if (!day) return;
-      wrap.querySelectorAll(".profit-candle").forEach((item) => item.classList.toggle("is-active", item.dataset.candle === String(index)));
+      wrap.querySelectorAll(".profit-point").forEach((item) => item.classList.toggle("is-active", item.dataset.profitPoint === String(index)));
       let tooltip = wrap.querySelector(".profit-tooltip");
       if (!tooltip) {
         tooltip = document.createElement("div");
         tooltip.className = "profit-tooltip";
         wrap.appendChild(tooltip);
       }
-      const games = day.games.map((game) => `${GAME_CONFIGS[game.gameKey]?.label || game.gameKey} ${game.count}注`).join(" · ");
       tooltip.innerHTML = `
         <div class="profit-tooltip-date">${day.date}</div>
         <div class="profit-tooltip-grid">
-          <span>花费</span><span>${formatMoney(day.cost)}</span>
-          <span>中奖</span><span>${formatMoney(day.prize)}</span>
-          <span>当日盈亏</span><span>${day.net > 0 ? "+" : ""}${formatMoney(day.net)}</span>
           <span>累计盈亏</span><span>${day.close > 0 ? "+" : ""}${formatMoney(day.close)}</span>
-          <span>中奖率</span><span>${day.winRate}%</span>
         </div>
-        <div class="profit-tooltip-games">${games || "无彩种明细"}</div>
       `;
       const rect = wrap.getBoundingClientRect();
       const fallbackX = rect.left + ((index + 0.5) / series.days.length) * rect.width;
@@ -1755,11 +1766,11 @@
       window.clearTimeout(hideTimer);
       hideTimer = window.setTimeout(() => {
         tooltip.remove();
-        wrap.querySelectorAll(".profit-candle").forEach((item) => item.classList.remove("is-active"));
+        wrap.querySelectorAll(".profit-point").forEach((item) => item.classList.remove("is-active"));
       }, 5000);
     };
-    wrap.querySelectorAll("[data-candle-index]").forEach((hit) => {
-      const index = Number(hit.dataset.candleIndex);
+    wrap.querySelectorAll("[data-profit-point-index]").forEach((hit) => {
+      const index = Number(hit.dataset.profitPointIndex);
       hit.addEventListener("pointerdown", (event) => {
         window.clearTimeout(pressTimer);
         pressTimer = window.setTimeout(() => show(index, event.clientX), 380);

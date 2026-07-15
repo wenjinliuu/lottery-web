@@ -1922,38 +1922,22 @@ button { border: 0; cursor: pointer; background: transparent; }
   stroke-dasharray: 4 3;
 }
 
-.profit-candle-wick {
-  stroke-width: 1.6;
+.profit-line-segment {
+  stroke-width: 2.8;
   stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
 }
 
-.profit-candle-body { rx: 1.5; }
-.profit-candle.is-positive .profit-candle-wick { stroke: #10b981; }
-.profit-candle.is-positive .profit-candle-body { fill: #10b981; }
-.profit-candle.is-negative .profit-candle-wick { stroke: #ef4444; }
-.profit-candle.is-negative .profit-candle-body { fill: #ef4444; }
-.profit-candle.is-flat .profit-candle-wick { stroke: #94a3b8; }
-.profit-candle.is-flat .profit-candle-body { fill: #94a3b8; }
-.profit-candle-hit { fill: transparent; cursor: pointer; }
-.profit-candle.is-active .profit-candle-body {
-  filter: drop-shadow(0 0 4px rgba(74, 108, 247, 0.58));
+.profit-point-marker {
+  fill: var(--surface);
+  stroke-width: 2.2;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  vector-effect: non-scaling-stroke;
 }
-
-.profit-trend-line {
-  fill: none;
-  stroke: rgba(71, 85, 105, 0.30);
-  stroke-width: 3.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.profit-trend-segment {
-  stroke-width: 2.4;
-  stroke-linecap: round;
-}
-.profit-trend-segment.is-positive { stroke: #10b981; }
-.profit-trend-segment.is-negative { stroke: #ef4444; }
-.profit-trend-segment.is-flat { stroke: #94a3b8; }
+.profit-point.is-active .profit-point-marker { opacity: 1; }
+.profit-point-hit { fill: transparent; cursor: pointer; }
+.profit-single-point { fill: #ef4444; }
 
 .profit-range-tabs {
   display: flex;
@@ -2007,34 +1991,12 @@ button { border: 0; cursor: pointer; background: transparent; }
 [data-theme="dark"] .profit-dot,
 :root:not([data-theme="light"]) .profit-dot { fill: #14182a; }
 
-.profit-legend {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 14px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-.profit-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-  font-size: 12px;
+.profit-chart-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 700;
-}
-.profit-legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.profit-legend-dot.is-positive { background: #10b981; }
-.profit-legend-dot.is-negative { background: #ef4444; }
-.profit-legend-line {
-  width: 14px;
-  height: 3px;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #ef4444, #10b981);
+  text-align: center;
 }
 
 .profit-tooltip {
