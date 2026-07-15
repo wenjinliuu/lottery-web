@@ -710,6 +710,11 @@ button { border: 0; cursor: pointer; background: transparent; }
   background: linear-gradient(180deg, rgba(254, 243, 199, 0.92), rgba(255, 255, 255, 0.34));
   box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.28);
 }
+.draft-draw-tag[data-tone="inferred"] {
+  color: #a16207;
+  background: linear-gradient(180deg, rgba(254, 249, 195, 0.92), rgba(255, 255, 255, 0.34));
+  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.28);
+}
 .draft-draw-tag[data-tone="muted"] {
   color: var(--muted-strong);
   background: var(--glass-tint-soft);
@@ -726,6 +731,42 @@ button { border: 0; cursor: pointer; background: transparent; }
   color: #fcd34d;
   background: linear-gradient(180deg, rgba(245, 158, 11, 0.22), rgba(245, 158, 11, 0.06));
 }
+[data-theme="dark"] .draft-draw-tag[data-tone="inferred"],
+:root:not([data-theme="light"]) .draft-draw-tag[data-tone="inferred"] {
+  color: #fde68a;
+  background: linear-gradient(180deg, rgba(202, 138, 4, 0.24), rgba(202, 138, 4, 0.07));
+}
+
+.draft-draw-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted-strong);
+  background: var(--glass-tint-soft);
+  box-shadow: inset 0 0 0 1px var(--glass-stroke);
+}
+.draft-draw-refresh .icn { width: 14px; height: 14px; }
+.draft-draw-refresh:active { transform: scale(0.92); }
+.draft-draw-refresh.is-loading .icn { animation: draft-refresh-spin 0.8s linear infinite; }
+.draft-draw-refresh[disabled] { opacity: 0.55; cursor: wait; }
+@keyframes draft-refresh-spin { to { transform: rotate(360deg); } }
+
+.record-target-state {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: 1px;
+}
+.record-target-state.is-inferred { color: #a16207; background: rgba(250, 204, 21, 0.16); }
+.record-target-state.is-review { color: #b91c1c; background: rgba(248, 113, 113, 0.16); }
 .check-page-head > div:first-child,
 .check-records-head > div:first-child,
 .history-head > .history-title-wrap { min-width: 0; flex: 1 1 auto; }
