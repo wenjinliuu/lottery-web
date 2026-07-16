@@ -30,6 +30,10 @@
     const normalized = String(token || "")
       .replace(/[OoQqDd]/g, "0")
       .replace(/[Il|!]/g, "1")
+      .replace(/[Zz]/g, "2")
+      .replace(/[Ss]/g, "5")
+      .replace(/[Gg]/g, "6")
+      .replace(/[Bb]/g, "8")
       .replace(/[^0-9]/g, "");
     if (!normalized || normalized.length > 2) return null;
     return Number(normalized);
@@ -37,7 +41,7 @@
 
   function extractNumberTokens(value) {
     const source = String(value || "");
-    const matches = source.match(/[0-9OQDIloq|!]{2}/g) || [];
+    const matches = source.match(/[0-9OQDIloq|!ZzSsGgBb]{2}/g) || [];
     return matches.map(normalizeDigitToken).filter((item) => Number.isFinite(item));
   }
 
@@ -83,10 +87,18 @@
       let red = [];
       let blue;
       if (dash >= 0) {
-        const left = extractNumberTokens(line.slice(0, dash));
-        const right = extractNumberTokens(line.slice(dash + 1));
+        const leftSource = line.slice(0, dash);
+        const rightSource = line.slice(dash + 1);
+        const left = extractNumberTokens(leftSource);
+        const right = extractNumberTokens(rightSource);
         red = left.slice(-6);
         blue = right[0];
+        if (red.length !== 6 || !red.every((n) => n >= 1 && n <= 33) || !isAscendingUnique(red)) {
+          red = extractCompactNumberSequence(leftSource, 6, 33);
+        }
+        if (!Number.isFinite(blue) || blue < 1 || blue > 16) {
+          blue = extractCompactNumberSequence(rightSource, 1, 16)[0];
+        }
       } else if (/^\s*[A-E][.·:：\s]/i.test(line)) {
         /* 双色球单式票固定使用 A-E 行号；分隔横线漏识别时仍可按 6+1 解析。 */
         const withoutMultiple = line.replace(/\(\s*[0-9OQDIloq|!]{1,2}\s*\)?\s*$/, "");
@@ -251,6 +263,21 @@
     return dates.sort((a, b) => a.index - b.index);
   }
 
+  function chooseDrawDate(dates, timedDate) {
+    const candidates = dates.filter((item) => !item.hasTime);
+    if (!candidates.length) return dates[0];
+    if (timedDate) {
+      const saleTime = new Date(`${timedDate.value}T12:00:00`).getTime();
+      const nearby = candidates
+        .map((item) => ({ item, distance: Math.abs(new Date(`${item.value}T12:00:00`).getTime() - saleTime) }))
+        .filter(({ distance }) => distance <= 370 * 86400000)
+        .sort((a, b) => a.distance - b.distance || a.item.index - b.item.index);
+      if (nearby.length) return nearby[0].item;
+    }
+    const latestPlausibleYear = new Date().getFullYear() + 2;
+    return candidates.find((item) => Number(item.value.slice(0, 4)) <= latestPlausibleYear) || candidates[0];
+  }
+
   function extractTotal(text) {
     const lines = normalizeText(text).split("\n");
     for (const line of lines) {
@@ -279,7 +306,7 @@
     const tickets = gameKey === "dlt" ? dltTickets : ssqTickets;
     const dates = extractDates(text);
     const timedDate = dates.find((item) => item.hasTime);
-    const drawDateItem = dates.find((item) => !item.hasTime) || dates[0];
+    const drawDateItem = chooseDrawDate(dates, timedDate);
     const totalAmount = extractTotal(text);
     const dltMode = gameKey === "dlt" ? extractDltMode(text) : { addOn: false, multiple: null };
     let multiple = dltMode.multiple || null;
@@ -566,6 +593,26 @@
     ];
   }
 
+  function buildHighContrastCanvas(source) {
+    const scale = 1.35;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(source.width * scale);
+    canvas.height = Math.round(source.height * scale);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let index = 0; index < data.data.length; index += 4) {
+      const gray = data.data[index];
+      const value = gray < 172 ? 0 : 255;
+      data.data[index] = value;
+      data.data[index + 1] = value;
+      data.data[index + 2] = value;
+    }
+    ctx.putImageData(data, 0, 0);
+    return canvas;
+  }
+
   async function recognizeFile(file, onProgress) {
     const canvas = await prepareImage(file);
     const numberRegions = buildNumberRegionCanvases(canvas);
@@ -620,6 +667,27 @@
           const regionPass = await worker.recognize(numberRegions[index]);
           mergedText += `\n---NUMBER-RECHECK---\n${regionPass.data.text}`;
           confidence = Math.max(confidence, regionPass.data.confidence);
+        }
+        const provisional = parseLotteryTicketText(mergedText, confidence);
+        const missingTicket = provisional.warnings.some((message) => message.includes("当前识别到"));
+        if (missingTicket) {
+          const recoveryCanvas = buildHighContrastCanvas(numberRegions[0]);
+          try {
+            phaseStart = 0.97;
+            phaseSpan = 0.02;
+            onProgress?.({ progress: phaseStart, label: "正在补查可能漏掉的号码行" });
+            await worker.setParameters({
+              tessedit_pageseg_mode: "6",
+              preserve_interword_spaces: "1",
+              tessedit_char_whitelist: "ABCDEabcde0123456789+-() "
+            });
+            const recoveryPass = await worker.recognize(recoveryCanvas);
+            mergedText += `\n---NUMBER-RECHECK---\n${recoveryPass.data.text}`;
+            confidence = Math.max(confidence, recoveryPass.data.confidence);
+          } finally {
+            recoveryCanvas.width = 1;
+            recoveryCanvas.height = 1;
+          }
         }
       } catch (error) {
         /* 中文主识别已成功时，号码复核失败不阻断用户手动确认。 */
