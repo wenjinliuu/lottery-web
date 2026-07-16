@@ -1865,7 +1865,7 @@
       <section class="scan-ball-sheet" role="dialog" aria-modal="true" aria-labelledby="scanBallPickerTitle">
         <div class="scan-ball-sheet-handle" aria-hidden="true"></div>
         <div class="scan-ball-picker">
-          <div class="scan-ball-picker-head"><strong id="scanBallPickerTitle">手动新增一注</strong><span>已选 ${draft.main.length + draft.extra.length}/${config.mainCount + config.extraCount}</span></div>
+          <div class="scan-ball-picker-head"><strong id="scanBallPickerTitle">手动新增一注</strong><span data-scan-pick-count>已选 ${draft.main.length + draft.extra.length}/${config.mainCount + config.extraCount}</span></div>
           <div class="scan-ball-sheet-scroll">
             <div class="scan-pick-section"><div><strong>${config.mainLabel}</strong><span>选择 ${config.mainCount} 个</span></div><div class="scan-pick-grid">${group("main", config.mainMax, draft.main, config.mainTone)}</div></div>
             <div class="scan-pick-section"><div><strong>${config.extraLabel}</strong><span>选择 ${config.extraCount} 个</span></div><div class="scan-pick-grid">${group("extra", config.extraMax, draft.extra, config.extraTone)}</div></div>
@@ -1926,7 +1926,6 @@
       requestAnimationFrame(() => els.ticketScan?.querySelector("[data-scan-pick-zone]")?.focus({ preventScroll: true }));
     });
     pickerRoot.querySelectorAll("[data-scan-pick-zone]").forEach((btn) => btn.addEventListener("click", () => {
-      const pickerScrollTop = pickerRoot.querySelector(".scan-ball-sheet-scroll")?.scrollTop || 0;
       state.ticketScanResult = readTicketScanForm(form);
       const config = getScanBallConfig(state.ticketScanResult.gameKey);
       const zone = btn.dataset.scanPickZone === "extra" ? "extra" : "main";
@@ -1941,12 +1940,17 @@
       else toast(`最多选择 ${maxCount} 个号码`);
       draft[zone] = values.sort((a, b) => a - b);
       state.ticketScanAddDraft = draft;
-      renderTicketScanReview();
-      requestAnimationFrame(() => {
-        const scroll = els.ticketScan?.querySelector(".scan-ball-sheet-scroll");
-        if (scroll) scroll.scrollTop = pickerScrollTop;
-        els.ticketScan?.querySelector(`[data-scan-pick-zone="${zone}"][data-scan-pick-number="${number}"]`)?.focus({ preventScroll: true });
+      pickerRoot.querySelectorAll(`[data-scan-pick-zone="${zone}"]`).forEach((ball) => {
+        const selected = draft[zone].includes(Number(ball.dataset.scanPickNumber));
+        ball.classList.toggle("is-selected", selected);
+        ball.setAttribute("aria-pressed", String(selected));
       });
+      const selectedCount = draft.main.length + draft.extra.length;
+      const requiredCount = config.mainCount + config.extraCount;
+      const countLabel = pickerRoot.querySelector("[data-scan-pick-count]");
+      if (countLabel) countLabel.textContent = `已选 ${selectedCount}/${requiredCount}`;
+      const confirm = pickerRoot.querySelector("[data-scan-pick-confirm]");
+      if (confirm) confirm.disabled = draft.main.length !== config.mainCount || draft.extra.length !== config.extraCount;
     }));
     pickerRoot.querySelector("[data-scan-pick-cancel]")?.addEventListener("click", () => {
       state.ticketScanResult = readTicketScanForm(form);
