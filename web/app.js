@@ -96,7 +96,7 @@
       "myRecordsBackBtn", "myRecordsSummary", "recordFilterChips", "recordFilterSummary",
       "wonRecordsBackBtn", "wonRecordsSummary", "wonRecordList", "mineWonRecordsBtn",
       "detailSheet", "detailSheetBackdrop", "detailSheetCloseBtn", "detailSheetTitle", "detailSheetSub", "detailSheetBody",
-      "scanTicketBtn", "ticketScan", "ticketScanBackdrop", "ticketScanCloseBtn", "ticketScanTitle", "ticketScanSub", "ticketScanBody", "ticketScanInput",
+      "scanTicketBtn", "ticketScan", "ticketScanBackdrop", "ticketScanCloseBtn", "ticketScanTitle", "ticketScanSub", "ticketScanBody", "ticketScanOverlay", "ticketScanInput",
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
       "lastBackupHint",
@@ -1699,11 +1699,15 @@
     state.ticketScanResult = null;
     state.ticketScanPreview = "";
     state.ticketScanAddDraft = null;
+    els.ticketScan.classList.remove("is-picking");
+    if (els.ticketScanOverlay) els.ticketScanOverlay.innerHTML = "";
     if (els.ticketScanInput) els.ticketScanInput.value = "";
   }
 
   function renderTicketScanIntro(errorText = "") {
     if (!els.ticketScanBody) return;
+    els.ticketScan.classList.remove("is-picking");
+    if (els.ticketScanOverlay) els.ticketScanOverlay.innerHTML = "";
     els.ticketScanTitle.textContent = "扫描彩票";
     els.ticketScanSub.textContent = "图片只在本机识别，不会上传或保存";
     els.ticketScanBody.innerHTML = `
@@ -1756,6 +1760,8 @@
 
   function renderTicketScanProgress(progress = 0, label = "正在本地识别") {
     if (!els.ticketScanBody) return;
+    els.ticketScan.classList.remove("is-picking");
+    if (els.ticketScanOverlay) els.ticketScanOverlay.innerHTML = "";
     const value = Math.max(2, Math.min(100, Math.round((Number(progress) || 0) * 100)));
     els.ticketScanTitle.textContent = "正在识别彩票";
     els.ticketScanSub.textContent = "首次使用需要下载识别模型，之后会自动缓存";
@@ -1803,7 +1809,6 @@
           ${result.tickets.map((ticket, index) => renderScanTicketEditor(result.gameKey, ticket, index, result.tickets.length)).join("")}
         </div>
         <button class="scan-add-ticket" type="button" data-scan-add>＋ 新增一注</button>
-        ${state.ticketScanAddDraft ? renderScanBallPicker(result.gameKey, state.ticketScanAddDraft) : ""}
         ${renderScanValidationMessages(result)}
         <div class="scan-cost-check"><span>${result.tickets.length}注 · 按号码计算</span><strong>${formatMoney(result.calculatedAmount)}</strong></div>
         <div class="scan-review-actions">
@@ -1812,6 +1817,12 @@
         </div>
       </form>
     `;
+    els.ticketScan.classList.toggle("is-picking", Boolean(state.ticketScanAddDraft));
+    if (els.ticketScanOverlay) {
+      els.ticketScanOverlay.innerHTML = state.ticketScanAddDraft
+        ? renderScanBallPicker(result.gameKey, state.ticketScanAddDraft)
+        : "";
+    }
     bindTicketScanReview();
   }
 
@@ -1887,6 +1898,7 @@
   function bindTicketScanReview() {
     const form = els.ticketScanBody.querySelector("#ticketScanForm");
     if (!form) return;
+    const pickerRoot = els.ticketScanOverlay || form;
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       state.ticketScanResult = readTicketScanForm(form);
@@ -1911,10 +1923,10 @@
       state.ticketScanAddDraft = { gameKey: state.ticketScanResult.gameKey, main: [], extra: [] };
       renderTicketScanReview();
       if (els.ticketScanBody) els.ticketScanBody.scrollTop = 0;
-      requestAnimationFrame(() => els.ticketScanBody?.querySelector("[data-scan-pick-zone]")?.focus({ preventScroll: true }));
+      requestAnimationFrame(() => els.ticketScan?.querySelector("[data-scan-pick-zone]")?.focus({ preventScroll: true }));
     });
-    form.querySelectorAll("[data-scan-pick-zone]").forEach((btn) => btn.addEventListener("click", () => {
-      const pickerScrollTop = form.querySelector(".scan-ball-sheet-scroll")?.scrollTop || 0;
+    pickerRoot.querySelectorAll("[data-scan-pick-zone]").forEach((btn) => btn.addEventListener("click", () => {
+      const pickerScrollTop = pickerRoot.querySelector(".scan-ball-sheet-scroll")?.scrollTop || 0;
       state.ticketScanResult = readTicketScanForm(form);
       const config = getScanBallConfig(state.ticketScanResult.gameKey);
       const zone = btn.dataset.scanPickZone === "extra" ? "extra" : "main";
@@ -1931,18 +1943,18 @@
       state.ticketScanAddDraft = draft;
       renderTicketScanReview();
       requestAnimationFrame(() => {
-        const scroll = els.ticketScanBody?.querySelector(".scan-ball-sheet-scroll");
+        const scroll = els.ticketScan?.querySelector(".scan-ball-sheet-scroll");
         if (scroll) scroll.scrollTop = pickerScrollTop;
-        els.ticketScanBody?.querySelector(`[data-scan-pick-zone="${zone}"][data-scan-pick-number="${number}"]`)?.focus({ preventScroll: true });
+        els.ticketScan?.querySelector(`[data-scan-pick-zone="${zone}"][data-scan-pick-number="${number}"]`)?.focus({ preventScroll: true });
       });
     }));
-    form.querySelector("[data-scan-pick-cancel]")?.addEventListener("click", () => {
+    pickerRoot.querySelector("[data-scan-pick-cancel]")?.addEventListener("click", () => {
       state.ticketScanResult = readTicketScanForm(form);
       state.ticketScanAddDraft = null;
       renderTicketScanReview();
       requestAnimationFrame(() => els.ticketScanBody?.querySelector("[data-scan-add]")?.focus());
     });
-    form.querySelector("[data-scan-pick-confirm]")?.addEventListener("click", () => {
+    pickerRoot.querySelector("[data-scan-pick-confirm]")?.addEventListener("click", () => {
       const result = readTicketScanForm(form);
       const config = getScanBallConfig(result.gameKey);
       const draft = state.ticketScanAddDraft;

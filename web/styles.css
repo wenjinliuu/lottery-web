@@ -2245,6 +2245,9 @@ body.scan-open { overflow: hidden; }
   box-shadow: 0 28px 80px rgba(31, 41, 71, 0.35);
   animation: sheet-in 240ms var(--ease-spring) both;
 }
+.ticket-scan.is-picking .ticket-scan-panel { height: min(92vh, 820px); }
+.ticket-scan.is-picking .ticket-scan-body { overflow: hidden; }
+.ticket-scan-overlay { position: static; }
 
 [data-theme="dark"] .ticket-scan-panel,
 :root:not([data-theme="light"]) .ticket-scan-panel {
@@ -2455,17 +2458,17 @@ body.scan-open { overflow: hidden; }
   right: 0;
   bottom: 0;
   left: 0;
-  height: min(54dvh, 500px);
+  height: 62%;
   padding: 8px 14px max(12px, env(safe-area-inset-bottom));
   border-radius: 26px 26px 0 0;
   color: var(--text);
-  background: rgba(250, 252, 255, 0.985);
+  background: rgb(250, 252, 255);
   border-top: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 -18px 48px rgba(31, 41, 71, 0.22);
   animation: sheet-in 220ms var(--ease-spring) both;
 }
 [data-theme="dark"] .scan-ball-sheet,
-:root:not([data-theme="light"]) .scan-ball-sheet { background: rgba(20, 25, 42, 0.985); border-top-color: rgba(255, 255, 255, 0.12); }
+:root:not([data-theme="light"]) .scan-ball-sheet { background: rgb(20, 25, 42); border-top-color: rgba(255, 255, 255, 0.12); }
 .scan-ball-sheet-handle { width: 38px; height: 4px; margin: 0 auto 8px; border-radius: 999px; background: rgba(123, 136, 160, 0.32); }
 .scan-ball-picker { height: calc(100% - 12px); display: flex; flex-direction: column; min-height: 0; }
 .scan-ball-picker-head,
@@ -2512,6 +2515,7 @@ body.scan-open { overflow: hidden; }
   .check-records-refresh { min-height: 32px; padding: 0 10px; font-size: 11px; }
   .ticket-scan { padding: max(14px, env(safe-area-inset-top)) 0 0; }
   .ticket-scan-panel { width: 100%; max-height: calc(100dvh - max(14px, env(safe-area-inset-top))); border-radius: 24px 24px 0 0; padding: 14px; }
+  .ticket-scan.is-picking .ticket-scan-panel { height: calc(100dvh - max(14px, env(safe-area-inset-top))); }
   .ticket-scan-body { max-height: calc(100dvh - max(14px, env(safe-area-inset-top)) - 74px); }
   .scan-number-input { width: 32px; height: 32px; }
   .scan-review-top { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 9px; }
@@ -2521,12 +2525,16 @@ body.scan-open { overflow: hidden; }
   .scan-meta-grid input, .scan-meta-grid select { height: 36px; }
   .scan-pick-grid { grid-template-columns: repeat(7, 1fr); gap: 5px; }
   .scan-pick-ball { width: 30px; height: 30px; }
-  .scan-ball-sheet { height: min(55dvh, 500px); border-radius: 24px 24px 0 0; }
+  .scan-ball-sheet { height: 62%; border-radius: 24px 24px 0 0; }
   .scan-review.is-picking .scan-preview-zoom img { height: clamp(155px, 24dvh, 215px); }
 }
 @media (max-width: 350px) {
   .scan-review-top { grid-template-columns: 1fr; }
   .scan-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-height: 650px) {
+  .ticket-scan.is-picking .scan-ball-sheet { height: 60%; }
+  .scan-review.is-picking .scan-preview-zoom img { height: 120px; }
 }
 .game-stat-detail-grid div { min-width: 0; }
 .game-stat-detail-grid span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; }
