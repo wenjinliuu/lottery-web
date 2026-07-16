@@ -26,6 +26,24 @@ assert.equal(ssq.multiple, 3);
 assert.equal(ssq.totalAmount, 18);
 assert.equal(ssq.errors.length, 0);
 
+const noisySsq = LotteryOCR.parseLotteryTicketText(`
+中国福利彩票 双色球
+7D92-04-09-C92
+A.01 04 14 23 27 32-12 (3)
+B.01 03 12 19 25 26-10 (3)
+C.O4 1Z 2S 26 27 3O-O3 (3)
+D.-- -- -- -- -- ---- (-)
+E.-- -- -- -- -- ---- (-)
+开奖期:2026081 26-07-16
+销售期:2026081-130 26-07-16 09:35:51
+合计18元
+`, 76);
+
+assert.equal(noisySsq.tickets.length, 3);
+assert.deepEqual(noisySsq.tickets[2].red, [4, 12, 25, 26, 27, 30]);
+assert.deepEqual(noisySsq.tickets[2].blue, [3]);
+assert.equal(noisySsq.drawDate, "2026-07-16");
+
 const dlt = LotteryOCR.parseLotteryTicketText(`
 体彩 超级大乐透
 第26079期 2026年07月15日开奖
