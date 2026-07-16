@@ -79,18 +79,20 @@
           </section>
 
           <section class="card">
-            <div class="title-row draft-head">
-              <div class="title-main">
-                <div class="section-title section-title-no-margin">选号列表</div>
-                <span class="draft-draw-tag" id="draftDrawTag" data-tone="muted">等待开奖数据</span>
-                <button class="draft-draw-refresh has-icon" id="draftDrawRefreshBtn" type="button" aria-label="刷新下一期开奖数据" title="刷新下一期开奖数据" hidden>
-                  <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+            <div class="draft-head">
+              <div class="section-title section-title-no-margin">选号列表</div>
+              <div class="draft-head-second-row">
+                <div class="draft-draw-actions">
+                  <span class="draft-draw-tag" id="draftDrawTag" data-tone="muted">等待开奖数据</span>
+                  <button class="draft-draw-refresh has-icon" id="draftDrawRefreshBtn" type="button" aria-label="刷新下一期开奖数据" title="刷新下一期开奖数据" hidden>
+                    <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+                  </button>
+                </div>
+                <button class="mini-clear has-icon" id="clearDraftBtn" type="button">
+                  <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                  <span>清空</span>
                 </button>
               </div>
-              <button class="mini-clear has-icon" id="clearDraftBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                <span>清空</span>
-              </button>
             </div>
             <div class="meta meta-row ticket-meta-row">
               <div id="draftSummary">暂无号码</div>
@@ -229,7 +231,7 @@
             <div class="profit-head">
               <div class="profit-head-left">
                 <div class="profit-title">累计盈亏</div>
-                <div class="profit-sub" id="profitSub">最近 30 天</div>
+                <div class="profit-sub" id="profitSub">全部记录</div>
               </div>
               <div class="profit-net">
                 <div class="profit-net-value" id="profitNetValue">0元</div>
@@ -239,11 +241,11 @@
               <div class="profit-empty" id="profitEmpty">暂无数据，先去选号吧</div>
             </div>
             <div class="profit-range-tabs" id="profitRangeTabs" aria-label="收益趋势时间范围">
-              <button class="profit-range-btn is-active" type="button" data-profit-range="30" aria-pressed="true">30天</button>
+              <button class="profit-range-btn" type="button" data-profit-range="30" aria-pressed="false">30天</button>
               <button class="profit-range-btn" type="button" data-profit-range="90" aria-pressed="false">90天</button>
-              <button class="profit-range-btn" type="button" data-profit-range="all" aria-pressed="false">全部</button>
+              <button class="profit-range-btn is-active" type="button" data-profit-range="all" aria-pressed="true">全部</button>
             </div>
-            <div class="profit-chart-hint">长按折线查看日期和累计盈亏</div>
+            <div class="profit-chart-hint">点击或长按折线查看当日明细和累计盈亏</div>
           </section>
 
           <section class="card mine-section-card">
