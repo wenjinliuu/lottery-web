@@ -255,6 +255,11 @@
       if (event.key === "Escape" && els.ticketScan && !els.ticketScan.hidden) {
         const expandedPreview = els.ticketScanBody?.querySelector(".scan-preview-zoom.is-expanded");
         if (expandedPreview) expandedPreview.classList.remove("is-expanded");
+        else if (state.ticketScanAddDraft) {
+          state.ticketScanAddDraft = null;
+          renderTicketScanReview();
+          requestAnimationFrame(() => els.ticketScanBody?.querySelector("[data-scan-add]")?.focus());
+        }
         else closeTicketScan();
       }
     });
@@ -1773,7 +1778,7 @@
     els.ticketScanTitle.textContent = "确认识别结果";
     els.ticketScanSub.textContent = `本地识别可信度 ${result.confidence || 0}% · 请核对后导入`;
     els.ticketScanBody.innerHTML = `
-      <form class="scan-review" id="ticketScanForm">
+      <form class="scan-review${state.ticketScanAddDraft ? " is-picking" : ""}" id="ticketScanForm">
         <div class="scan-review-top${state.ticketScanPreview ? "" : " no-preview"}">
           <div class="scan-preview-column">
             ${state.ticketScanPreview ? `
@@ -1846,11 +1851,16 @@
     }).join("");
     const ready = draft.main.length === config.mainCount && draft.extra.length === config.extraCount;
     return `
-      <section class="scan-ball-picker" aria-label="手动新增一注">
-        <div class="scan-ball-picker-head"><strong>手动新增一注</strong><span>已选 ${draft.main.length + draft.extra.length}/${config.mainCount + config.extraCount}</span></div>
-        <div class="scan-pick-section"><div><strong>${config.mainLabel}</strong><span>选择 ${config.mainCount} 个</span></div><div class="scan-pick-grid">${group("main", config.mainMax, draft.main, config.mainTone)}</div></div>
-        <div class="scan-pick-section"><div><strong>${config.extraLabel}</strong><span>选择 ${config.extraCount} 个</span></div><div class="scan-pick-grid">${group("extra", config.extraMax, draft.extra, config.extraTone)}</div></div>
-        <div class="scan-ball-picker-actions"><button type="button" data-scan-pick-cancel>取消</button><button class="is-confirm" type="button" data-scan-pick-confirm${ready ? "" : " disabled"}>确定新增</button></div>
+      <section class="scan-ball-sheet" role="dialog" aria-modal="true" aria-labelledby="scanBallPickerTitle">
+        <div class="scan-ball-sheet-handle" aria-hidden="true"></div>
+        <div class="scan-ball-picker">
+          <div class="scan-ball-picker-head"><strong id="scanBallPickerTitle">手动新增一注</strong><span>已选 ${draft.main.length + draft.extra.length}/${config.mainCount + config.extraCount}</span></div>
+          <div class="scan-ball-sheet-scroll">
+            <div class="scan-pick-section"><div><strong>${config.mainLabel}</strong><span>选择 ${config.mainCount} 个</span></div><div class="scan-pick-grid">${group("main", config.mainMax, draft.main, config.mainTone)}</div></div>
+            <div class="scan-pick-section"><div><strong>${config.extraLabel}</strong><span>选择 ${config.extraCount} 个</span></div><div class="scan-pick-grid">${group("extra", config.extraMax, draft.extra, config.extraTone)}</div></div>
+          </div>
+          <div class="scan-ball-picker-actions"><button type="button" data-scan-pick-cancel>取消</button><button class="is-confirm" type="button" data-scan-pick-confirm${ready ? "" : " disabled"}>确定新增</button></div>
+        </div>
       </section>
     `;
   }
@@ -1900,8 +1910,11 @@
       state.ticketScanResult = readTicketScanForm(form);
       state.ticketScanAddDraft = { gameKey: state.ticketScanResult.gameKey, main: [], extra: [] };
       renderTicketScanReview();
+      if (els.ticketScanBody) els.ticketScanBody.scrollTop = 0;
+      requestAnimationFrame(() => els.ticketScanBody?.querySelector("[data-scan-pick-zone]")?.focus({ preventScroll: true }));
     });
     form.querySelectorAll("[data-scan-pick-zone]").forEach((btn) => btn.addEventListener("click", () => {
+      const pickerScrollTop = form.querySelector(".scan-ball-sheet-scroll")?.scrollTop || 0;
       state.ticketScanResult = readTicketScanForm(form);
       const config = getScanBallConfig(state.ticketScanResult.gameKey);
       const zone = btn.dataset.scanPickZone === "extra" ? "extra" : "main";
@@ -1917,11 +1930,17 @@
       draft[zone] = values.sort((a, b) => a - b);
       state.ticketScanAddDraft = draft;
       renderTicketScanReview();
+      requestAnimationFrame(() => {
+        const scroll = els.ticketScanBody?.querySelector(".scan-ball-sheet-scroll");
+        if (scroll) scroll.scrollTop = pickerScrollTop;
+        els.ticketScanBody?.querySelector(`[data-scan-pick-zone="${zone}"][data-scan-pick-number="${number}"]`)?.focus({ preventScroll: true });
+      });
     }));
     form.querySelector("[data-scan-pick-cancel]")?.addEventListener("click", () => {
       state.ticketScanResult = readTicketScanForm(form);
       state.ticketScanAddDraft = null;
       renderTicketScanReview();
+      requestAnimationFrame(() => els.ticketScanBody?.querySelector("[data-scan-add]")?.focus());
     });
     form.querySelector("[data-scan-pick-confirm]")?.addEventListener("click", () => {
       const result = readTicketScanForm(form);
@@ -1934,6 +1953,7 @@
       state.ticketScanResult = window.LotteryOCR.validateTicketResult(result);
       state.ticketScanAddDraft = null;
       renderTicketScanReview();
+      requestAnimationFrame(() => els.ticketScanBody?.querySelector(`[data-scan-ticket="${result.tickets.length - 1}"]`)?.scrollIntoView({ block: "nearest" }));
     });
     form.querySelectorAll("[data-scan-delete]").forEach((btn) => btn.addEventListener("click", () => {
       const result = readTicketScanForm(form);

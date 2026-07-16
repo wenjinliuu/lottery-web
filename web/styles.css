@@ -2437,7 +2437,37 @@ body.scan-open { overflow: hidden; }
 .scan-number-input.is-yellow { color: #fff; background: var(--yellow); }
 .scan-add-ticket { width: 100%; min-height: 36px; color: #3159d8; background: rgba(74, 108, 247, 0.09); box-shadow: inset 0 0 0 1px rgba(74, 108, 247, 0.15); }
 
-.scan-ball-picker { padding: 12px; border-radius: 16px; background: var(--glass-tint-soft); box-shadow: inset 0 0 0 1px var(--glass-stroke); }
+.scan-review.is-picking .scan-review-top { grid-template-columns: minmax(0, 1fr); }
+.scan-review.is-picking .scan-preview-column { width: min(100%, 360px); margin: 0 auto; }
+.scan-review.is-picking .scan-preview-zoom img { height: clamp(150px, 23dvh, 220px); }
+.scan-review.is-picking .scan-review-summary,
+.scan-review.is-picking .scan-meta-grid,
+.scan-review.is-picking .scan-ticket-list,
+.scan-review.is-picking .scan-add-ticket,
+.scan-review.is-picking .scan-validation-list,
+.scan-review.is-picking .scan-validation-ok,
+.scan-review.is-picking .scan-cost-check,
+.scan-review.is-picking .scan-review-actions { display: none; }
+
+.scan-ball-sheet {
+  position: absolute;
+  z-index: 28;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: min(54dvh, 500px);
+  padding: 8px 14px max(12px, env(safe-area-inset-bottom));
+  border-radius: 26px 26px 0 0;
+  color: var(--text);
+  background: rgba(250, 252, 255, 0.985);
+  border-top: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 -18px 48px rgba(31, 41, 71, 0.22);
+  animation: sheet-in 220ms var(--ease-spring) both;
+}
+[data-theme="dark"] .scan-ball-sheet,
+:root:not([data-theme="light"]) .scan-ball-sheet { background: rgba(20, 25, 42, 0.985); border-top-color: rgba(255, 255, 255, 0.12); }
+.scan-ball-sheet-handle { width: 38px; height: 4px; margin: 0 auto 8px; border-radius: 999px; background: rgba(123, 136, 160, 0.32); }
+.scan-ball-picker { height: calc(100% - 12px); display: flex; flex-direction: column; min-height: 0; }
 .scan-ball-picker-head,
 .scan-pick-section > div:first-child,
 .scan-ball-picker-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -2445,6 +2475,7 @@ body.scan-open { overflow: hidden; }
 .scan-ball-picker-head strong { color: var(--ink); font-size: 13px; font-weight: 900; }
 .scan-ball-picker-head span,
 .scan-pick-section > div:first-child span { color: var(--muted); font-size: 10px; font-weight: 800; }
+.scan-ball-sheet-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 0 1px 8px; }
 .scan-pick-section + .scan-pick-section { margin-top: 13px; }
 .scan-pick-section > div:first-child strong { color: var(--text); font-size: 11px; font-weight: 900; }
 .scan-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 6px; margin-top: 8px; }
@@ -2456,7 +2487,7 @@ body.scan-open { overflow: hidden; }
 .scan-pick-ball.is-red.is-selected { background: var(--red); }
 .scan-pick-ball.is-blue.is-selected { background: var(--blue); }
 .scan-pick-ball.is-yellow.is-selected { background: var(--yellow); }
-.scan-ball-picker-actions { margin-top: 14px; }
+.scan-ball-picker-actions { flex: 0 0 auto; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--glass-stroke); }
 .scan-ball-picker-actions button { flex: 1 1 0; min-height: 36px; border-radius: 11px; color: var(--muted-strong); background: var(--glass-tint-soft); box-shadow: inset 0 0 0 1px var(--glass-stroke); font-size: 11px; font-weight: 900; }
 .scan-ball-picker-actions .is-confirm { color: #fff; background: linear-gradient(135deg, #4a6cf7, #3155d7); box-shadow: none; }
 .scan-ball-picker-actions .is-confirm:disabled { opacity: 0.38; }
@@ -2490,6 +2521,8 @@ body.scan-open { overflow: hidden; }
   .scan-meta-grid input, .scan-meta-grid select { height: 36px; }
   .scan-pick-grid { grid-template-columns: repeat(7, 1fr); gap: 5px; }
   .scan-pick-ball { width: 30px; height: 30px; }
+  .scan-ball-sheet { height: min(55dvh, 500px); border-radius: 24px 24px 0 0; }
+  .scan-review.is-picking .scan-preview-zoom img { height: clamp(155px, 24dvh, 215px); }
 }
 @media (max-width: 350px) {
   .scan-review-top { grid-template-columns: 1fr; }
