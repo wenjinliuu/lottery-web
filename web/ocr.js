@@ -79,13 +79,23 @@
     normalizeText(text).split("\n").forEach((rawLine) => {
       const line = rawLine.trim();
       const separator = line.search(/\s[-]\s*|[0-9OQDIloq|!]\s*[-]\s*[0-9OQDIloq|!]/);
-      if (separator < 0) return;
-      const dash = line.indexOf("-", separator);
-      if (dash < 0) return;
-      const left = extractNumberTokens(line.slice(0, dash));
-      const right = extractNumberTokens(line.slice(dash + 1));
-      const red = left.slice(-6);
-      const blue = right[0];
+      const dash = separator >= 0 ? line.indexOf("-", separator) : -1;
+      let red = [];
+      let blue;
+      if (dash >= 0) {
+        const left = extractNumberTokens(line.slice(0, dash));
+        const right = extractNumberTokens(line.slice(dash + 1));
+        red = left.slice(-6);
+        blue = right[0];
+      } else if (/^\s*[A-E][.·:：\s]/i.test(line)) {
+        /* 双色球单式票固定使用 A-E 行号；分隔横线漏识别时仍可按 6+1 解析。 */
+        const withoutMultiple = line.replace(/\(\s*[0-9OQDIloq|!]{1,2}\s*\)?\s*$/, "");
+        const values = extractNumberTokens(withoutMultiple.replace(/^\s*[A-E][.·:：\s]*/i, ""));
+        red = values.slice(0, 6);
+        blue = values[6];
+      } else {
+        return;
+      }
       if (red.length !== 6 || !Number.isFinite(blue)) return;
       if (!red.every((n) => n >= 1 && n <= 33) || blue < 1 || blue > 16) return;
       if (!isAscendingUnique(red)) return;
@@ -101,13 +111,24 @@
     normalizeText(text).split("\n").forEach((rawLine) => {
       const line = rawLine.trim();
       const plus = line.search(/[+*]/);
-      if (plus < 0) return;
-      const leftSource = line.slice(0, plus);
-      const rightSource = line.slice(plus + 1);
-      const left = extractNumberTokens(leftSource);
-      const right = extractNumberTokens(rightSource);
+      let leftSource = plus >= 0 ? line.slice(0, plus) : "";
+      let rightSource = plus >= 0 ? line.slice(plus + 1) : "";
+      let left = extractNumberTokens(leftSource);
+      let right = extractNumberTokens(rightSource);
       let front = left.slice(-5);
       let back = right.slice(0, 2);
+      if (plus < 0) {
+        /* 大乐透号码行的 + 容易被热敏票/压缩图吃掉，七个两位数仍可稳定按 5+2 拆分。 */
+        const withoutMultiple = line.replace(/\(\s*[0-9OQDIloq|!]{1,2}\s*\)?\s*$/, "");
+        const values = extractNumberTokens(withoutMultiple);
+        if (values.length !== 7) return;
+        front = values.slice(0, 5);
+        back = values.slice(5, 7);
+        leftSource = front.map((n) => String(n).padStart(2, "0")).join(" ");
+        rightSource = back.map((n) => String(n).padStart(2, "0")).join(" ");
+        left = front;
+        right = back;
+      }
       if (/[0-9OQDIloq|!ZzSsGB]{3,}/.test(leftSource) || front.length !== 5 || !front.every((n) => n >= 1 && n <= 35) || !isAscendingUnique(front)) {
         front = extractCompactNumberSequence(leftSource, 5, 35);
       }
@@ -317,6 +338,14 @@
 
     const unitPrice = result.gameKey === "dlt" && result.addOn === true ? 3 : 2;
     const calculatedAmount = result.tickets.reduce((sum, ticket) => sum + unitPrice * Number(ticket.multiple || result.multiple || 1), 0);
+    const totalAmount = Number(result.totalAmount);
+    const commonMultiple = Number(result.multiple || 1);
+    const expectedTicketCount = totalAmount > 0 && commonMultiple > 0
+      ? totalAmount / (unitPrice * commonMultiple)
+      : 0;
+    if (Number.isInteger(expectedTicketCount) && expectedTicketCount > 0 && expectedTicketCount !== result.tickets.length) {
+      warnings.push(`根据票面金额推算应有${expectedTicketCount}注，当前识别到${result.tickets.length}注`);
+    }
     if (Number.isFinite(Number(result.totalAmount)) && Number(result.totalAmount) > 0 && calculatedAmount !== Number(result.totalAmount)) {
       errors.push(`按号码计算为${calculatedAmount}元，与票面${result.totalAmount}元不一致`);
     }
@@ -427,8 +456,8 @@
     }
     if (!best) return { x: 0, y: 0, width: image.width, height: image.height };
     const scaleX = image.width / width, scaleY = image.height / height;
-    const marginX = (best.maxX - best.minX) * 0.04;
-    const marginY = (best.maxY - best.minY) * 0.025;
+    const marginX = (best.maxX - best.minX) * 0.06;
+    const marginY = (best.maxY - best.minY) * 0.06;
     const x = clamp((best.minX - marginX) * scaleX, 0, image.width);
     const y = clamp((best.minY - marginY) * scaleY, 0, image.height);
     const right = clamp((best.maxX + marginX) * scaleX, 0, image.width);
@@ -461,12 +490,89 @@
     return canvas;
   }
 
+  function cropCanvas(source, top, bottom) {
+    const y = clamp(Math.round(top), 0, source.height - 1);
+    const height = clamp(Math.round(bottom - top), 1, source.height - y);
+    const canvas = document.createElement("canvas");
+    canvas.width = source.width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source, 0, y, source.width, height, 0, 0, canvas.width, height);
+    return canvas;
+  }
+
+  function findDashedSeparatorPair(canvas) {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const left = Math.round(canvas.width * 0.05);
+    const right = Math.round(canvas.width * 0.95);
+    const stepX = Math.max(1, Math.round(canvas.width / 720));
+    const rows = [];
+    const startY = Math.round(canvas.height * 0.08);
+    const endY = Math.round(canvas.height * 0.78);
+    for (let y = startY; y < endY; y += 1) {
+      let dark = 0, runs = 0, inRun = false, sampled = 0;
+      for (let x = left; x < right; x += stepX) {
+        const offset = (y * canvas.width + x) * 4;
+        const isDark = pixels[offset] < 118;
+        sampled += 1;
+        if (isDark) {
+          dark += 1;
+          if (!inRun) runs += 1;
+        }
+        inRun = isDark;
+      }
+      const ratio = dark / Math.max(1, sampled);
+      if (ratio >= 0.10 && ratio <= 0.62 && runs >= 7) rows.push({ y, score: ratio * 20 + Math.min(runs, 24) * 0.12 });
+    }
+    const peaks = [];
+    rows.forEach((row) => {
+      const last = peaks[peaks.length - 1];
+      if (last && row.y <= last.end + 2) {
+        last.end = row.y;
+        if (row.score > last.score) Object.assign(last, { y: row.y, score: row.score });
+      } else {
+        peaks.push({ ...row, end: row.y });
+      }
+    });
+    let best = null;
+    for (let i = 0; i < peaks.length; i += 1) {
+      for (let j = i + 1; j < peaks.length; j += 1) {
+        const gap = peaks[j].y - peaks[i].y;
+        if (gap < canvas.height * 0.08 || gap > canvas.height * 0.46) continue;
+        if (peaks[i].y > canvas.height * 0.52 || peaks[j].y > canvas.height * 0.76) continue;
+        const score = peaks[i].score + peaks[j].score + gap / canvas.height;
+        if (!best || score > best.score) best = { top: peaks[i].y, bottom: peaks[j].y, score };
+      }
+    }
+    return best;
+  }
+
+  function buildNumberRegionCanvases(canvas) {
+    const pair = findDashedSeparatorPair(canvas);
+    if (pair) {
+      const margin = canvas.height * 0.035;
+      return [
+        cropCanvas(canvas, pair.top - margin, pair.bottom + margin),
+        cropCanvas(canvas, canvas.height * 0.10, canvas.height * 0.68)
+      ];
+    }
+    /* 双色球 A-E 行没有稳定双虚线，使用两个重叠动态比例区覆盖短票和长票。 */
+    return [
+      cropCanvas(canvas, canvas.height * 0.10, canvas.height * 0.62),
+      cropCanvas(canvas, canvas.height * 0.26, canvas.height * 0.80)
+    ];
+  }
+
   async function recognizeFile(file, onProgress) {
     const canvas = await prepareImage(file);
+    const numberRegions = buildNumberRegionCanvases(canvas);
     onProgress?.({ progress: 0.04, label: "正在加载本地识别模型" });
     const Tesseract = await ensureTesseract();
     let phaseStart = 0.15;
-    let phaseSpan = 0.50;
+    let phaseSpan = 0.38;
     const worker = await Tesseract.createWorker(["chi_sim", "eng"], 1, {
       logger(message) {
         const rawProgress = Number(message.progress) || 0;
@@ -490,18 +596,31 @@
       let confidence = result.data.confidence;
       try {
         await worker.reinitialize("eng");
-        phaseStart = 0.67;
-        phaseSpan = 0.15;
+        phaseStart = 0.55;
+        phaseSpan = 0.12;
         onProgress?.({ progress: phaseStart, label: "正在复核号码排列" });
         await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
         const blockPass = await worker.recognize(canvas);
-        phaseStart = 0.84;
-        phaseSpan = 0.14;
+        phaseStart = 0.69;
+        phaseSpan = 0.10;
         onProgress?.({ progress: phaseStart, label: "正在复核模糊号码" });
         await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
         const sparsePass = await worker.recognize(canvas);
         mergedText += `\n---NUMBER-RECHECK---\n${blockPass.data.text}\n---NUMBER-RECHECK---\n${sparsePass.data.text}`;
         confidence = Math.max(confidence, blockPass.data.confidence, sparsePass.data.confidence);
+        await worker.setParameters({
+          tessedit_pageseg_mode: "6",
+          preserve_interword_spaces: "1",
+          tessedit_char_whitelist: "ABCDEabcde0123456789+-() "
+        });
+        for (let index = 0; index < numberRegions.length; index += 1) {
+          phaseStart = 0.80 + index * (0.18 / numberRegions.length);
+          phaseSpan = 0.18 / numberRegions.length;
+          onProgress?.({ progress: phaseStart, label: "正在复核完整号码行" });
+          const regionPass = await worker.recognize(numberRegions[index]);
+          mergedText += `\n---NUMBER-RECHECK---\n${regionPass.data.text}`;
+          confidence = Math.max(confidence, regionPass.data.confidence);
+        }
       } catch (error) {
         /* 中文主识别已成功时，号码复核失败不阻断用户手动确认。 */
       }
@@ -512,6 +631,7 @@
       };
     } finally {
       await worker.terminate();
+      numberRegions.forEach((region) => { region.width = 1; region.height = 1; });
       canvas.width = 1;
       canvas.height = 1;
     }

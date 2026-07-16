@@ -43,10 +43,11 @@
     loadedHistoryGames: new Set(),
     historyLoadingGames: new Set(),
     recordFilterGame: "all",
-    profitRange: "30",
+    profitRange: "all",
     ticketScanResult: null,
     ticketScanPreview: "",
     ticketScanBusy: false,
+    ticketScanAddDraft: null,
     nextDrawRefreshing: false,
     nextDrawRefreshAvailableAt: 0
   };
@@ -251,7 +252,11 @@
     if (els.detailSheetCloseBtn) els.detailSheetCloseBtn.addEventListener("click", closeDetailSheet);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && els.detailSheet && !els.detailSheet.hidden) closeDetailSheet();
-      if (event.key === "Escape" && els.ticketScan && !els.ticketScan.hidden) closeTicketScan();
+      if (event.key === "Escape" && els.ticketScan && !els.ticketScan.hidden) {
+        const expandedPreview = els.ticketScanBody?.querySelector(".scan-preview-zoom.is-expanded");
+        if (expandedPreview) expandedPreview.classList.remove("is-expanded");
+        else closeTicketScan();
+      }
     });
     if (els.dltAddOnBtn) {
       els.dltAddOnBtn.addEventListener("click", () => {
@@ -269,7 +274,7 @@
       els.profitRangeTabs.addEventListener("click", (event) => {
         const btn = event.target.closest("[data-profit-range]");
         if (!btn) return;
-        state.profitRange = btn.dataset.profitRange || "30";
+        state.profitRange = btn.dataset.profitRange || "all";
         els.profitRangeTabs.querySelectorAll("[data-profit-range]").forEach((item) => {
           const active = item.dataset.profitRange === state.profitRange;
           item.classList.toggle("is-active", active);
@@ -1443,6 +1448,11 @@
   function openMyRecordsView() {
     renderMyRecordsList();
     switchView("myRecords");
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
   }
 
   function openWonRecordsView() {
@@ -1670,6 +1680,7 @@
     state.ticketScanResult = null;
     state.ticketScanPreview = "";
     state.ticketScanBusy = false;
+    state.ticketScanAddDraft = null;
     els.ticketScan.hidden = false;
     document.body.classList.add("scan-open");
     renderTicketScanIntro();
@@ -1682,6 +1693,7 @@
     document.body.classList.remove("scan-open");
     state.ticketScanResult = null;
     state.ticketScanPreview = "";
+    state.ticketScanAddDraft = null;
     if (els.ticketScanInput) els.ticketScanInput.value = "";
   }
 
@@ -1724,6 +1736,7 @@
       });
       state.ticketScanResult = parsed;
       state.ticketScanPreview = previewUrl || "";
+      state.ticketScanAddDraft = null;
       renderTicketScanProgress(0.98, "正在核对开奖期号");
       await loadGameHistory(parsed.gameKey, false);
       renderTicketScanReview();
@@ -1761,23 +1774,31 @@
     els.ticketScanSub.textContent = `本地识别可信度 ${result.confidence || 0}% · 请核对后导入`;
     els.ticketScanBody.innerHTML = `
       <form class="scan-review" id="ticketScanForm">
-        <div class="scan-review-preview">
-          ${state.ticketScanPreview ? `<img src="${state.ticketScanPreview}" alt="裁剪后的彩票预览">` : ""}
-          <div><strong>${gameLabel}</strong><span class="scan-validation is-${statusTone}">${statusText}</span></div>
-        </div>
-        <div class="scan-meta-grid">
-          <label><span>彩种</span><select name="gameKey"><option value="ssq"${result.gameKey === "ssq" ? " selected" : ""}>双色球</option><option value="dlt"${result.gameKey === "dlt" ? " selected" : ""}>大乐透</option></select></label>
-          <label><span>期号</span><input name="issue" inputmode="numeric" value="${escapeScanText(result.issue)}" placeholder="请输入期号"></label>
-          <label><span>开奖日期</span><input name="drawDate" type="date" value="${escapeScanText(result.drawDate)}"></label>
-          <label><span>购买时间</span><input name="saleDateTime" type="datetime-local" step="1" value="${escapeScanText(result.saleDateTime)}"></label>
-          ${result.gameKey === "dlt" ? `<label><span>投注方式</span><select name="addOn"><option value=""${result.addOn === null ? " selected" : ""}>请选择</option><option value="false"${result.addOn === false ? " selected" : ""}>普通投注</option><option value="true"${result.addOn === true ? " selected" : ""}>追加投注</option></select></label>` : ""}
-          <label><span>倍数</span><input name="multiple" type="number" inputmode="numeric" min="1" max="99" value="${result.multiple || 1}"></label>
-          <label><span>票面金额</span><div class="scan-money-input"><input name="totalAmount" type="number" inputmode="decimal" min="0" value="${result.totalAmount || ""}"><em>元</em></div></label>
+        <div class="scan-review-top${state.ticketScanPreview ? "" : " no-preview"}">
+          <div class="scan-preview-column">
+            ${state.ticketScanPreview ? `
+              <button class="scan-preview-zoom" type="button" data-scan-preview-zoom aria-label="放大彩票图片">
+                <img src="${state.ticketScanPreview}" alt="裁剪后的彩票预览">
+                <span>点击图片放大核对</span>
+              </button>
+            ` : ""}
+            <div class="scan-review-summary"><strong>${gameLabel}</strong><span class="scan-validation is-${statusTone}">${statusText}</span></div>
+          </div>
+          <div class="scan-meta-grid">
+            <label><span>彩种</span><select name="gameKey"><option value="ssq"${result.gameKey === "ssq" ? " selected" : ""}>双色球</option><option value="dlt"${result.gameKey === "dlt" ? " selected" : ""}>大乐透</option></select></label>
+            <label><span>期号</span><input name="issue" inputmode="numeric" value="${escapeScanText(result.issue)}" placeholder="请输入期号"></label>
+            <label><span>开奖日期</span><input name="drawDate" type="date" value="${escapeScanText(result.drawDate)}"></label>
+            <label><span>购买时间</span><input name="saleDateTime" type="datetime-local" step="1" value="${escapeScanText(result.saleDateTime)}"></label>
+            ${result.gameKey === "dlt" ? `<label><span>投注方式</span><select name="addOn"><option value=""${result.addOn === null ? " selected" : ""}>请选择</option><option value="false"${result.addOn === false ? " selected" : ""}>普通投注</option><option value="true"${result.addOn === true ? " selected" : ""}>追加投注</option></select></label>` : ""}
+            <label><span>倍数</span><input name="multiple" type="number" inputmode="numeric" min="1" max="99" value="${result.multiple || 1}"></label>
+            <label><span>票面金额</span><div class="scan-money-input"><input name="totalAmount" type="number" inputmode="decimal" min="0" value="${result.totalAmount || ""}"><em>元</em></div></label>
+          </div>
         </div>
         <div class="scan-ticket-list">
           ${result.tickets.map((ticket, index) => renderScanTicketEditor(result.gameKey, ticket, index, result.tickets.length)).join("")}
         </div>
         <button class="scan-add-ticket" type="button" data-scan-add>＋ 新增一注</button>
+        ${state.ticketScanAddDraft ? renderScanBallPicker(result.gameKey, state.ticketScanAddDraft) : ""}
         ${renderScanValidationMessages(result)}
         <div class="scan-cost-check"><span>${result.tickets.length}注 · 按号码计算</span><strong>${formatMoney(result.calculatedAmount)}</strong></div>
         <div class="scan-review-actions">
@@ -1808,6 +1829,30 @@
 
   function scanNumberInput(zone, ticketIndex, numberIndex, value, max, tone) {
     return `<input class="scan-number-input is-${tone}" data-scan-zone="${zone}" data-ticket-index="${ticketIndex}" data-number-index="${numberIndex}" type="number" inputmode="numeric" min="1" max="${max}" value="${String(Number(value) || "").padStart(2, "0")}" aria-label="第${ticketIndex + 1}注第${numberIndex + 1}个号码">`;
+  }
+
+  function getScanBallConfig(gameKey) {
+    return gameKey === "dlt"
+      ? { mainMax: 35, mainCount: 5, mainLabel: "前区", mainTone: "blue", extraMax: 12, extraCount: 2, extraLabel: "后区", extraTone: "yellow" }
+      : { mainMax: 33, mainCount: 6, mainLabel: "红球", mainTone: "red", extraMax: 16, extraCount: 1, extraLabel: "蓝球", extraTone: "blue" };
+  }
+
+  function renderScanBallPicker(gameKey, draft) {
+    const config = getScanBallConfig(gameKey);
+    const group = (zone, max, selected, tone) => Array.from({ length: max }, (_, index) => {
+      const number = index + 1;
+      const active = selected.includes(number);
+      return `<button class="scan-pick-ball is-${tone}${active ? " is-selected" : ""}" type="button" data-scan-pick-zone="${zone}" data-scan-pick-number="${number}" aria-pressed="${active}">${pad(number)}</button>`;
+    }).join("");
+    const ready = draft.main.length === config.mainCount && draft.extra.length === config.extraCount;
+    return `
+      <section class="scan-ball-picker" aria-label="手动新增一注">
+        <div class="scan-ball-picker-head"><strong>手动新增一注</strong><span>已选 ${draft.main.length + draft.extra.length}/${config.mainCount + config.extraCount}</span></div>
+        <div class="scan-pick-section"><div><strong>${config.mainLabel}</strong><span>选择 ${config.mainCount} 个</span></div><div class="scan-pick-grid">${group("main", config.mainMax, draft.main, config.mainTone)}</div></div>
+        <div class="scan-pick-section"><div><strong>${config.extraLabel}</strong><span>选择 ${config.extraCount} 个</span></div><div class="scan-pick-grid">${group("extra", config.extraMax, draft.extra, config.extraTone)}</div></div>
+        <div class="scan-ball-picker-actions"><button type="button" data-scan-pick-cancel>取消</button><button class="is-confirm" type="button" data-scan-pick-confirm${ready ? "" : " disabled"}>确定新增</button></div>
+      </section>
+    `;
   }
 
   function renderScanValidationMessages(result) {
@@ -1844,15 +1889,50 @@
     form.addEventListener("change", (event) => {
       const changedGame = event.target.name === "gameKey";
       state.ticketScanResult = readTicketScanForm(form, changedGame);
+      if (changedGame) state.ticketScanAddDraft = null;
       renderTicketScanReview();
+    });
+    form.querySelector("[data-scan-preview-zoom]")?.addEventListener("click", (event) => {
+      event.currentTarget.classList.toggle("is-expanded");
     });
     form.querySelector("[data-scan-again]")?.addEventListener("click", () => els.ticketScanInput?.click());
     form.querySelector("[data-scan-add]")?.addEventListener("click", () => {
+      state.ticketScanResult = readTicketScanForm(form);
+      state.ticketScanAddDraft = { gameKey: state.ticketScanResult.gameKey, main: [], extra: [] };
+      renderTicketScanReview();
+    });
+    form.querySelectorAll("[data-scan-pick-zone]").forEach((btn) => btn.addEventListener("click", () => {
+      state.ticketScanResult = readTicketScanForm(form);
+      const config = getScanBallConfig(state.ticketScanResult.gameKey);
+      const zone = btn.dataset.scanPickZone === "extra" ? "extra" : "main";
+      const maxCount = zone === "main" ? config.mainCount : config.extraCount;
+      const number = Number(btn.dataset.scanPickNumber);
+      const draft = state.ticketScanAddDraft || { gameKey: state.ticketScanResult.gameKey, main: [], extra: [] };
+      const values = draft[zone].slice();
+      const existing = values.indexOf(number);
+      if (existing >= 0) values.splice(existing, 1);
+      else if (maxCount === 1) values.splice(0, values.length, number);
+      else if (values.length < maxCount) values.push(number);
+      else toast(`最多选择 ${maxCount} 个号码`);
+      draft[zone] = values.sort((a, b) => a - b);
+      state.ticketScanAddDraft = draft;
+      renderTicketScanReview();
+    }));
+    form.querySelector("[data-scan-pick-cancel]")?.addEventListener("click", () => {
+      state.ticketScanResult = readTicketScanForm(form);
+      state.ticketScanAddDraft = null;
+      renderTicketScanReview();
+    });
+    form.querySelector("[data-scan-pick-confirm]")?.addEventListener("click", () => {
       const result = readTicketScanForm(form);
+      const config = getScanBallConfig(result.gameKey);
+      const draft = state.ticketScanAddDraft;
+      if (!draft || draft.main.length !== config.mainCount || draft.extra.length !== config.extraCount) return;
       result.tickets.push(result.gameKey === "dlt"
-        ? { front: [1, 2, 3, 4, 5], back: [1, 2], multiple: result.multiple }
-        : { red: [1, 2, 3, 4, 5, 6], blue: [1], multiple: result.multiple });
+        ? { front: draft.main.slice(), back: draft.extra.slice(), multiple: result.multiple }
+        : { red: draft.main.slice(), blue: draft.extra.slice(), multiple: result.multiple });
       state.ticketScanResult = window.LotteryOCR.validateTicketResult(result);
+      state.ticketScanAddDraft = null;
       renderTicketScanReview();
     });
     form.querySelectorAll("[data-scan-delete]").forEach((btn) => btn.addEventListener("click", () => {
@@ -1993,7 +2073,7 @@
     bindProfitChartInteractions(series);
   }
 
-  function buildDailyProfitSeries(records, range = "30") {
+  function buildDailyProfitSeries(records, range = "all") {
     const settled = (records || [])
       .filter((r) => r && (r.status === "won" || r.status === "lost") && r.createdAt)
       .slice()
@@ -2166,7 +2246,7 @@
       return `
         <g class="profit-point" data-profit-point="${index}">
           <circle class="profit-point-marker" cx="${x.toFixed(1)}" cy="${yOf(day.close).toFixed(1)}" r="4" stroke="${markerColor}"/>
-          <rect class="profit-point-hit" data-profit-point-index="${index}" x="${left.toFixed(1)}" y="${padT}" width="${Math.max(1, right - left).toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，累计盈亏${formatMoney(day.close)}"/>
+          <rect class="profit-point-hit" data-profit-point-index="${index}" x="${left.toFixed(1)}" y="${padT}" width="${Math.max(1, right - left).toFixed(1)}" height="${innerH}" tabindex="0" role="button" aria-label="${day.date}，花费${formatMoney(day.cost)}，中奖${formatMoney(day.prize)}，当日盈亏${formatMoney(day.net)}，累计盈亏${formatMoney(day.close)}"/>
         </g>
       `;
     }).join("");
@@ -2206,8 +2286,12 @@
       tooltip.innerHTML = `
         <div class="profit-tooltip-date">${day.date}</div>
         <div class="profit-tooltip-grid">
+          <span>当日花费</span><span>${formatMoney(day.cost)}</span>
+          <span>当日中奖</span><span>${formatMoney(day.prize)}</span>
+          <span>当日盈亏</span><span>${day.net > 0 ? "+" : ""}${formatMoney(day.net)}</span>
           <span>累计盈亏</span><span>${day.close > 0 ? "+" : ""}${formatMoney(day.close)}</span>
         </div>
+        ${day.games.length ? `<div class="profit-tooltip-games">彩种：${day.games.map((game) => GAME_CONFIGS[game.gameKey]?.label || game.gameKey).join("、")}</div>` : ""}
       `;
       const rect = wrap.getBoundingClientRect();
       const fallbackX = rect.left + ((index + 0.5) / series.days.length) * rect.width;

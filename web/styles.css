@@ -679,12 +679,25 @@ button { border: 0; cursor: pointer; background: transparent; }
 .title-main { min-width: 0; flex: 1 1 auto; }
 .title-row > .title-main { min-width: 0; }
 
-/* 选号列表卡片 head：标题 + 彩种 chip + 开奖日期 chip 同行 */
-.draft-head .title-main {
+/* 选号列表卡片 head：标题独占首行，开奖状态与清空按钮位于第二行。 */
+.draft-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 9px;
+}
+.draft-head-second-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 8px;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.draft-draw-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .draft-draw-tag {
@@ -2061,8 +2074,8 @@ button { border: 0; cursor: pointer; background: transparent; }
   position: absolute;
   z-index: 8;
   top: 8px;
-  min-width: 148px;
-  max-width: 210px;
+  min-width: 172px;
+  max-width: 230px;
   padding: 10px 11px;
   border-radius: 13px;
   color: var(--ink);
@@ -2221,7 +2234,7 @@ body.scan-open { overflow: hidden; }
 
 .ticket-scan-panel {
   position: relative;
-  width: min(100%, 560px);
+  width: min(100%, 760px);
   max-height: min(92vh, 820px);
   overflow: hidden;
   padding: 16px;
@@ -2326,25 +2339,55 @@ body.scan-open { overflow: hidden; }
 .scan-progress-copy { margin-top: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
 
 .scan-review { display: flex; flex-direction: column; gap: 12px; }
-.scan-review-preview {
+.scan-review-top {
   display: grid;
-  grid-template-columns: 74px 1fr;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 12px;
+}
+.scan-review-top.no-preview { grid-template-columns: 1fr; }
+.scan-preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
   padding: 10px;
   border-radius: 16px;
   background: var(--glass-tint-soft);
   box-shadow: inset 0 0 0 1px var(--glass-stroke);
 }
-.scan-review-preview:not(:has(img)) { grid-template-columns: 1fr; }
-.scan-review-preview img { width: 74px; height: 82px; object-fit: cover; border-radius: 10px; background: #fff; }
-.scan-review-preview strong { display: block; color: var(--ink); font-size: 16px; font-weight: 900; }
+.scan-preview-zoom {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+.scan-preview-zoom img { width: 100%; height: clamp(190px, 32vh, 300px); object-fit: contain; border-radius: 12px; background: #fff; }
+.scan-preview-zoom.is-expanded {
+  position: fixed;
+  inset: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  z-index: 180;
+  justify-content: center;
+  padding: 14px;
+  border-radius: 20px;
+  color: #fff;
+  background: rgba(5, 10, 22, 0.94);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+}
+.scan-preview-zoom.is-expanded img { width: 100%; height: calc(100% - 28px); max-height: none; object-fit: contain; background: transparent; }
+.scan-review-summary strong { display: block; color: var(--ink); font-size: 16px; font-weight: 900; }
 .scan-validation { display: inline-flex; margin-top: 7px; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 900; }
 .scan-validation.is-ok { color: #047857; background: rgba(16, 185, 129, 0.12); }
 .scan-validation.is-warning { color: #b45309; background: rgba(245, 158, 11, 0.14); }
 .scan-validation.is-error { color: #b91c1c; background: rgba(239, 68, 68, 0.12); }
 
-.scan-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.scan-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 9px; }
 .scan-meta-grid label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .scan-meta-grid label > span { color: var(--muted); font-size: 10px; font-weight: 800; }
 .scan-meta-grid input,
@@ -2389,10 +2432,34 @@ body.scan-open { overflow: hidden; }
 }
 .scan-number-input::-webkit-outer-spin-button,
 .scan-number-input::-webkit-inner-spin-button { margin: 0; appearance: none; }
-.scan-number-input.is-red { background: #ff2d55; }
-.scan-number-input.is-blue { background: #4a6cf7; }
-.scan-number-input.is-yellow { color: #5b4300; background: #f5c84b; }
+.scan-number-input.is-red { background: var(--red); }
+.scan-number-input.is-blue { background: var(--blue); }
+.scan-number-input.is-yellow { color: #fff; background: var(--yellow); }
 .scan-add-ticket { width: 100%; min-height: 36px; color: #3159d8; background: rgba(74, 108, 247, 0.09); box-shadow: inset 0 0 0 1px rgba(74, 108, 247, 0.15); }
+
+.scan-ball-picker { padding: 12px; border-radius: 16px; background: var(--glass-tint-soft); box-shadow: inset 0 0 0 1px var(--glass-stroke); }
+.scan-ball-picker-head,
+.scan-pick-section > div:first-child,
+.scan-ball-picker-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.scan-ball-picker-head { margin-bottom: 12px; }
+.scan-ball-picker-head strong { color: var(--ink); font-size: 13px; font-weight: 900; }
+.scan-ball-picker-head span,
+.scan-pick-section > div:first-child span { color: var(--muted); font-size: 10px; font-weight: 800; }
+.scan-pick-section + .scan-pick-section { margin-top: 13px; }
+.scan-pick-section > div:first-child strong { color: var(--text); font-size: 11px; font-weight: 900; }
+.scan-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 6px; margin-top: 8px; }
+.scan-pick-ball { width: 32px; height: 32px; justify-self: center; border-radius: 50%; font-size: 10px; font-weight: 900; box-shadow: inset 0 0 0 1px currentColor; transition: transform 160ms var(--ease-spring), background 160ms ease, color 160ms ease; }
+.scan-pick-ball.is-red { color: rgba(var(--c-red), 0.55); background: rgba(var(--c-red), 0.045); }
+.scan-pick-ball.is-blue { color: rgba(var(--c-blue), 0.55); background: rgba(var(--c-blue), 0.045); }
+.scan-pick-ball.is-yellow { color: rgba(var(--c-yellow), 0.58); background: rgba(var(--c-yellow), 0.05); }
+.scan-pick-ball.is-selected { color: #fff; transform: translateY(-1px) scale(1.06); box-shadow: 0 4px 10px rgba(15, 23, 42, 0.14); }
+.scan-pick-ball.is-red.is-selected { background: var(--red); }
+.scan-pick-ball.is-blue.is-selected { background: var(--blue); }
+.scan-pick-ball.is-yellow.is-selected { background: var(--yellow); }
+.scan-ball-picker-actions { margin-top: 14px; }
+.scan-ball-picker-actions button { flex: 1 1 0; min-height: 36px; border-radius: 11px; color: var(--muted-strong); background: var(--glass-tint-soft); box-shadow: inset 0 0 0 1px var(--glass-stroke); font-size: 11px; font-weight: 900; }
+.scan-ball-picker-actions .is-confirm { color: #fff; background: linear-gradient(135deg, #4a6cf7, #3155d7); box-shadow: none; }
+.scan-ball-picker-actions .is-confirm:disabled { opacity: 0.38; }
 
 .scan-validation-list { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .scan-validation-list li { padding: 8px 10px; border-radius: 10px; font-size: 11px; font-weight: 800; line-height: 1.4; }
@@ -2416,6 +2483,17 @@ body.scan-open { overflow: hidden; }
   .ticket-scan-panel { width: 100%; max-height: 96vh; border-radius: 24px 24px 0 0; padding: 14px; }
   .ticket-scan-body { max-height: calc(96vh - 74px); }
   .scan-number-input { width: 32px; height: 32px; }
+  .scan-review-top { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 9px; }
+  .scan-preview-column { padding: 8px; }
+  .scan-preview-zoom img { height: clamp(210px, 36vh, 300px); }
+  .scan-meta-grid { grid-template-columns: 1fr; gap: 7px; }
+  .scan-meta-grid input, .scan-meta-grid select { height: 36px; }
+  .scan-pick-grid { grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .scan-pick-ball { width: 30px; height: 30px; }
+}
+@media (max-width: 350px) {
+  .scan-review-top { grid-template-columns: 1fr; }
+  .scan-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .game-stat-detail-grid div { min-width: 0; }
 .game-stat-detail-grid span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; }
