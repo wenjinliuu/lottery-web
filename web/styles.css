@@ -2465,7 +2465,6 @@ body.scan-open { overflow: hidden; }
   background: rgb(250, 252, 255);
   border-top: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 -18px 48px rgba(31, 41, 71, 0.22);
-  animation: sheet-in 220ms var(--ease-spring) both;
 }
 [data-theme="dark"] .scan-ball-sheet,
 :root:not([data-theme="light"]) .scan-ball-sheet { background: rgb(20, 25, 42); border-top-color: rgba(255, 255, 255, 0.12); }
