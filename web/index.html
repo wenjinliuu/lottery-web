@@ -1,24 +1,24 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#f7f7f7" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0b0f1c" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" id="themeColorMeta" content="#f7f7f7">
     <title>彩票号码备忘</title>
-    <link rel="stylesheet" href="./styles.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%BD%A9%3C/text%3E%3C/svg%3E">
     <script>
-      /* 主题预加载：避免暗色模式刷新闪烁 */
+      /* 主题预加载：仅保留浅色/深色两态；无缓存及旧 system 值默认浅色。 */
       (function () {
+        var theme = "light";
         try {
-          var saved = localStorage.getItem("lottery-theme");
-          if (saved === "light" || saved === "dark") {
-            document.documentElement.setAttribute("data-theme", saved);
-          }
-        } catch (e) {}
+          if (localStorage.getItem("lottery-theme") === "dark") theme = "dark";
+        } catch (e) { /* private mode keeps the light default */ }
+        document.documentElement.setAttribute("data-theme", theme);
+        var themeColor = document.getElementById("themeColorMeta");
+        if (themeColor) themeColor.setAttribute("content", theme === "dark" ? "#0b0f1c" : "#f7f7f7");
       })();
     </script>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%BD%A9%3C/text%3E%3C/svg%3E">
   </head>
   <body>
     <main class="page">
@@ -253,7 +253,7 @@
             <div class="mine-menu-item mine-menu-item-last">
               <div class="mine-menu-copy">
                 <div class="mine-menu-title">深色模式</div>
-                <div class="mine-menu-sub" id="themeToggleSub">跟随系统</div>
+                <div class="mine-menu-sub" id="themeToggleSub">浅色</div>
               </div>
               <button class="theme-toggle" id="themeToggleBtn" type="button" role="switch" aria-checked="false" aria-label="切换深色模式"></button>
             </div>

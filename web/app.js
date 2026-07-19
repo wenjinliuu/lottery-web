@@ -104,17 +104,17 @@
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
-  /* ===== iOS 26 Liquid Glass — Theme manager (system → dark → light → system) ===== */
+  /* ===== iOS 26 Liquid Glass — Theme manager (light ↔ dark) ===== */
 
   const THEME_STORAGE_KEY = "lottery-theme";
-  const THEME_LABELS = { system: "跟随系统", dark: "深色", light: "浅色" };
+  const THEME_LABELS = { dark: "深色", light: "浅色" };
 
   function initTheme() {
     applyTheme(readSavedTheme());
     if (els.themeToggleBtn) {
       els.themeToggleBtn.addEventListener("click", () => {
         const cur = readSavedTheme();
-        const next = cur === "system" ? "dark" : cur === "dark" ? "light" : "system";
+        const next = cur === "dark" ? "light" : "dark";
         saveTheme(next);
         applyTheme(next);
       });
@@ -123,37 +123,31 @@
         if (e.key === " " || e.key === "Enter") { e.preventDefault(); els.themeToggleBtn.click(); }
       });
     }
-    if (window.matchMedia) {
-      try {
-        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-          if (readSavedTheme() === "system") applyTheme("system");
-        });
-      } catch (e) { /* Safari < 14 fallback noop */ }
-    }
   }
 
   function readSavedTheme() {
     try {
       const v = localStorage.getItem(THEME_STORAGE_KEY);
-      return v === "dark" || v === "light" ? v : "system";
-    } catch (e) { return "system"; }
+      /* 未设置、旧版 system 值或异常值一律迁移为默认浅色。 */
+      return v === "dark" ? "dark" : "light";
+    } catch (e) { return "light"; }
   }
 
   function saveTheme(mode) {
     try {
-      if (mode === "system") localStorage.removeItem(THEME_STORAGE_KEY);
-      else localStorage.setItem(THEME_STORAGE_KEY, mode);
+      localStorage.setItem(THEME_STORAGE_KEY, mode === "dark" ? "dark" : "light");
     } catch (e) { /* private mode etc. */ }
   }
 
   function applyTheme(mode) {
     const root = document.documentElement;
-    if (mode === "dark" || mode === "light") root.setAttribute("data-theme", mode);
-    else root.removeAttribute("data-theme");
-    const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = mode === "dark" || (mode === "system" && systemDark);
+    const normalizedMode = mode === "dark" ? "dark" : "light";
+    const isDark = normalizedMode === "dark";
+    root.setAttribute("data-theme", normalizedMode);
+    const themeColor = document.getElementById("themeColorMeta");
+    if (themeColor) themeColor.setAttribute("content", isDark ? "#0b0f1c" : "#f7f7f7");
     if (els.themeToggleBtn) els.themeToggleBtn.setAttribute("aria-checked", String(isDark));
-    if (els.themeToggleSub) els.themeToggleSub.textContent = THEME_LABELS[mode] || THEME_LABELS.system;
+    if (els.themeToggleSub) els.themeToggleSub.textContent = THEME_LABELS[normalizedMode];
   }
 
   /* ===== iOS 26 Liquid Glass — View Transitions (with reduce-motion fallback) ===== */
