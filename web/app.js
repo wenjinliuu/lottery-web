@@ -10,8 +10,10 @@
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(["ssq", "dlt"]);
+  const APP_VERSION = "2.0.0";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
+  const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
   const GAME_CONFIGS = {
     ssq: { label: "双色球", accent: "red", price: 2, sections: [{ key: "red", label: "红球", count: 6, color: "red" }, { key: "blue", label: "蓝球", count: 1, color: "blue" }] },
     qlc: { label: "七乐彩", accent: "yellow", price: 2, sections: [{ key: "nums7", label: "基本号", count: 7, color: "yellow" }], drawSections: [{ key: "nums7", label: "基本号", count: 7, color: "yellow" }, { key: "special", label: "特别号", count: 1, color: "k8orange" }] },
@@ -49,7 +51,11 @@
     ticketScanBusy: false,
     ticketScanAddDraft: null,
     nextDrawRefreshing: false,
-    nextDrawRefreshAvailableAt: 0
+    nextDrawRefreshAvailableAt: 0,
+    health: null,
+    healthError: "",
+    monthCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    pwaState: window.LotteryPWA?.getState?.() || {}
   };
 
   const els = {};
@@ -61,7 +67,7 @@
     initTheme();
     initControls();
     bindEvents();
-    await Promise.all([loadCalendar(), loadDraws()]);
+    await Promise.all([loadCalendar(), loadDraws(), loadHealth()]);
     await loadRecords();
     await reconcileInferredRecords(false);
     /* 首屏默认 ssq；若今日不开 ssq，自动切到今日开奖列表第一个 */
@@ -78,6 +84,7 @@
     renderTodayRecommend();
     randomizeTickets();
     renderBackupHint();
+    renderDataStatus();
   }
 
   function cacheElements() {
@@ -100,7 +107,9 @@
       "dltAddOnBtn",
       "todayRecommend", "todayRecommendChips",
       "lastBackupHint",
-      "draftDrawTag", "draftDrawRefreshBtn"
+      "draftDrawTag", "draftDrawRefreshBtn",
+      "monthlyStatsBtn", "monthlyBackBtn", "monthPrevBtn", "monthNextBtn", "monthCurrentLabel", "monthlySummary", "monthlyKpis", "monthlyCalendar", "monthlyGameChart", "monthlyCompareChart",
+      "dataStatusCard", "dataStatusSummary", "dataStatusDot", "dataStatusGrid", "dataStatusRefreshBtn", "pwaInstallBtn"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -241,6 +250,19 @@
     if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
     if (els.wonRecordsBackBtn) els.wonRecordsBackBtn.addEventListener("click", () => switchView("mine"));
     if (els.mineWonRecordsBtn) els.mineWonRecordsBtn.addEventListener("click", openWonRecordsView);
+    if (els.monthlyStatsBtn) els.monthlyStatsBtn.addEventListener("click", openMonthlyStatsView);
+    if (els.monthlyBackBtn) els.monthlyBackBtn.addEventListener("click", () => switchView("mine"));
+    if (els.monthPrevBtn) els.monthPrevBtn.addEventListener("click", () => changeStatsMonth(-1));
+    if (els.monthNextBtn) els.monthNextBtn.addEventListener("click", () => changeStatsMonth(1));
+    if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.addEventListener("click", refreshDataStatus);
+    if (els.pwaInstallBtn) els.pwaInstallBtn.addEventListener("click", installPwa);
+    window.addEventListener("online", renderDataStatus);
+    window.addEventListener("offline", renderDataStatus);
+    window.addEventListener("lottery:pwa-state", (event) => {
+      state.pwaState = event.detail || {};
+      renderDataStatus();
+      if (state.pwaState.updateReady) toast("彩票夹有新版本", { label: "立即更新", onClick: () => window.LotteryPWA?.applyUpdate?.() });
+    });
     document.querySelectorAll("[data-stat-details]").forEach((btn) => btn.addEventListener("click", openGameStatsSheet));
     if (els.detailSheetBackdrop) els.detailSheetBackdrop.addEventListener("click", closeDetailSheet);
     if (els.detailSheetCloseBtn) els.detailSheetCloseBtn.addEventListener("click", closeDetailSheet);
@@ -423,6 +445,11 @@
       renderHero();
       /* 进 random 时刷新开奖日期标注（处理停售时刻跨越） */
       if (view === "random") renderDraftHead();
+      if (view === "mine") {
+        renderBackupHint();
+        renderDataStatus();
+      }
+      if (view === "monthly") renderMonthlyStats();
     });
   }
 
@@ -447,6 +474,93 @@
       renderTodayRecommend();
       return false;
     }
+  }
+
+  async function loadHealth() {
+    try {
+      state.health = await fetchJson(`${LOTTERY_DATA_BASE_URL}/health.json?t=${Date.now()}`);
+      state.healthError = "";
+      renderDataStatus();
+      return true;
+    } catch (error) {
+      state.health = null;
+      state.healthError = String(error?.message || "健康数据读取失败");
+      renderDataStatus();
+      return false;
+    }
+  }
+
+  function getDataStatusModel() {
+    const online = navigator.onLine !== false;
+    const latestAt = state.latestUpdatedAt || "";
+    const calendarAt = state.calendar?.updated_at || state.calendar?.updatedAt || "";
+    const healthAt = state.health?.updated_at || state.health?.updatedAt || "";
+    const inferred = state.draws.filter((draw) => draw.nextStatus === "inferred" || draw.nextConfirmed === false).length;
+    const remoteOk = state.health?.ok !== false && Boolean(state.health);
+    const pwa = state.pwaState || window.LotteryPWA?.getState?.() || {};
+    const backup = getBackupHealth();
+    const tone = !online || state.health?.ok === false ? "error" : (!remoteOk || inferred || backup.tone === "warn" || pwa.offlineDataUsed) ? "warn" : "ok";
+    return {
+      tone,
+      summary: !online
+        ? "当前离线，页面正在使用本地记录与已缓存内容"
+        : tone === "ok" ? "开奖数据、应用与本地备份状态正常" : "部分数据仍在确认，建议查看下方状态",
+      items: [
+        { label: "网络", value: online ? "在线" : "离线", tone: online ? "ok" : "error" },
+        { label: "开奖仓库", value: remoteOk ? "运行正常" : state.healthError ? "暂时不可用" : "状态待确认", tone: remoteOk ? "ok" : "warn" },
+        { label: "最新开奖", value: latestAt ? formatStatusTime(latestAt) : "尚未载入", tone: latestAt ? "ok" : "warn" },
+        { label: "开奖日历", value: calendarAt ? formatStatusTime(calendarAt) : "尚未载入", tone: calendarAt ? (inferred ? "warn" : "ok") : "warn" },
+        { label: "下期信息", value: inferred ? `${inferred} 个彩种为预计` : "均为已确认状态", tone: inferred ? "warn" : "ok" },
+        { label: "本地备份", value: backup.shortText, tone: backup.tone },
+        { label: "离线应用", value: pwa.installed ? "已安装" : pwa.registered ? "已启用" : pwa.supported === false ? "浏览器不支持" : "正在准备", tone: pwa.registered || pwa.installed ? "ok" : "warn" },
+        { label: "应用版本", value: `v${APP_VERSION}${pwa.updateReady ? " · 可更新" : ""}`, tone: pwa.updateReady ? "warn" : "ok" }
+      ],
+      healthAt
+    };
+  }
+
+  function formatStatusTime(value) {
+    if (!value) return "未知";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  }
+
+  function renderDataStatus() {
+    if (!els.dataStatusGrid) return;
+    state.pwaState = window.LotteryPWA?.getState?.() || state.pwaState || {};
+    const model = getDataStatusModel();
+    if (els.dataStatusSummary) els.dataStatusSummary.textContent = model.summary;
+    if (els.dataStatusDot) els.dataStatusDot.dataset.tone = model.tone;
+    els.dataStatusGrid.innerHTML = model.items.map((item) => `
+      <div class="status-item">
+        <div class="status-item-label">${item.label}</div>
+        <div class="status-item-value" data-tone="${item.tone}">${item.value}</div>
+      </div>
+    `).join("");
+    if (els.pwaInstallBtn) {
+      els.pwaInstallBtn.hidden = !(state.pwaState.installAvailable || state.pwaState.manualInstall);
+      const label = els.pwaInstallBtn.querySelector("span");
+      if (label) label.textContent = state.pwaState.manualInstall ? "查看安装方法" : "安装到桌面";
+    }
+  }
+
+  async function refreshDataStatus() {
+    if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.disabled = true;
+    const results = await Promise.all([loadHealth(), loadCalendar(), loadDraws(false)]);
+    renderDataStatus();
+    if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.disabled = false;
+    toast(results.every(Boolean) ? "数据状态已更新" : "部分状态暂时无法获取");
+  }
+
+  async function installPwa() {
+    if (state.pwaState.manualInstall) {
+      window.alert("在 iPhone 或 iPad 的 Safari 中：点击底部“分享”按钮，然后选择“添加到主屏幕”，即可把彩票夹作为独立应用打开。");
+      return;
+    }
+    const installed = await window.LotteryPWA?.install?.();
+    toast(installed ? "彩票夹已添加到桌面" : "未完成安装，可稍后再试");
+    renderDataStatus();
   }
 
   function getTodayOpenGames() {
@@ -833,6 +947,7 @@
       toast("请先生成号码");
       return;
     }
+    if (!ensureResponsibleAcknowledgement()) return;
 
     const now = new Date().toISOString();
     const multiple = clampInt(els.multipleInput.value, 1, 99);
@@ -905,6 +1020,18 @@
     } else {
       toast(`已保存 ${records.length} 注`, viewAction);
     }
+  }
+
+  function ensureResponsibleAcknowledgement() {
+    const key = "lottery-responsible-play-ack-v1";
+    try {
+      if (localStorage.getItem(key) === "yes") return true;
+    } catch (error) { /* 仍显示一次确认 */ }
+    const accepted = window.confirm("彩票夹的号码功能仅供试玩与记录，不构成购买或中奖建议。本工具不提供网络售彩、代购或支付入口；如需购买，请通过当地合法、正规线下彩票销售渠道，并理性参与。\n\n点击“确定”表示我已知晓。");
+    if (accepted) {
+      try { localStorage.setItem(key, "yes"); } catch (error) { /* private mode */ }
+    }
+    return accepted;
   }
 
   /* iOS Safari 复制方案：
@@ -1117,7 +1244,7 @@
 
   async function clearRecords() {
     if (!state.records.length) return;
-    if (!window.confirm("确定清空所有本地选号记录吗？")) return;
+    if (!window.confirm("确定清空所有本地彩票记录吗？")) return;
     await dbClear();
     state.records = [];
     renderRecords();
@@ -1134,11 +1261,16 @@
   }
   function renderBackupHint() {
     if (!els.lastBackupHint) return;
+    const health = getBackupHealth();
+    els.lastBackupHint.textContent = health.text;
+    els.lastBackupHint.classList.add("backup-health-alert");
+    els.lastBackupHint.classList.toggle("is-ok", health.tone === "ok");
+  }
+
+  function getBackupHealth() {
     const last = readLastBackupAt();
-    if (!last) {
-      els.lastBackupHint.textContent = "生成 JSON 文件，换设备时可以恢复。";
-      return;
-    }
+    if (!state.records.length) return { tone: "ok", shortText: "暂无需备份", text: "暂无本地记录，产生记录后会提醒备份。" };
+    if (!last) return { tone: "warn", shortText: "尚未备份", text: "尚未备份：建议现在导出一份 JSON 文件。" };
     const diffMs = Date.now() - new Date(last).getTime();
     const day = 86400000;
     let rel;
@@ -1147,14 +1279,22 @@
     else if (diffMs < day) rel = `${Math.floor(diffMs / 3600000)} 小时前`;
     else if (diffMs < day * 30) rel = `${Math.floor(diffMs / day)} 天前`;
     else rel = formatDate(last);
-    els.lastBackupHint.textContent = `上次备份：${rel}`;
+    const due = !Number.isFinite(diffMs) || diffMs >= day * 7;
+    return {
+      tone: due ? "warn" : "ok",
+      shortText: due ? `已超过 ${Math.max(7, Math.floor(diffMs / day) || 7)} 天` : rel,
+      text: due ? `上次备份：${rel}，建议重新导出。` : `上次备份：${rel}，状态正常。`
+    };
   }
 
   async function exportBackup() {
     const now = new Date().toISOString();
     const payload = {
-      version: 1,
+      version: 2,
+      appVersion: APP_VERSION,
       exportedAt: now,
+      recordCount: state.records.length,
+      checksum: backupChecksum(state.records),
       records: state.records
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -1175,15 +1315,27 @@
     try {
       const payload = JSON.parse(await file.text());
       const records = Array.isArray(payload.records) ? payload.records : [];
+      if (payload.checksum && payload.checksum !== backupChecksum(records)) throw new Error("backup_checksum_mismatch");
       for (const record of records) await dbPut(evaluateRecord(record));
       state.records = await dbGetAll();
       renderRecords();
+      renderBackupHint();
       toast(`已导入 ${records.length} 条记录`);
     } catch (error) {
       toast("导入失败，文件格式不正确");
     } finally {
       event.target.value = "";
     }
+  }
+
+  function backupChecksum(records) {
+    const text = JSON.stringify(records || []);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
   }
 
   function renderAll() {
@@ -1247,7 +1399,7 @@
       : "暂无号码";
     if (!state.draftTickets.length) {
       els.draftList.className = "ticket-list empty-state";
-      els.draftList.textContent = "点击“随机选号”生成号码";
+      els.draftList.textContent = "点击“重新随机”生成试玩号码";
       return;
     }
     els.draftList.className = "ticket-list";
@@ -1345,12 +1497,14 @@
   function renderRecords() {
     const visibleRecords = getCheckVisibleRecords();
     renderRecordGroups(els.recordList, visibleRecords, {
-      emptyText: "暂无本期或上期选号记录，完整记录在“我的”页查看",
+      emptyText: "暂无本期或上期彩票记录，完整记录在“我的”页查看",
       deleteScope: "check"
     });
     renderMyRecordsList();
     renderWonRecordsList();
     renderMineStats();
+    renderBackupHint();
+    renderDataStatus();
   }
 
   function getCheckVisibleRecords() {
@@ -1380,14 +1534,14 @@
     }
     if (els.myRecordsSummary) {
       const label = state.recordFilterGame === "all" ? "全部彩种" : (GAME_CONFIGS[state.recordFilterGame]?.label || state.recordFilterGame);
-      els.myRecordsSummary.textContent = `${label} · ${groupRecordsByBatch(filteredRecords).length} 次选号`;
+      els.myRecordsSummary.textContent = `${label} · ${groupRecordsByBatch(filteredRecords).length} 次记录`;
     }
     if (els.recordFilterSummary) {
       const stats = summarizeRecords(filteredRecords);
       const batchCount = groupRecordsByBatch(filteredRecords).length;
       const label = state.recordFilterGame === "all" ? "全部彩种" : (GAME_CONFIGS[state.recordFilterGame]?.label || state.recordFilterGame);
       const prize = stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize);
-      els.recordFilterSummary.textContent = `${label} · ${batchCount} 次选号 · ${filteredRecords.length} 注 · 花费 ${formatCompactMoney(stats.totalCost)} · 中奖 ${prize} · 中奖率 ${stats.winRate}%`;
+      els.recordFilterSummary.textContent = `${label} · ${batchCount} 次记录 · ${filteredRecords.length} 注 · 花费 ${formatCompactMoney(stats.totalCost)} · 中奖 ${prize} · 中奖率 ${stats.winRate}%`;
     }
   }
 
@@ -1410,10 +1564,10 @@
     if (!records.length) {
       container.className = "record-list empty empty-cta";
       container.innerHTML = `
-        <div>当前筛选下暂无选号记录</div>
+        <div>当前筛选下暂无彩票记录</div>
         <button class="mini-blue has-icon" type="button" data-empty-go-random>
           <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-          <span>先去选几注</span>
+          <span>先去试玩</span>
         </button>
       `;
       container.querySelector("[data-empty-go-random]")?.addEventListener("click", () => switchView("random"));
@@ -1428,6 +1582,7 @@
     container.querySelectorAll("[data-delete-batch]").forEach((btn) => {
       btn.addEventListener("click", async () => deleteRecordsByBatch(btn.dataset.deleteBatch));
     });
+    bindRedeemActions(container);
   }
 
   function renderWonRecordsList() {
@@ -1440,7 +1595,8 @@
     }
     if (els.wonRecordsSummary) {
       const total = wonRecords.reduce((sum, record) => sum + Number(record.prizeAmount || 0), 0);
-      els.wonRecordsSummary.textContent = `共 ${wonRecords.length} 注 · 累计 ${formatCompactMoney(total)}`;
+      const unredeemed = wonRecords.filter((record) => record.status === "won" && !record.redeemedAt).length;
+      els.wonRecordsSummary.textContent = `共 ${wonRecords.length} 注 · 待兑奖 ${unredeemed} 注 · 累计 ${formatCompactMoney(total)}`;
     }
   }
 
@@ -1468,7 +1624,7 @@
         <div>${options.emptyText || "暂无保存记录"}</div>
         <button class="mini-blue has-icon" type="button" data-empty-go-random>
           <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-          <span>先去选几注</span>
+          <span>先去试玩</span>
         </button>
       `;
       const goBtn = container.querySelector("[data-empty-go-random]");
@@ -1483,7 +1639,7 @@
       const batches = groupRecordsByBatch(gameRecords);
       const groupStatus = stats.pendingCount ? `${stats.pendingCount} 注待开奖` : stats.floatCount ? `${stats.floatCount} 注奖金待定` : "已开奖";
       const amountText = stats.totalPrize > 0 ? formatMoney(stats.totalPrize) : stats.floatCount ? "浮动待定" : formatMoney(0);
-      const meta = `${batches.length} 次选号 · 花费 ${formatMoney(stats.totalCost)} · 中奖率 ${stats.winRate}% · ${groupStatus}`;
+      const meta = `${batches.length} 次记录 · 花费 ${formatMoney(stats.totalCost)} · 中奖率 ${stats.winRate}% · ${groupStatus}`;
       return `
         <section class="record-game-group random-ticket-${gameKey}" style="--stagger-i:${groupIdx}">
           <div class="record-group-head">
@@ -1513,6 +1669,7 @@
     container.querySelectorAll("[data-delete-batch]").forEach((btn) => {
       btn.addEventListener("click", async () => deleteRecordsByBatch(btn.dataset.deleteBatch));
     });
+    bindRedeemActions(container);
   }
 
   function renderRecordBatch(batch) {
@@ -1540,7 +1697,7 @@
           </div>
         </div>
         <div class="record-batch-tickets">${records.map((record) => renderRecordItem(record)).join("")}</div>
-        <button class="delete-btn has-icon record-batch-delete" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本次选号">${ICON.trash}<span>删除本次选号</span></button>
+        <button class="delete-btn has-icon record-batch-delete" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本次记录">${ICON.trash}<span>删除本次记录</span></button>
       </article>
     `;
   }
@@ -1558,15 +1715,34 @@
       <article class="record-card random-ticket-${record.gameKey}">
         <div class="record-ticket-meta">
           <div class="record-ticket-line">
-            <span>${playText || "选号"}</span>
+            <span>${playText || "试玩"}</span>
             <span>成本 ${formatMoney(cost)}</span>
             <span>${record.multiple || 1}倍</span>
           </div>
-          <span class="status-pill ${statusClass(record.status)}">${chipText}</span>
+          <div class="record-ticket-status">
+            <span class="status-pill ${statusClass(record.status)}">${chipText}</span>
+            ${record.status === "won" ? `<button class="redeem-btn${record.redeemedAt ? " is-redeemed" : ""}" type="button" data-toggle-redeemed="${record.id}">${record.redeemedAt ? "已兑奖" : "标记兑奖"}</button>` : ""}
+          </div>
         </div>
         ${renderTicketBalls(record.gameKey, record.numbers, record.matched, resolved)}
       </article>
     `;
+  }
+
+  function bindRedeemActions(container) {
+    container?.querySelectorAll("[data-toggle-redeemed]").forEach((btn) => {
+      btn.addEventListener("click", async () => toggleRecordRedeemed(btn.dataset.toggleRedeemed));
+    });
+  }
+
+  async function toggleRecordRedeemed(recordId) {
+    const record = state.records.find((item) => item.id === recordId);
+    if (!record || record.status !== "won") return;
+    const next = { ...record, redeemedAt: record.redeemedAt ? "" : new Date().toISOString(), updatedAt: new Date().toISOString() };
+    await dbPut(next);
+    state.records = await dbGetAll();
+    renderRecords();
+    toast(next.redeemedAt ? "已标记为已兑奖" : "已恢复为待兑奖");
   }
 
   function groupRecordsByGame(records) {
@@ -1611,7 +1787,7 @@
     if (!targets.length) return;
     const label = GAME_CONFIGS[gameKey]?.label || gameKey;
     const scopeText = scope === "check" ? "当前显示的" : scope === "won" ? "中奖" : "全部";
-    if (!window.confirm(`确定删除${label}${scopeText}选号记录吗？`)) return;
+    if (!window.confirm(`确定删除${label}${scopeText}彩票记录吗？`)) return;
     for (const record of targets) await dbDelete(record.id);
     state.records = await dbGetAll();
     renderRecords();
@@ -1620,11 +1796,11 @@
 
   async function deleteRecordsByBatch(batchId) {
     const targets = state.records.filter((record) => (record.batchId || record.id) === batchId);
-    if (!targets.length || !window.confirm("确定删除这一次选号记录吗？")) return;
+    if (!targets.length || !window.confirm("确定删除这一次彩票记录吗？")) return;
     for (const record of targets) await dbDelete(record.id);
     state.records = await dbGetAll();
     renderRecords();
-    toast("本次选号记录已删除");
+    toast("本次彩票记录已删除");
   }
 
   function renderMineStats() {
@@ -1643,7 +1819,7 @@
     if (!els.detailSheet || !els.detailSheetBody) return;
     const groups = groupRecordsByGame(state.records);
     els.detailSheetTitle.textContent = "各彩种统计";
-    els.detailSheetSub.textContent = "按已保存的全部本地选号记录汇总";
+    els.detailSheetSub.textContent = "按已保存的全部本地彩票记录汇总";
     els.detailSheetBody.innerHTML = groups.length ? groups.map(({ gameKey, gameRecords }) => {
       const stats = summarizeRecords(gameRecords);
       const batchCount = groupRecordsByBatch(gameRecords).length;
@@ -1651,7 +1827,7 @@
         <article class="game-stat-detail">
           <div class="game-stat-detail-head">
             <div class="game-stat-detail-name">${GAME_CONFIGS[gameKey]?.label || gameKey}</div>
-            <div class="game-stat-detail-count">${batchCount} 次选号 · ${gameRecords.length} 注</div>
+            <div class="game-stat-detail-count">${batchCount} 次记录 · ${gameRecords.length} 注</div>
           </div>
           <div class="game-stat-detail-grid">
             <div><span>累计花费</span><strong>${formatCompactMoney(stats.totalCost)}</strong></div>
@@ -1660,7 +1836,7 @@
           </div>
         </article>
       `;
-    }).join("") : `<div class="empty-state">暂无选号记录</div>`;
+    }).join("") : `<div class="empty-state">暂无彩票记录</div>`;
     els.detailSheet.hidden = false;
     document.body.classList.add("sheet-open");
     window.setTimeout(() => els.detailSheetCloseBtn?.focus(), 20);
@@ -2088,10 +2264,10 @@
     if (!series.days.length) {
       els.profitChartWrap.innerHTML = `
         <div class="profit-empty empty-cta" id="profitEmpty">
-          <div>暂无数据，先去选号吧</div>
+          <div>暂无数据，先去试玩吧</div>
           <button class="mini-blue has-icon" type="button" data-empty-go-random>
             <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-            <span>去选号</span>
+            <span>去试玩</span>
           </button>
         </div>
       `;
@@ -2348,6 +2524,135 @@
     });
   }
 
+  /* ===== 月度统计日历 ===== */
+
+  function openMonthlyStatsView() {
+    state.monthCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    switchView("monthly");
+    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+  }
+
+  function changeStatsMonth(delta) {
+    const next = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + delta, 1);
+    const current = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    if (next > current) return;
+    state.monthCursor = next;
+    renderMonthlyStats();
+  }
+
+  function getMonthKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function buildMonthStats(cursor) {
+    const monthKey = getMonthKey(cursor);
+    const records = state.records.filter((record) => {
+      if (!record || !["won", "lost", "prize_float"].includes(record.status)) return false;
+      return getRecordProfitDate(record).startsWith(monthKey);
+    });
+    const days = new Map();
+    const games = new Map();
+    records.forEach((record) => {
+      const date = getRecordProfitDate(record);
+      const cost = Number(record.price || 0) * Number(record.multiple || 1);
+      const prize = Number(record.prizeAmount || 0);
+      if (!days.has(date)) days.set(date, { date, cost: 0, prize: 0, net: 0, count: 0, wonCount: 0 });
+      const day = days.get(date);
+      day.cost += cost;
+      day.prize += prize;
+      day.net += prize - cost;
+      day.count += 1;
+      if (record.status === "won" || record.status === "prize_float") day.wonCount += 1;
+      const gameKey = record.gameKey || "unknown";
+      if (!games.has(gameKey)) games.set(gameKey, { gameKey, cost: 0, prize: 0, count: 0 });
+      const game = games.get(gameKey);
+      game.cost += cost;
+      game.prize += prize;
+      game.count += 1;
+    });
+    const totalCost = records.reduce((sum, record) => sum + Number(record.price || 0) * Number(record.multiple || 1), 0);
+    const totalPrize = records.reduce((sum, record) => sum + Number(record.prizeAmount || 0), 0);
+    const pendingCount = state.records.filter((record) => (record.status === "pending" || !record.status) && getRecordProfitDate(record).startsWith(monthKey)).length;
+    return { monthKey, records, days, games: Array.from(games.values()).sort((a, b) => b.cost - a.cost), totalCost, totalPrize, net: totalPrize - totalCost, pendingCount };
+  }
+
+  function renderMonthlyStats() {
+    if (!els.monthlyCalendar) return;
+    const cursor = state.monthCursor;
+    const stats = buildMonthStats(cursor);
+    const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const label = `${cursor.getFullYear()}年${cursor.getMonth() + 1}月`;
+    if (els.monthCurrentLabel) els.monthCurrentLabel.textContent = label;
+    if (els.monthNextBtn) els.monthNextBtn.disabled = cursor >= currentMonth;
+    if (els.monthlySummary) els.monthlySummary.textContent = `${stats.records.length} 注已开奖记录${stats.pendingCount ? ` · ${stats.pendingCount} 注待开奖` : ""}`;
+    if (els.monthlyKpis) {
+      const netClass = stats.net > 0 ? "is-positive" : stats.net < 0 ? "is-negative" : "";
+      const wonDays = Array.from(stats.days.values()).filter((day) => day.net > 0).length;
+      els.monthlyKpis.innerHTML = `
+        <article class="monthly-kpi"><span>当月花费</span><strong>${formatCompactMoney(stats.totalCost)}</strong></article>
+        <article class="monthly-kpi"><span>当月中奖</span><strong>${formatCompactMoney(stats.totalPrize)}</strong></article>
+        <article class="monthly-kpi"><span>当月盈亏</span><strong class="${netClass}">${stats.net > 0 ? "+" : ""}${formatCompactMoney(stats.net)}</strong></article>
+        <article class="monthly-kpi"><span>盈利天数</span><strong>${wonDays}天</strong></article>
+      `;
+    }
+    renderMonthlyCalendar(cursor, stats);
+    renderMonthlyGameChart(stats);
+    renderMonthlyCompareChart(cursor);
+  }
+
+  function renderMonthlyCalendar(cursor, stats) {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+    const dayCount = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+    const cells = Array.from({ length: firstWeekday }, () => `<div class="monthly-day is-empty" aria-hidden="true"></div>`);
+    for (let dayNumber = 1; dayNumber <= dayCount; dayNumber += 1) {
+      const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNumber).padStart(2, "0")}`;
+      const data = stats.days.get(date);
+      const tone = data ? data.net > 0 ? "is-win" : data.net < 0 ? "is-loss" : "" : "";
+      const netText = data ? `${data.net > 0 ? "+" : ""}${formatChartTick(data.net)}` : "";
+      const aria = data ? `${date}，花费${formatMoney(data.cost)}，中奖${formatMoney(data.prize)}，盈亏${formatMoney(data.net)}` : `${date}，无已开奖记录`;
+      cells.push(`<div class="monthly-day${data ? " has-data" : ""} ${tone}" aria-label="${aria}"><span class="monthly-day-number">${dayNumber}</span><span class="monthly-day-net">${netText}</span></div>`);
+    }
+    els.monthlyCalendar.innerHTML = cells.join("");
+  }
+
+  function renderMonthlyGameChart(stats) {
+    if (!els.monthlyGameChart) return;
+    const games = stats.games.filter((game) => game.cost > 0);
+    if (!games.length || !stats.totalCost) {
+      els.monthlyGameChart.innerHTML = `<div class="monthly-chart-empty">本月暂无已开奖记录</div>`;
+      return;
+    }
+    const circumference = 2 * Math.PI * 42;
+    let offset = 0;
+    const segments = games.map((game) => {
+      const share = game.cost / stats.totalCost;
+      const dash = share * circumference;
+      const node = `<circle class="monthly-donut-segment" cx="56" cy="56" r="42" stroke="${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"/>`;
+      offset += dash;
+      return node;
+    }).join("");
+    const legend = games.map((game) => `
+      <div class="monthly-legend-item"><span class="monthly-legend-dot" style="background:${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}"></span><span>${GAME_CONFIGS[game.gameKey]?.label || game.gameKey}</span><strong>${Math.round((game.cost / stats.totalCost) * 100)}%</strong></div>
+    `).join("");
+    els.monthlyGameChart.innerHTML = `<div class="monthly-donut-wrap"><svg class="monthly-donut" viewBox="0 0 112 112" role="img" aria-label="各彩种花费占比"><circle class="monthly-donut-track" cx="56" cy="56" r="42"/>${segments}</svg><div class="monthly-legend">${legend}</div></div>`;
+  }
+
+  function renderMonthlyCompareChart(cursor) {
+    if (!els.monthlyCompareChart) return;
+    const months = [];
+    for (let index = 5; index >= 0; index -= 1) {
+      const month = new Date(cursor.getFullYear(), cursor.getMonth() - index, 1);
+      months.push({ cursor: month, ...buildMonthStats(month) });
+    }
+    const maxAbs = Math.max(1, ...months.map((month) => Math.abs(month.net)));
+    els.monthlyCompareChart.innerHTML = `<div class="month-bars">${months.map((month) => {
+      const height = Math.max(3, (Math.abs(month.net) / maxAbs) * 100);
+      return `<div class="month-bar-item" aria-label="${month.cursor.getFullYear()}年${month.cursor.getMonth() + 1}月，盈亏${formatMoney(month.net)}"><div class="month-bar-value">${month.net > 0 ? "+" : ""}${formatChartTick(month.net)}</div><div class="month-bar-track"><div class="month-bar${month.net > 0 ? " is-positive" : ""}" style="height:${height.toFixed(1)}%"></div></div><div class="month-bar-label">${month.cursor.getMonth() + 1}月</div></div>`;
+    }).join("")}</div>`;
+  }
+
   function formatChartTick(value) {
     const n = Number(value) || 0;
     if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(n % 10000 === 0 ? 0 : 1)}万`;
@@ -2600,167 +2905,8 @@
   }
 
   function evaluateTicket(gameKey, ticket, draw, multiple = 1, drawMeta = null, record = null) {
-    let result = noPrize({});
-    if (gameKey === "ssq") result = evaluateSSQ(ticket, draw, drawMeta);
-    if (gameKey === "dlt") result = evaluateDLT(ticket, draw);
-    if (gameKey === "k8") result = evaluateK8(ticket, draw, drawMeta);
-    if (gameKey === "fc3d" || gameKey === "pl3") result = evaluateDigit(ticket, draw);
-    if (gameKey === "pl5") result = evaluatePL5(ticket, draw);
-    if (gameKey === "qlc") result = evaluateQLC(ticket, draw);
-    if (gameKey === "qxc") result = evaluateQXC(ticket, draw);
-    const multiplier = clampInt(multiple, 1, 99);
-    const dynamicAmount = result.float ? resolveFloatingPrizeAmount(drawMeta, result.prizeName, gameKey, record || { numbers: ticket }) : 0;
-    if (result.float && dynamicAmount > 0) {
-      return { ...result, float: false, amount: dynamicAmount * multiplier };
-    }
-    return { ...result, amount: result.float ? 0 : result.amount * multiplier };
-  }
-
-  function evaluateSSQ(ticket, draw, drawMeta) {
-    const red = countMatches(ticket.red, draw.red);
-    const blue = Number(ticket.blue?.[0]) === Number(draw.blue?.[0]) ? 1 : 0;
-    const matched = { red: markMatches(ticket.red, draw.red), blue: [blue === 1] };
-    if (red === 6 && blue) return floatPrize("一等奖", matched);
-    if (red === 6) return floatPrize("二等奖", matched);
-    if (red === 5 && blue) return floatPrize("三等奖", matched);
-    if ((red === 5 && !blue) || (red === 4 && blue)) return floatPrize("四等奖", matched);
-    if ((red === 4 && !blue) || (red === 3 && blue)) return floatPrize("五等奖", matched);
-    if ([0, 1, 2].includes(red) && blue) return floatPrize("六等奖", matched);
-    /* 福运奖只在当期开奖数据明确包含该奖项时启用。3+1 已命中更高的五等奖。 */
-    if (red === 3 && !blue && hasPrizeByName(drawMeta, "福运奖")) return floatPrize("福运奖", matched);
-    return noPrize(matched);
-  }
-
-  function evaluateDLT(ticket, draw) {
-    const front = countMatches(ticket.front, draw.front);
-    const back = countMatches(ticket.back, draw.back);
-    const matched = { front: markMatches(ticket.front, draw.front), back: markMatches(ticket.back, draw.back) };
-    if (front === 5 && back === 2) return floatPrize("一等奖", matched);
-    if (front === 5 && back === 1) return floatPrize("二等奖", matched);
-    if ((front === 5 && back === 0) || (front === 4 && back === 2)) return floatPrize("三等奖", matched);
-    if (front === 4 && back === 1) return floatPrize("四等奖", matched);
-    if ((front === 4 && back === 0) || (front === 3 && back === 2)) return floatPrize("五等奖", matched);
-    if ((front === 3 && back === 1) || (front === 2 && back === 2)) return floatPrize("六等奖", matched);
-    if ((front === 3 && back === 0) || (front === 2 && back === 1) || (front === 1 && back === 2) || (front === 0 && back === 2)) return floatPrize("七等奖", matched);
-    return noPrize(matched);
-  }
-
-  function evaluateK8(ticket, draw, drawMeta) {
-    const matches = countMatches(ticket.nums, draw.nums);
-    const matched = { nums: markMatches(ticket.nums, draw.nums) };
-    const prize = findK8PrizeEntry(drawMeta?.prizeList || [], Number(ticket.playCount), matches);
-    return prize ? floatPrize(prize.prizeName, matched) : noPrize(matched);
-  }
-
-  function evaluateDigit(ticket, draw) {
-    const nums = ticket.nums3 || [];
-    if (ticket.playMode === "single") {
-      const matched = { nums3: nums.map((n, i) => n === draw.nums[i]) };
-      return matched.nums3.every(Boolean) ? floatPrize("直选", matched) : noPrize(matched);
-    }
-    const matched = { nums3: markMatches(nums, draw.nums) };
-    if (ticket.playMode === "group3") return isGroup3(draw.nums) && multisetEqual(nums, draw.nums) ? floatPrize("组三", matched) : noPrize(matched);
-    return new Set(draw.nums).size === 3 && multisetEqual(nums, draw.nums) ? floatPrize("组六", matched) : noPrize(matched);
-  }
-
-  function evaluatePL5(ticket, draw) {
-    const matched = { nums5: (ticket.nums5 || []).map((n, i) => n === draw.nums[i]) };
-    return matched.nums5.every(Boolean) ? floatPrize("一等奖", matched) : noPrize(matched);
-  }
-
-  function evaluateQLC(ticket, draw) {
-    const front = countMatches(ticket.nums7, draw.front);
-    const special = (ticket.nums7 || []).includes(draw.special) ? 1 : 0;
-    const matched = { nums7: markMatches(ticket.nums7, (draw.front || []).concat([draw.special])) };
-    if (front === 7) return floatPrize("一等奖", matched);
-    if (front === 6 && special) return floatPrize("二等奖", matched);
-    if (front === 6) return floatPrize("三等奖", matched);
-    if (front === 5 && special) return floatPrize("四等奖", matched);
-    if (front === 5) return floatPrize("五等奖", matched);
-    if (front === 4 && special) return floatPrize("六等奖", matched);
-    if (front === 4) return floatPrize("七等奖", matched);
-    return noPrize(matched);
-  }
-
-  function evaluateQXC(ticket, draw) {
-    const mainMatched = (ticket.nums6 || []).map((n, i) => n === draw.nums6[i]);
-    const mainCount = mainMatched.filter(Boolean).length;
-    const tailMatched = Number(ticket.tail) === Number(draw.tail);
-    const matched = { nums6: mainMatched, tail: [tailMatched] };
-    if (mainCount === 6 && tailMatched) return floatPrize("一等奖", matched);
-    if (mainCount === 6) return floatPrize("二等奖", matched);
-    if (mainCount === 5 && tailMatched) return floatPrize("三等奖", matched);
-    if (mainCount === 5 || (mainCount === 4 && tailMatched)) return floatPrize("四等奖", matched);
-    if (mainCount === 4 || (mainCount === 3 && tailMatched)) return floatPrize("五等奖", matched);
-    if (mainCount === 3 || tailMatched) return floatPrize("六等奖", matched);
-    return noPrize(matched);
-  }
-
-  function hasPrizeByName(draw, prizeName) {
-    return Boolean(draw?.prizeList?.some((prize) => canonicalPrizeName(prize.prizeName) === canonicalPrizeName(prizeName)));
-  }
-
-  function findK8PrizeEntry(prizeList, playCount, hits) {
-    const playChinese = toChineseNumber(playCount);
-    const hitsChinese = toChineseNumber(hits);
-    return prizeList.find((prize) => {
-      const name = String(prize.prizeName || prize.require || "");
-      return (name.includes(`选${playCount}`) || name.includes(`选${playChinese}`))
-        && (name.includes(`中${hits}`) || name.includes(`中${hitsChinese}`));
-    }) || null;
-  }
-
-  function resolveFloatingPrizeAmount(draw, prizeName, gameKey, record) {
-    if (!draw || !Array.isArray(draw.prizeList)) return 0;
-    const base = findPrizeAmount(draw.prizeList, prizeName, gameKey, record);
-    if (gameKey !== "dlt" || !isDltAddOn(record) || !["一等奖", "二等奖"].includes(prizeName)) return base;
-    const addOn = findPrizeAmount(draw.prizeList, `${prizeName}追加`, gameKey, record)
-      || findPrizeAmount(draw.prizeList, `追加${prizeName}`, gameKey, record)
-      || findDltInlineAddOnPrizeAmount(draw.prizeList, prizeName)
-      || findDltAddOnPrizeAmount(draw.prizeList, prizeName);
-    /* 不在前端推算“80%”；当期追加奖金缺失时保留为金额待定。 */
-    return addOn > 0 ? base + addOn : 0;
-  }
-
-  function findPrizeAmount(prizeList, prizeName, gameKey, record) {
-    const candidates = prizeList.filter((prize) => {
-      const name = String(prize.prizeName || prize.require || "");
-      if (gameKey === "k8") {
-        const playCount = Number(record?.numbers?.playCount || record?.playMode || 0);
-        const hits = String(prizeName).match(/\d+/g)?.pop() || "";
-        return (name.includes(`选${playCount}`) || name.includes(`选${toChineseNumber(playCount)}`))
-          && (name.includes(`中${hits}`) || name.includes(`中${toChineseNumber(Number(hits))}`));
-      }
-      const normalizedName = canonicalPrizeName(name);
-      const normalizedTarget = canonicalPrizeName(prizeName);
-      return normalizedName.includes(normalizedTarget) && (String(prizeName).includes("追加") || !name.includes("追加"));
-    });
-    return candidates.reduce((amount, prize) => amount || parseMoneyNumber(prize.singleBonus || prize.prize), 0);
-  }
-
-  function findDltAddOnPrizeAmount(prizeList, prizeName) {
-    const candidates = prizeList.filter((prize) => {
-      const name = String(prize.prizeName || prize.require || "");
-      return name.includes("追加") && name.includes(prizeName);
-    });
-    return candidates.reduce((amount, prize) => amount || parseMoneyNumber(prize.singleBonus || prize.prize), 0);
-  }
-
-  function findDltInlineAddOnPrizeAmount(prizeList, prizeName) {
-    const prize = prizeList.find((item) => String(item.prizeName || item.require || "").includes(prizeName) && item.addBonus);
-    return prize ? parseMoneyNumber(prize.addBonus) : 0;
-  }
-
-  function canonicalPrizeName(value) {
-    return String(value || "")
-      .replace(/组选[3三]奖?/g, "组三")
-      .replace(/组选[6六]奖?/g, "组六")
-      .replace(/直选奖/g, "直选")
-      .replace(/\s+/g, "");
-  }
-
-  function isDltAddOn(record) {
-    return record?.addOn || record?.numbers?.addOn || record?.playMode === "add";
+    if (!window.LotteryPrizeRules?.evaluateTicket) throw new Error("中奖规则模块未加载");
+    return window.LotteryPrizeRules.evaluateTicket(gameKey, ticket, draw, multiple, drawMeta, record);
   }
 
   function getLatestDraw(gameKey) {
@@ -2789,47 +2935,6 @@
     const normalized = text.includes("T") ? text : text.replace(/-/g, "/");
     const date = new Date(normalized);
     return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  function countMatches(ticket = [], draw = []) {
-    const counts = {};
-    draw.forEach((n) => { counts[n] = (counts[n] || 0) + 1; });
-    return ticket.reduce((sum, n) => {
-      if (!counts[n]) return sum;
-      counts[n] -= 1;
-      return sum + 1;
-    }, 0);
-  }
-
-  function markMatches(ticket = [], draw = []) {
-    const counts = {};
-    draw.forEach((n) => { counts[n] = (counts[n] || 0) + 1; });
-    return ticket.map((n) => {
-      if (!counts[n]) return false;
-      counts[n] -= 1;
-      return true;
-    });
-  }
-
-  function multisetEqual(a = [], b = []) {
-    if (a.length !== b.length) return false;
-    const counts = {};
-    a.forEach((n) => { counts[n] = (counts[n] || 0) + 1; });
-    return b.every((n) => counts[n]-- > 0);
-  }
-
-  function isGroup3(nums = []) {
-    const counts = {};
-    nums.forEach((n) => { counts[n] = (counts[n] || 0) + 1; });
-    return Object.values(counts).sort((a, b) => a - b).join(",") === "1,2";
-  }
-
-  function noPrize(matched) {
-    return { prizeName: "未中奖", amount: 0, float: false, matched };
-  }
-
-  function floatPrize(prizeName, matched) {
-    return { prizeName, amount: 0, float: true, matched };
   }
 
   function dbOpen() {
