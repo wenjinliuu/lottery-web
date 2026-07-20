@@ -44,6 +44,45 @@ assert.deepEqual(noisySsq.tickets[2].red, [4, 12, 25, 26, 27, 30]);
 assert.deepEqual(noisySsq.tickets[2].blue, [3]);
 assert.equal(noisySsq.drawDate, "2026-07-16");
 
+const cRowRecoverySamples = [
+  {
+    broken: "ce 15 16 23 28 31-12 (3)",
+    recheck: "C103 15 16 23 28 31-12 (3)",
+    red: [3, 15, 16, 23, 28, 31], blue: 12
+  },
+  {
+    broken: "£5 12 25 26 27 30-03 (3)",
+    recheck: "C104 12 25 26 27 30-03 (3)",
+    red: [4, 12, 25, 26, 27, 30], blue: 3
+  },
+  {
+    broken: "iat 10 16 27 29 32-03 (3)",
+    recheck: "C01 10 16 27 29 32-03 (3)",
+    red: [1, 10, 16, 27, 29, 32], blue: 3
+  },
+  {
+    broken: ": 14 26 28 29 31-10 (3)",
+    recheck: "C.09 14 26 28 29 31-10 (3)",
+    red: [9, 14, 26, 28, 29, 31], blue: 10
+  }
+];
+
+cRowRecoverySamples.forEach((sample, index) => {
+  const recovered = LotteryOCR.parseLotteryTicketText(`
+中国福利彩票 双色球
+A.01 04 14 23 27 32-12 (3)
+B.01 03 12 19 25 26-10 (3)
+${sample.broken}
+开奖期:2026082 26-07-19
+合计18元
+---NUMBER-RECHECK---
+${sample.recheck}
+`, 76);
+  assert.equal(recovered.tickets.length, 3, `C行样本${index + 1}应恢复为三注`);
+  assert.deepEqual(recovered.tickets[2].red, sample.red, `C行样本${index + 1}首个红球恢复错误`);
+  assert.deepEqual(recovered.tickets[2].blue, [sample.blue], `C行样本${index + 1}蓝球恢复错误`);
+});
+
 const dlt = LotteryOCR.parseLotteryTicketText(`
 体彩 超级大乐透
 第26079期 2026年07月15日开奖

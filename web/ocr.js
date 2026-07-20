@@ -91,7 +91,18 @@
         const rightSource = line.slice(dash + 1);
         const left = extractNumberTokens(leftSource);
         const right = extractNumberTokens(rightSource);
-        red = left.slice(-6);
+        /*
+         * 单行复核时，热敏票上的 “C.” 常被连成 C1，例如 C.04 → C104。
+         * 优先按 A-E 行号拆出首个红球，避免把这个假 1 当成号码 10。
+         */
+        const labeledPrefix = leftSource.match(/^\s*[A-E]\s*[.·:：1Il|!]?\s*([0-9OQDIloq|!ZzSsGgBb]{2})(?=\s|$)/i);
+        const labeledFirst = labeledPrefix ? normalizeDigitToken(labeledPrefix[1]) : null;
+        if (Number.isFinite(labeledFirst)) {
+          const remaining = extractNumberTokens(leftSource.slice(labeledPrefix[0].length));
+          red = [labeledFirst].concat(remaining.slice(0, 5));
+        } else {
+          red = left.slice(-6);
+        }
         blue = right[0];
         if (red.length !== 6 || !red.every((n) => n >= 1 && n <= 33) || !isAscendingUnique(red)) {
           red = extractCompactNumberSequence(leftSource, 6, 33);
@@ -530,6 +541,148 @@
     return canvas;
   }
 
+  function cropRectCanvas(source, left, top, right, bottom, scale = 1) {
+    const x = clamp(Math.round(left), 0, source.width - 1);
+    const y = clamp(Math.round(top), 0, source.height - 1);
+    const width = clamp(Math.round(right - left), 1, source.width - x);
+    const height = clamp(Math.round(bottom - top), 1, source.height - y);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function longestActiveRun(values, isActive, maxGap) {
+    let best = null;
+    let current = null;
+    values.forEach((value, index) => {
+      if (!isActive(value)) return;
+      if (!current || index - current.last > maxGap + 1) {
+        current = { start: index, end: index, last: index };
+      } else {
+        current.end = index;
+        current.last = index;
+      }
+      if (!best || current.end - current.start > best.end - best.start) best = { ...current };
+    });
+    return best;
+  }
+
+  function findPaperBox(canvas, pixels) {
+    const rowStepX = Math.max(1, Math.round(canvas.width / 520));
+    const rowLeft = Math.round(canvas.width * 0.12);
+    const rowRight = Math.round(canvas.width * 0.88);
+    const rowBrightness = [];
+    for (let y = 0; y < canvas.height; y += 1) {
+      let bright = 0, sampled = 0;
+      for (let x = rowLeft; x < rowRight; x += rowStepX) {
+        bright += pixels[(y * canvas.width + x) * 4] > 185 ? 1 : 0;
+        sampled += 1;
+      }
+      rowBrightness.push(bright / Math.max(1, sampled));
+    }
+    const vertical = longestActiveRun(rowBrightness, (ratio) => ratio > 0.58, 3);
+    const top = vertical ? vertical.start : 0;
+    const bottom = vertical ? vertical.end : canvas.height - 1;
+    const paperHeight = Math.max(1, bottom - top + 1);
+
+    const columnStepY = Math.max(1, Math.round(paperHeight / 520));
+    const columnTop = Math.round(top + paperHeight * 0.08);
+    const columnBottom = Math.round(bottom - paperHeight * 0.08);
+    const columnBrightness = [];
+    for (let x = 0; x < canvas.width; x += 1) {
+      let bright = 0, sampled = 0;
+      for (let y = columnTop; y < columnBottom; y += columnStepY) {
+        bright += pixels[(y * canvas.width + x) * 4] > 185 ? 1 : 0;
+        sampled += 1;
+      }
+      columnBrightness.push(bright / Math.max(1, sampled));
+    }
+    const horizontal = longestActiveRun(columnBrightness, (ratio) => ratio > 0.54, 3);
+    return {
+      left: horizontal ? horizontal.start : 0,
+      right: horizontal ? horizontal.end : canvas.width - 1,
+      top,
+      bottom
+    };
+  }
+
+  function buildSsqSingleLineCanvases(canvas) {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const paper = findPaperBox(canvas, pixels);
+    const paperWidth = Math.max(1, paper.right - paper.left + 1);
+    const paperHeight = Math.max(1, paper.bottom - paper.top + 1);
+    const left = Math.round(paper.left + paperWidth * 0.015);
+    const right = Math.round(paper.right - paperWidth * 0.015);
+    const stepX = Math.max(1, Math.round(paperWidth / 720));
+    const searchTop = Math.round(paper.top + paperHeight * 0.10);
+    const searchBottom = Math.round(paper.top + paperHeight * 0.56);
+    const density = [];
+    for (let y = searchTop; y < searchBottom; y += 1) {
+      let dark = 0, sampled = 0;
+      for (let x = left; x < right; x += stepX) {
+        dark += pixels[(y * canvas.width + x) * 4] < 115 ? 1 : 0;
+        sampled += 1;
+      }
+      density.push(dark / Math.max(1, sampled));
+    }
+
+    const smoothRadius = Math.max(4, Math.round(paperHeight * 0.009));
+    const smoothed = density.map((unused, index) => {
+      const start = Math.max(0, index - smoothRadius);
+      const end = Math.min(density.length, index + smoothRadius + 1);
+      let total = 0;
+      for (let cursor = start; cursor < end; cursor += 1) total += density[cursor];
+      return total / Math.max(1, end - start);
+    });
+    const peakPool = [];
+    for (let index = 3; index < smoothed.length - 3; index += 1) {
+      const localMax = Math.max(...smoothed.slice(index - 3, index + 4));
+      if (smoothed[index] >= 0.012 && smoothed[index] === localMax) {
+        peakPool.push({ y: searchTop + index, score: smoothed[index] });
+      }
+    }
+    const minPeakGap = paperHeight * 0.018;
+    const peaks = [];
+    peakPool.sort((a, b) => b.score - a.score).forEach((peak) => {
+      if (peaks.every((chosen) => Math.abs(chosen.y - peak.y) > minPeakGap)) peaks.push(peak);
+    });
+    peaks.sort((a, b) => a.y - b.y);
+
+    let best = null;
+    for (let start = 0; start <= peaks.length - 5; start += 1) {
+      const group = peaks.slice(start, start + 5);
+      const gaps = group.slice(1).map((peak, index) => peak.y - group[index].y);
+      const mean = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+      if (mean < paperHeight * 0.018 || mean > paperHeight * 0.080) continue;
+      const spread = (Math.max(...gaps) - Math.min(...gaps)) / Math.max(1, mean);
+      const midpoint = (group[0].y + group[4].y) / 2;
+      const score = spread + Math.abs(mean / paperHeight - 0.035) * 4
+        + Math.abs((midpoint - paper.top) / paperHeight - 0.37) * 0.16;
+      if (!best || score < best.score) best = { group, mean, score };
+    }
+
+    const fallbackCenters = [0.28, 0.32, 0.36, 0.40, 0.44]
+      .map((ratio) => paper.top + paperHeight * ratio);
+    const centers = best ? best.group.map((peak) => peak.y) : fallbackCenters;
+    const rowGap = best ? best.mean : paperHeight * 0.04;
+    const halfHeight = clamp(rowGap * 0.46, paperHeight * 0.016, paperHeight * 0.036);
+    return centers.map((center) => cropRectCanvas(
+      canvas,
+      left,
+      center - halfHeight,
+      right,
+      center + halfHeight,
+      1.55
+    ));
+  }
+
   function findDashedSeparatorPair(canvas) {
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -658,7 +811,7 @@
         await worker.setParameters({
           tessedit_pageseg_mode: "6",
           preserve_interword_spaces: "1",
-          tessedit_char_whitelist: "ABCDEabcde0123456789+-() "
+          tessedit_char_whitelist: "ABCDEabcde.0123456789+-() "
         });
         for (let index = 0; index < numberRegions.length; index += 1) {
           phaseStart = 0.80 + index * (0.18 / numberRegions.length);
@@ -668,18 +821,45 @@
           mergedText += `\n---NUMBER-RECHECK---\n${regionPass.data.text}`;
           confidence = Math.max(confidence, regionPass.data.confidence);
         }
-        const provisional = parseLotteryTicketText(mergedText, confidence);
-        const missingTicket = provisional.warnings.some((message) => message.includes("当前识别到"));
-        if (missingTicket) {
-          const recoveryCanvas = buildHighContrastCanvas(numberRegions[0]);
+        let provisional = parseLotteryTicketText(mergedText, confidence);
+        let missingTicket = provisional.warnings.some((message) => message.includes("当前识别到"));
+        if (missingTicket && provisional.gameKey === "ssq") {
+          const rowCanvases = buildSsqSingleLineCanvases(canvas);
           try {
-            phaseStart = 0.97;
-            phaseSpan = 0.02;
+            await worker.setParameters({
+              tessedit_pageseg_mode: "7",
+              preserve_interword_spaces: "1",
+              tessedit_char_whitelist: "ABCDEabcde.0123456789+-() "
+            });
+            for (let index = 0; index < rowCanvases.length; index += 1) {
+              phaseStart = 0.981 + index * (0.017 / rowCanvases.length);
+              phaseSpan = 0.017 / rowCanvases.length;
+              onProgress?.({ progress: phaseStart, label: "正在逐行补查双色球号码" });
+              const rowPass = await worker.recognize(rowCanvases[index]);
+              mergedText += `\n---NUMBER-RECHECK---\n${rowPass.data.text}`;
+              confidence = Math.max(confidence, rowPass.data.confidence);
+              const rowCheck = parseLotteryTicketText(mergedText, confidence);
+              if (!rowCheck.warnings.some((message) => message.includes("当前识别到"))) break;
+            }
+          } finally {
+            rowCanvases.forEach((row) => { row.width = 1; row.height = 1; });
+          }
+          provisional = parseLotteryTicketText(mergedText, confidence);
+          missingTicket = provisional.warnings.some((message) => message.includes("当前识别到"));
+        }
+        if (missingTicket) {
+          const recoverySource = provisional.gameKey === "ssq"
+            ? numberRegions[1] || numberRegions[0]
+            : numberRegions[0];
+          const recoveryCanvas = buildHighContrastCanvas(recoverySource);
+          try {
+            phaseStart = 0.998;
+            phaseSpan = 0.001;
             onProgress?.({ progress: phaseStart, label: "正在补查可能漏掉的号码行" });
             await worker.setParameters({
               tessedit_pageseg_mode: "6",
               preserve_interword_spaces: "1",
-              tessedit_char_whitelist: "ABCDEabcde0123456789+-() "
+              tessedit_char_whitelist: "ABCDEabcde.0123456789+-() "
             });
             const recoveryPass = await worker.recognize(recoveryCanvas);
             mergedText += `\n---NUMBER-RECHECK---\n${recoveryPass.data.text}`;
