@@ -14,6 +14,7 @@ assert.match(html, /data-view="random" aria-label="试玩"/);
 assert.match(html, /data-view="check" aria-label="票夹"/);
 assert.match(html, /data-view-panel="monthly"/);
 assert.match(html, /数据状态中心/);
+assert.match(html, /id="drawUpdateNotice"/);
 assert.match(html, /正规线下彩票销售渠道/);
 assert.ok(html.indexOf("./rules.js") < html.indexOf("./app.js"), "rules must load before app");
 
@@ -27,5 +28,7 @@ assert.match(headers, /\/sw\.js[\s\S]*no-cache/, "service worker updates should 
 assert.match(app, /LotteryPrizeRules\.evaluateTicket/, "app should use the standalone prize rules module");
 assert.match(app, /backupChecksum/, "backup v2 should include integrity checking");
 assert.match(app, /renderMonthlyStats/, "monthly statistics should be wired");
+assert.match(app, /开奖号码尚未更新，请稍后再试/, "stale same-day draw data should be visible");
+assert.doesNotMatch(app, /frontend_schedule_inference/, "the frontend must not invent draw issues");
 
 console.log("Product v2 tests passed");

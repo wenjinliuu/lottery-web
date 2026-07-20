@@ -97,7 +97,7 @@
       "increaseMultiplierBtn", "multiplierText", "toggleDrawsBtn",
       "mineTotalCost", "minePrizeTotal", "mineWinRate", "mineWonCount", "mineRecordSummary",
       "mineRecordToggleBtn", "mineRecordList",
-      "latestDrawsUpdated", "historyBackBtn", "toast",
+      "latestDrawsUpdated", "drawUpdateNotice", "historyBackBtn", "toast",
       "themeToggleBtn", "themeToggleSub",
       "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitSub", "profitRangeTabs",
       "myRecordsBackBtn", "myRecordsSummary", "recordFilterChips", "recordFilterSummary",
@@ -468,10 +468,14 @@
       const url = `${LOTTERY_DATA_BASE_URL}/calendar.json?t=${Date.now()}`;
       state.calendar = await fetchJson(url);
       renderTodayRecommend();
+      renderDrawUpdateStatus();
+      renderDataStatus();
       return true;
     } catch (e) {
       state.calendar = null;
       renderTodayRecommend();
+      renderDrawUpdateStatus();
+      renderDataStatus();
       return false;
     }
   }
@@ -495,22 +499,28 @@
     const latestAt = state.latestUpdatedAt || "";
     const calendarAt = state.calendar?.updated_at || state.calendar?.updatedAt || "";
     const healthAt = state.health?.updated_at || state.health?.updatedAt || "";
-    const inferred = state.draws.filter((draw) => draw.nextStatus === "inferred" || draw.nextConfirmed === false).length;
+    const inferred = state.draws.filter((draw) => draw.nextStatus === "inferred").length;
+    const unavailable = state.draws.filter((draw) => draw.nextStatus === "unavailable" || !draw.nextExpect).length;
+    const pendingDraws = getPendingDrawUpdates();
+    const pendingNames = pendingDraws.map((item) => item.label).join("、");
     const remoteOk = state.health?.ok !== false && Boolean(state.health);
     const pwa = state.pwaState || window.LotteryPWA?.getState?.() || {};
     const backup = getBackupHealth();
-    const tone = !online || state.health?.ok === false ? "error" : (!remoteOk || inferred || backup.tone === "warn" || pwa.offlineDataUsed) ? "warn" : "ok";
+    const tone = !online || state.health?.ok === false ? "error" : (!remoteOk || inferred || unavailable || pendingDraws.length || backup.tone === "warn" || pwa.offlineDataUsed) ? "warn" : "ok";
     return {
       tone,
       summary: !online
         ? "当前离线，页面正在使用本地记录与已缓存内容"
-        : tone === "ok" ? "开奖数据、应用与本地备份状态正常" : "部分数据仍在确认，建议查看下方状态",
+        : pendingDraws.length
+          ? `今日${pendingNames}开奖号码尚未更新，请稍后再试`
+          : tone === "ok" ? "开奖数据、应用与本地备份状态正常" : "部分数据仍在确认，建议查看下方状态",
       items: [
         { label: "网络", value: online ? "在线" : "离线", tone: online ? "ok" : "error" },
         { label: "开奖仓库", value: remoteOk ? "运行正常" : state.healthError ? "暂时不可用" : "状态待确认", tone: remoteOk ? "ok" : "warn" },
-        { label: "最新开奖", value: latestAt ? formatStatusTime(latestAt) : "尚未载入", tone: latestAt ? "ok" : "warn" },
+        { label: "最新开奖", value: pendingDraws.length ? `${pendingNames}待更新` : latestAt ? formatStatusTime(latestAt) : "尚未载入", tone: pendingDraws.length || !latestAt ? "warn" : "ok" },
+        { label: "今日开奖号", value: pendingDraws.length ? `${pendingNames}尚未更新` : "已同步", tone: pendingDraws.length ? "warn" : "ok" },
         { label: "开奖日历", value: calendarAt ? formatStatusTime(calendarAt) : "尚未载入", tone: calendarAt ? (inferred ? "warn" : "ok") : "warn" },
-        { label: "下期信息", value: inferred ? `${inferred} 个彩种为预计` : "均为已确认状态", tone: inferred ? "warn" : "ok" },
+        { label: "下期信息", value: unavailable ? `${unavailable} 个彩种待生成` : inferred ? `${inferred} 个彩种为预计` : "均为已确认状态", tone: unavailable || inferred ? "warn" : "ok" },
         { label: "本地备份", value: backup.shortText, tone: backup.tone },
         { label: "离线应用", value: pwa.installed ? "已安装" : pwa.registered ? "已启用" : pwa.supported === false ? "浏览器不支持" : "正在准备", tone: pwa.registered || pwa.installed ? "ok" : "warn" },
         { label: "应用版本", value: `v${APP_VERSION}${pwa.updateReady ? " · 可更新" : ""}`, tone: pwa.updateReady ? "warn" : "ok" }
@@ -543,6 +553,56 @@
       const label = els.pwaInstallBtn.querySelector("span");
       if (label) label.textContent = state.pwaState.manualInstall ? "查看安装方法" : "安装到桌面";
     }
+  }
+
+  function getChinaNowParts(now = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(now).reduce((map, part) => {
+      if (part.type !== "literal") map[part.type] = part.value;
+      return map;
+    }, {});
+    const date = `${parts.year}-${parts.month}-${parts.day}`;
+    return {
+      date,
+      clock: `${parts.hour}:${parts.minute}`,
+      weekday: new Date(`${date}T00:00:00Z`).getUTCDay()
+    };
+  }
+
+  function getCalendarEntry(gameKey) {
+    const list = state.calendar?.lotteries || {};
+    const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
+    return list[remoteKey] || list[gameKey] || null;
+  }
+
+  function getPendingDrawUpdates(now = new Date()) {
+    const current = getChinaNowParts(now);
+    return GAME_ORDER.reduce((items, gameKey) => {
+      const entry = getCalendarEntry(gameKey);
+      const weekdays = Array.isArray(entry?.draw_weekdays) ? entry.draw_weekdays.map(Number) : [];
+      const drawClock = String(entry?.draw_time || "").slice(0, 5);
+      if (!entry || !weekdays.includes(current.weekday) || !drawClock || current.clock < drawClock) return items;
+      const latest = getLatestDraw(gameKey);
+      const latestDate = normalizeDate(latest?.openDate || latest?.time || "");
+      if (latestDate !== current.date) items.push({ gameKey, label: GAME_CONFIGS[gameKey]?.label || gameKey });
+      return items;
+    }, []);
+  }
+
+  function renderDrawUpdateStatus() {
+    if (!els.drawUpdateNotice) return;
+    const pending = getPendingDrawUpdates();
+    els.drawUpdateNotice.hidden = !pending.length;
+    els.drawUpdateNotice.textContent = pending.length
+      ? `今日${pending.map((item) => item.label).join("、")}开奖号码尚未更新，请稍后再试`
+      : "";
   }
 
   async function refreshDataStatus() {
@@ -643,6 +703,8 @@
       els.historySummary.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无开奖数据";
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无更新时间";
       renderDraws();
+      renderDrawUpdateStatus();
+      renderDataStatus();
       if (showToast) toast("开奖数据已刷新");
       return true;
     } catch (error) {
@@ -650,6 +712,8 @@
       state.latestUpdatedAt = "";
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = "暂无更新时间";
       renderDrawsError();
+      renderDrawUpdateStatus();
+      renderDataStatus();
       if (showToast) toast("读取开奖 JSON 失败");
       return false;
     }
@@ -2746,21 +2810,22 @@
 
   function getNextDrawMetadata(gameKey) {
     const latest = getLatestDraw(gameKey);
-    if (!latest) {
+    const calendar = getCalendarEntry(gameKey);
+    if (!latest && !calendar) {
       return null;
     }
     return {
       latest,
-      expect: String(latest.nextExpect || ""),
-      openDate: String(latest.nextOpenDate || normalizeDate(latest.nextOpenTime) || ""),
-      openTime: String(latest.nextOpenTime || ""),
-      buyEndTime: String(latest.nextBuyEndTime || ""),
-      status: String(latest.nextStatus || "confirmed"),
-      source: String(latest.nextSource || "class_api"),
-      confirmed: latest.nextConfirmed !== false,
-      basisIssue: String(latest.nextBasisIssue || latest.expect || ""),
-      resolutionReason: String(latest.nextResolutionReason || ""),
-      sourceDrawId: latest.id || ""
+      expect: String(calendar?.next_issue || latest?.nextExpect || ""),
+      openDate: String(calendar?.next_draw_date || latest?.nextOpenDate || normalizeDate(calendar?.next_open_time || latest?.nextOpenTime) || ""),
+      openTime: String(calendar?.next_open_time || latest?.nextOpenTime || ""),
+      buyEndTime: String(calendar?.next_buy_end_time || latest?.nextBuyEndTime || ""),
+      status: String(calendar?.next_status || latest?.nextStatus || "unavailable"),
+      source: String(calendar?.next_source || latest?.nextSource || "none"),
+      confirmed: calendar ? calendar.next_confirmed !== false : latest?.nextConfirmed !== false,
+      basisIssue: String(calendar?.next_basis_issue || latest?.nextBasisIssue || latest?.expect || ""),
+      resolutionReason: String(calendar?.next_resolution_reason || latest?.nextResolutionReason || ""),
+      sourceDrawId: latest?.id || ""
     };
   }
 
@@ -2771,7 +2836,7 @@
     }
     const { expect, openTime, buyEndTime } = metadata;
     if (!expect || !openTime || !buyEndTime) {
-      return { ...metadata, available: false, message: "下期信息不完整，请稍后刷新" };
+      return { ...metadata, available: false, message: "开奖仓库尚未生成下期预测，请稍后刷新" };
     }
 
     const now = new Date();
@@ -2781,7 +2846,7 @@
       return { ...metadata, available: false, message: "下期时间格式异常，请稍后刷新" };
     }
     if (now >= openDateValue) {
-      return { ...metadata, available: false, message: "开奖数据待更新，请稍后刷新" };
+      return { ...metadata, available: false, message: "当期开奖号码尚未更新，请稍后再试" };
     }
     if (now >= buyEndDateValue) {
       return { ...metadata, available: false, message: "本期已截止，请等待下一期数据更新" };
@@ -2932,7 +2997,9 @@
   function parseApiDate(value) {
     const text = String(value || "").trim();
     if (!text) return null;
-    const normalized = text.includes("T") ? text : text.replace(/-/g, "/");
+    let normalized = text;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) normalized = `${text}T00:00:00+08:00`;
+    else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/.test(text)) normalized = `${text.replace(" ", "T")}${text.length === 16 ? ":00" : ""}+08:00`;
     const date = new Date(normalized);
     return Number.isNaN(date.getTime()) ? null : date;
   }
