@@ -4204,3 +4204,501 @@ body { width: 100%; }
     padding-left: 22px;
   }
 }
+
+/* ==========================================================================
+   v3.3 — 信息密度、统计与电子票视觉重构
+   ========================================================================== */
+
+/* 收益图：金额直接标在极值点，范围选择一行铺开。 */
+.home-trend-card {
+  margin-right: -3px;
+  margin-left: -3px;
+  padding-right: 0;
+  padding-left: 0;
+}
+.home-profit-card .profit-head { padding: 0 7px; }
+.home-profit-card .profit-chart-wrap {
+  height: 160px;
+  min-height: 160px;
+  margin-top: 0;
+}
+.profit-extreme-dot { fill: currentColor; stroke: var(--page); stroke-width: 1.4; }
+.profit-extreme-label {
+  fill: currentColor;
+  font-size: 8.5px;
+  font-weight: 950;
+  paint-order: stroke;
+  stroke: var(--page);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.profit-extreme.is-negative { color: #dc2626; }
+.profit-extreme.is-positive { color: #059669; }
+.profit-extreme.is-neutral { color: var(--muted-strong); }
+[data-theme="dark"] .profit-extreme.is-negative { color: #f87171; }
+[data-theme="dark"] .profit-extreme.is-positive { color: #34d399; }
+.home-profit-card .profit-range-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 0 5px;
+}
+.home-profit-card .profit-range-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 29px;
+  padding: 0 2px;
+  font-size: 9px;
+}
+
+/* 开奖卡紧凑化；快乐 8 首页只展示七球与省略号。 */
+.home-draw-carousel {
+  padding-bottom: 3px;
+  background: transparent !important;
+}
+.home-draw-carousel > .draw-card {
+  min-height: 0 !important;
+  padding-bottom: 14px;
+}
+.home-draw-carousel .draw-number-row { margin-top: 10px; }
+.home-draw-carousel .draw-prize-tag { margin-top: 8px; }
+.home-draw-carousel .draw-card::after { display: none; }
+.draw-ball-more {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-strong);
+  border: 1px solid rgba(100,116,139,.16);
+  border-radius: 50%;
+  background: rgba(255,255,255,.32);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 1px;
+}
+[data-theme="dark"] .draw-ball-more { background: rgba(15,23,42,.34); }
+
+/* 首页月度概览：环图承担花费，中奖/中奖率以紧凑指标补充。 */
+.home-monthly-card { padding: 15px 15px 14px; }
+.home-chevron-only {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 20px;
+}
+.home-section-sub .is-pending { color: #d97706; font-weight: 900; }
+.home-monthly-content {
+  min-height: 0;
+  margin-top: 7px;
+}
+.home-donut-wrap {
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+}
+.home-donut-figure,
+.home-donut { width: 104px; height: 104px; }
+.home-monthly-legend { gap: 5px; }
+.home-monthly-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(148,163,184,.13);
+}
+.home-monthly-metrics > div {
+  min-width: 0;
+  text-align: center;
+}
+.home-monthly-metrics span,
+.home-monthly-metrics strong { display: block; white-space: nowrap; }
+.home-monthly-metrics span { color: var(--muted); font-size: 8px; font-weight: 850; }
+.home-monthly-metrics strong { margin-top: 3px; color: var(--ink); font-size: 13px; font-weight: 950; }
+.home-monthly-metrics strong.is-positive { color: #059669; }
+
+/* 票夹筛选：去掉顶部统计卡，筛选与重新核对同一条轨道。 */
+.wallet-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  overflow-x: auto;
+  padding: 2px 1px 4px;
+  scrollbar-width: none;
+}
+.wallet-filter-row::-webkit-scrollbar { display: none; }
+.wallet-filter-row .wallet-filter-chips {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+}
+.wallet-filter-row .wallet-recheck-btn {
+  min-height: 36px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid rgba(16,185,129,.12);
+  color: #047857;
+  background: rgba(16,185,129,.10);
+}
+.wallet-filter-btn {
+  position: relative;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: rgba(148,163,184,.10);
+  box-shadow: none;
+}
+.wallet-filter-btn.is-active {
+  border: 0;
+  background: linear-gradient(180deg, #5ea8ff, #2563eb);
+  box-shadow: 0 7px 15px rgba(37,99,235,.18);
+}
+.wallet-filter-btn.has-pending:not(.is-active) {
+  color: #b45309;
+  background: rgba(245,158,11,.12);
+}
+.wallet-filter-badge {
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 99px;
+  color: #fff;
+  background: #f59e0b;
+  font-size: 8px;
+  font-weight: 950;
+}
+.wallet-filter-btn.is-active .wallet-filter-badge {
+  color: #b45309;
+  background: #fff;
+}
+.wallet-filter-summary {
+  margin: -10px 2px 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+/* 电子票：细纸纹、侧缺口、紧凑头部与克制的中奖高光。 */
+.wallet-ticket {
+  isolation: isolate;
+  padding: 14px 14px 11px;
+  border: 1px solid rgba(var(--wallet-rgb),.24);
+  border-right-style: dotted;
+  border-left-style: dotted;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(var(--wallet-rgb),.16), transparent 34%),
+    repeating-linear-gradient(0deg, rgba(var(--wallet-rgb),.018) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.18) 0 1px, transparent 1px 12px),
+    linear-gradient(145deg, rgba(var(--wallet-rgb),.075), var(--glass-tint-deep) 62%);
+  box-shadow: 0 9px 22px rgba(28,40,80,.08), inset 0 1px 0 rgba(255,255,255,.72);
+}
+.wallet-ticket::before,
+.wallet-ticket::after {
+  z-index: 3;
+  width: 15px;
+  height: 15px;
+}
+.wallet-ticket-top { position: relative; z-index: 2; align-items: flex-start; }
+.wallet-ticket-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.wallet-game-badge {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  padding: 3px;
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(var(--wallet-rgb));
+  box-shadow: 0 7px 15px rgba(var(--wallet-rgb),.22);
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1.05;
+  text-align: center;
+}
+.wallet-ticket-issue {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.wallet-play-badge {
+  padding: 4px 7px;
+  border-radius: 99px;
+  color: #1d4ed8;
+  background: rgba(59,130,246,.11);
+  font-size: 8px;
+  font-weight: 950;
+}
+.wallet-ticket-head-right {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+.wallet-ticket-money {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 7px;
+  text-align: right;
+  white-space: nowrap;
+}
+.wallet-ticket-money span { color: var(--muted); font-size: 8px; font-weight: 800; }
+.wallet-ticket-money strong { color: #059669; font-size: 12px; font-weight: 950; }
+.wallet-status { padding: 5px 8px; font-size: 9px; }
+.wallet-ticket-meta {
+  position: relative;
+  z-index: 2;
+  gap: 4px 8px;
+  margin-top: 8px;
+  padding-bottom: 8px;
+  font-size: 8px;
+}
+.wallet-ticket-lines {
+  position: relative;
+  z-index: 2;
+  gap: 6px;
+  padding: 9px 0 7px;
+}
+.wallet-ticket-line {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 6px;
+}
+.wallet-ticket-line .balls {
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.wallet-ticket-line .balls::-webkit-scrollbar { display: none; }
+.wallet-ticket-lines-k8 .wallet-ticket-line .balls { flex-wrap: wrap; overflow: visible; }
+.wallet-ticket-line .ball {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
+  font-size: 9px;
+}
+.wallet-ticket-actions {
+  position: relative;
+  z-index: 2;
+  min-height: 25px;
+  justify-content: flex-end;
+  margin-top: 1px;
+}
+.wallet-ticket-watermark {
+  position: relative;
+  z-index: 2;
+  margin-top: 5px;
+  font-size: 7.5px;
+}
+.wallet-ticket.is-winning {
+  border-color: rgba(16,185,129,.35);
+  background:
+    radial-gradient(circle at 94% 0, rgba(250,204,21,.23), transparent 31%),
+    radial-gradient(circle at 4% 96%, rgba(16,185,129,.16), transparent 32%),
+    repeating-linear-gradient(0deg, rgba(245,158,11,.025) 0 1px, transparent 1px 7px),
+    linear-gradient(145deg, rgba(254,240,138,.13), var(--glass-tint-deep) 58%);
+  box-shadow: 0 12px 28px rgba(16,185,129,.13), 0 0 0 1px rgba(250,204,21,.12), inset 0 1px 0 rgba(255,255,255,.78);
+}
+.wallet-winning-sparkles {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wallet-winning-sparkles i {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251,191,36,.65);
+  animation: wallet-win-twinkle 2.4s ease-in-out infinite;
+}
+.wallet-winning-sparkles i:nth-child(1) { top: 16%; left: 68%; }
+.wallet-winning-sparkles i:nth-child(2) { top: 40%; left: 94%; animation-delay: -.8s; }
+.wallet-winning-sparkles i:nth-child(3) { top: 72%; left: 7%; animation-delay: -1.5s; }
+.wallet-winning-sparkles i:nth-child(4) { top: 88%; left: 76%; animation-delay: -.3s; }
+@keyframes wallet-win-twinkle {
+  0%, 100% { opacity: .25; transform: scale(.7); }
+  50% { opacity: .9; transform: scale(1.35); }
+}
+.wallet-all-records-link {
+  min-height: 48px;
+  border: 1px solid rgba(37,99,235,.12);
+  border-radius: 18px;
+  color: #2563eb;
+  background: rgba(37,99,235,.06);
+  font-size: 11px;
+  font-weight: 900;
+}
+.all-wallet-records { min-width: 0; }
+
+/* 统计页：年月选择、紧凑摘要、全年彩种堆叠，日历置底。 */
+.monthly-page { gap: 10px; }
+.monthly-toolbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+}
+.stats-select-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 13px;
+  background: rgba(148,163,184,.09);
+}
+.stats-select-wrap span { color: var(--muted); font-size: 9px; font-weight: 850; }
+.stats-select-wrap select {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
+}
+.monthly-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--glass-stroke);
+  border-radius: 18px;
+  background: var(--glass-tint);
+}
+.monthly-kpi {
+  min-width: 0;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+.monthly-kpi + .monthly-kpi { border-left: 1px solid rgba(148,163,184,.13); }
+.monthly-kpi span { font-size: 8px; white-space: nowrap; }
+.monthly-kpi strong { margin-top: 4px; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.monthly-chart-grid { gap: 10px; }
+.monthly-chart-card { padding: 13px; }
+.monthly-donut-wrap {
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+.monthly-donut { width: 94px; height: 94px; }
+.month-stack-chart {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 135px;
+  margin-top: 8px;
+}
+.month-stack-item {
+  display: grid;
+  grid-template-rows: 14px 96px 14px;
+  min-width: 0;
+  align-items: end;
+}
+.month-stack-total {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 6.5px;
+  font-weight: 850;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+.month-stack-track {
+  display: flex;
+  height: 96px;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  overflow: hidden;
+  border-radius: 5px 5px 2px 2px;
+  background: rgba(148,163,184,.07);
+}
+.month-stack-segment { display: block; width: 100%; min-height: 0; }
+.month-stack-item.is-active .month-stack-track { outline: 2px solid rgba(37,99,235,.38); outline-offset: 2px; }
+.month-stack-label { color: var(--muted); font-size: 7px; font-weight: 850; text-align: center; }
+.month-stack-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  margin-top: 8px;
+}
+.month-stack-legend span { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 7.5px; font-weight: 800; }
+.month-stack-legend i { width: 6px; height: 6px; border-radius: 50%; }
+.monthly-calendar-card { padding: 12px 9px 10px; }
+.monthly-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 3px 9px;
+}
+.monthly-calendar-head strong { font-size: 12px; font-weight: 950; }
+.monthly-calendar-head span { color: var(--muted); font-size: 9px; font-weight: 800; }
+.monthly-day {
+  min-height: 49px;
+  padding: 5px 2px 3px;
+  border-radius: 10px;
+}
+.monthly-day-net { margin-top: 4px; font-size: 7px; }
+.monthly-day-prize {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: #059669;
+  font-size: 6.5px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monthly-calendar-empty {
+  grid-column: 1 / -1;
+  padding: 24px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (max-width: 390px) {
+  .home-profit-card .profit-range-btn { font-size: 8px; }
+  .wallet-filter-btn { padding: 0 12px; }
+  .wallet-ticket { padding-right: 11px; padding-left: 11px; }
+  .wallet-ticket-identity { gap: 6px; }
+  .wallet-game-badge { width: 40px; height: 40px; flex-basis: 40px; font-size: 9px; }
+  .wallet-ticket-money { display: grid; gap: 1px; }
+  .monthly-kpi span { font-size: 7px; }
+  .monthly-kpi strong { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-winning-sparkles i { animation: none; opacity: .55; }
+}

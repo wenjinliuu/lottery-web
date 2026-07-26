@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="彩票夹">
-    <link rel="manifest" href="./manifest.webmanifest?v=3.2.0">
+    <link rel="manifest" href="./manifest.webmanifest?v=3.3.0">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <style>[hidden] { display: none !important; }</style>
     <script>
@@ -24,7 +24,7 @@
         if (themeColor) themeColor.setAttribute("content", theme === "dark" ? "#0b0f1c" : "#f7f7f7");
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=3.2.0">
+    <link rel="stylesheet" href="./styles.css?v=3.3.0">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%A4%B9%3C/text%3E%3C/svg%3E">
   </head>
   <body>
@@ -45,19 +45,20 @@
               <div class="profit-head">
                 <div class="profit-head-left">
                   <div class="profit-title">累计盈亏</div>
-                  <div class="profit-sub" id="profitSub">本月记录</div>
+                  <div class="profit-sub" id="profitSub">全部记录</div>
                 </div>
-                <div class="profit-net"><div class="profit-net-value" id="profitNetValue">0元</div></div>
               </div>
               <div class="profit-chart-wrap" id="profitChartWrap">
                 <div class="profit-empty" id="profitEmpty">暂无完整数据</div>
               </div>
               <div class="profit-range-tabs" id="profitRangeTabs" role="group" aria-label="收益趋势时间范围">
-                <button class="profit-range-btn is-active" type="button" data-profit-range="month" aria-pressed="true">本月</button>
+                <button class="profit-range-btn is-active" type="button" data-profit-range="all" aria-pressed="true">全部</button>
+                <button class="profit-range-btn" type="button" data-profit-range="7" aria-pressed="false">7天</button>
+                <button class="profit-range-btn" type="button" data-profit-range="30" aria-pressed="false">30天</button>
                 <button class="profit-range-btn" type="button" data-profit-range="90" aria-pressed="false">90天</button>
-                <button class="profit-range-btn" type="button" data-profit-range="all" aria-pressed="false">全部</button>
+                <button class="profit-range-btn" type="button" data-profit-range="180" aria-pressed="false">180天</button>
+                <button class="profit-range-btn" type="button" data-profit-range="360" aria-pressed="false">360天</button>
               </div>
-              <div class="profit-chart-hint">点击或长按折线查看当日花费、中奖和累计盈亏</div>
             </div>
           </section>
 
@@ -82,15 +83,8 @@
                 <div class="home-section-title">本月概览</div>
                 <div class="home-section-sub" id="homeOverviewSub">统计本机保存的彩票记录</div>
               </div>
-              <button class="home-more-btn" id="homeOverviewMoreBtn" type="button"><span>月度详情</span><span aria-hidden="true">›</span></button>
+              <button class="home-more-btn home-chevron-only" id="homeOverviewMoreBtn" type="button" aria-label="查看统计"><span aria-hidden="true">›</span></button>
             </div>
-            <div class="home-kpi-grid">
-              <button class="home-kpi" type="button" data-stat-details><span class="home-kpi-value" id="mineTotalCost">0元</span><span class="home-kpi-label">本月花费</span></button>
-              <button class="home-kpi" type="button" data-stat-details><span class="home-kpi-value" id="minePrizeTotal">0元</span><span class="home-kpi-label">本月中奖</span></button>
-              <button class="home-kpi" type="button" data-stat-details><span class="home-kpi-value" id="mineWinRate">0%</span><span class="home-kpi-label">中奖率</span></button>
-              <button class="home-kpi" id="mineWonRecordsBtn" type="button"><span class="home-kpi-value" id="mineWonCount">0</span><span class="home-kpi-label">待核对票</span></button>
-            </div>
-            <div class="home-section-sub home-monthly-detail" id="homeMonthlySub">各彩种花费占比</div>
             <div class="home-monthly-content" id="homeMonthlyChart"></div>
             <button id="monthlyStatsBtn" type="button" hidden>查看日历</button>
           </section>
@@ -118,17 +112,14 @@
             </div>
           </header>
 
-          <section class="wallet-summary-card">
-            <div><span>全部票据</span><strong id="walletTotalTickets">0</strong></div>
-            <div><span>待核对</span><strong id="walletPendingTickets">0</strong></div>
-            <div><span>已中奖</span><strong id="walletWonTickets">0</strong></div>
+          <div class="wallet-filter-row">
+            <div class="wallet-filter-chips" id="walletFilterChips" role="group" aria-label="筛选票据状态"></div>
             <button class="wallet-recheck-btn" id="checkRecordsBtn" type="button">
               <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
               <span>重新核对</span>
             </button>
-          </section>
-
-          <div class="wallet-filter-chips" id="walletFilterChips" role="group" aria-label="筛选票据状态"></div>
+          </div>
+          <div class="wallet-filter-summary" id="walletFilterSummary">全部 · 暂无记录</div>
           <div id="recordList" class="wallet-ticket-list empty" aria-live="polite">暂无彩票记录</div>
           <button class="wallet-floating-add" id="addTicketBtn" type="button" aria-label="添加彩票"><span aria-hidden="true">＋</span></button>
         </div>
@@ -251,7 +242,7 @@
             <div class="record-filter-chips" id="recordFilterChips"></div>
             <div class="record-filter-summary" id="recordFilterSummary">全部彩种 · 暂无记录</div>
           </section>
-          <section class="card check-records-card"><div id="mineRecordList" class="record-list empty" aria-live="polite">暂无保存记录</div></section>
+          <section class="all-wallet-records"><div id="mineRecordList" class="wallet-ticket-list empty" aria-live="polite">暂无保存记录</div></section>
         </div>
       </section>
 
@@ -268,22 +259,22 @@
       <section class="view-section" data-view-panel="monthly" hidden>
         <div class="monthly-page">
           <div class="history-head monthly-head">
-            <div class="history-title-wrap"><div class="history-title">月度统计</div><div class="history-sub" id="monthlySummary">按开奖日期汇总本地记录</div></div>
+            <div class="history-title-wrap"><div class="history-title">统计</div><div class="history-sub" id="monthlySummary">按开奖日期汇总本地记录</div></div>
             <button class="mini-blue has-icon" id="monthlyBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
           </div>
-          <section class="card monthly-toolbar" aria-label="选择统计月份">
-            <button class="month-nav-btn" id="monthPrevBtn" type="button" aria-label="上一个月">‹</button>
-            <div class="month-current" id="monthCurrentLabel">本月</div>
-            <button class="month-nav-btn" id="monthNextBtn" type="button" aria-label="下一个月">›</button>
+          <section class="card monthly-toolbar" aria-label="选择统计年月">
+            <label class="stats-select-wrap"><span>年份</span><select id="statsYearSelect" aria-label="选择统计年份"></select></label>
+            <label class="stats-select-wrap"><span>月份</span><select id="statsMonthSelect" aria-label="选择统计月份"><option value="all">全年</option></select></label>
           </section>
           <div class="monthly-kpi-grid" id="monthlyKpis"></div>
-          <section class="card monthly-calendar-card">
-            <div class="monthly-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-            <div class="monthly-calendar" id="monthlyCalendar"></div>
-          </section>
           <section class="monthly-chart-grid">
             <article class="card monthly-chart-card"><div class="section-title section-title-no-margin">彩种花费占比</div><div id="monthlyGameChart"></div></article>
-            <article class="card monthly-chart-card"><div class="section-title section-title-no-margin">近六个月对比</div><div id="monthlyCompareChart"></div></article>
+            <article class="card monthly-chart-card"><div class="section-title section-title-no-margin">全年彩种花费</div><div id="monthlyCompareChart"></div></article>
+          </section>
+          <section class="card monthly-calendar-card">
+            <div class="monthly-calendar-head"><strong>每日明细</strong><span id="monthlyCalendarHint"></span></div>
+            <div class="monthly-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="monthly-calendar" id="monthlyCalendar"></div>
           </section>
           <aside class="responsible-note" aria-label="月度统计说明"><strong>统计说明</strong><span>统计基于本机已保存记录，开奖结果与奖金请以官方渠道为准。</span></aside>
         </div>
@@ -444,9 +435,9 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./rules.js?v=3.2.0"></script>
-    <script src="./ocr.js?v=3.2.0"></script>
-    <script src="./pwa.js?v=3.2.0"></script>
-    <script src="./app.js?v=3.2.0"></script>
+    <script src="./rules.js?v=3.3.0"></script>
+    <script src="./ocr.js?v=3.3.0"></script>
+    <script src="./pwa.js?v=3.3.0"></script>
+    <script src="./app.js?v=3.3.0"></script>
   </body>
 </html>
