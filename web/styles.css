@@ -4793,6 +4793,7 @@ body { width: 100%; }
   min-height: 132px !important;
   flex-direction: column;
   background-clip: padding-box;
+  box-shadow: none !important;
 }
 .home-draw-carousel > .draw-card::before,
 .home-draw-carousel > .draw-card::after { display: none !important; }

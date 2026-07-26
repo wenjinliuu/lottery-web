@@ -22,7 +22,7 @@ assert.match(html, /id="latestDraws" class="home-draw-carousel"/);
 assert.match(html, /class="home-floating-scan"/);
 assert.doesNotMatch(html, /class="home-brand"/);
 assert.doesNotMatch(html, /class="page-title"/);
-assert.match(html, /styles\.css\?v=3\.4\.0/);
+assert.match(html, /styles\.css\?v=3\.4\.1/);
 assert.match(html, /id="profitNetValue"/);
 assert.doesNotMatch(html, /id="profitSub"/);
 assert.match(html, /class="wallet-sticky-shell"/);
@@ -52,7 +52,7 @@ assert.match(headers, /\/sw\.js[\s\S]*no-cache/, "service worker updates should 
 assert.match(app, /LotteryPrizeRules\.evaluateTicket/, "app should use the standalone prize rules module");
 assert.match(app, /backupChecksum/, "backup v2 should include integrity checking");
 assert.match(app, /renderMonthlyStats/, "monthly statistics should be wired");
-assert.match(app, /const APP_VERSION = "3\.4\.0"/);
+assert.match(app, /const APP_VERSION = "3\.4\.1"/);
 assert.match(app, /renderWalletTickets/, "electronic ticket wallet should be wired");
 assert.match(app, /renderManualTool/, "all-game manual picker should be wired");
 assert.match(app, /scrollDrawCarouselToGame/, "latest draws should support swipe and dot navigation");
@@ -69,7 +69,7 @@ assert.match(app, /expandedWalletDraws/, "ticket logos should toggle the corresp
 assert.match(app, /isBaseline:\s*true/, "the all-time chart should start from zero");
 assert.match(app, /开奖号码尚未更新，请稍后再试/, "stale same-day draw data should be visible");
 assert.doesNotMatch(app, /frontend_schedule_inference/, "the frontend must not invent draw issues");
-assert.match(sw, /lottery-pocket-v3\.4\.0/);
+assert.match(sw, /lottery-pocket-v3\.4\.1/);
 assert.match(sw, /self\.skipWaiting\(\)/, "new visual assets should activate immediately");
 assert.match(sw, /isVersionedAppAsset/, "CSS and JavaScript should prefer fresh network assets");
 assert.match(styles, /--safe-top:\s*env\(safe-area-inset-top/, "page safe area must always resolve");
@@ -79,4 +79,4 @@ assert.match(styles, /\.wallet-filter-row[\s\S]*grid-template-columns:\s*repeat\
 assert.match(styles, /@keyframes wallet-firework/, "winning tickets should use a firework celebration");
 assert.match(styles, /\.wallet-ticket-line \.ball[\s\S]*aspect-ratio:\s*1\s*\/\s*1/, "wallet number balls must stay circular");
 
-console.log("Product v3.4 tests passed");
+console.log("Product v3.4.1 tests passed");
