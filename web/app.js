@@ -10,7 +10,7 @@
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
-  const APP_VERSION = "3.4.1";
+  const APP_VERSION = "3.4.2";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -48,7 +48,6 @@
     profitRange: "all",
     walletStatusFilter: "all",
     expandedWalletBatches: new Set(),
-    expandedWalletDraws: new Set(),
     drawCarouselIndex: 0,
     ticketAddStep: "intro",
     manualGameKey: "ssq",
@@ -80,6 +79,8 @@
     initControls();
     bindEvents();
     await Promise.all([loadCalendar(), loadDraws(), loadHealth()]);
+    /* 电子票默认展示对应开奖号：启动时并行缓存全部彩种最近 50 期。 */
+    await loadAllGameHistories();
     await loadRecords();
     await reconcileInferredRecords(false);
     /* 首页开奖轮播固定从双色球开始；选号工具的彩种状态与开奖浏览互不干扰。 */
@@ -322,9 +323,8 @@
       openTicketScan();
     });
     if (els.addAlbumTicketBtn) els.addAlbumTicketBtn.addEventListener("click", () => {
-      closeTicketAdd();
-      openTicketScan();
-      window.setTimeout(() => els.ticketScanInput?.click(), 80);
+      /* 保持在用户点击手势内直接唤起系统相册；选中图片后才进入识别页。 */
+      els.ticketScanInput?.click();
     });
     if (els.openRandomToolBtn) els.openRandomToolBtn.addEventListener("click", () => showTicketAddStep("random"));
     if (els.openManualToolBtn) els.openManualToolBtn.addEventListener("click", () => showTicketAddStep("manual"));
@@ -942,6 +942,10 @@
       state.historyLoadingGames.delete(gameKey);
       renderDraws();
     }
+  }
+
+  async function loadAllGameHistories() {
+    await Promise.all(GAME_ORDER.map((gameKey) => loadGameHistory(gameKey, false)));
   }
 
   async function ensurePendingRecordDraws() {
@@ -1896,7 +1900,6 @@
     const isWinning = status === "won" || status === "float";
     const isDltAddOn = gameKey === "dlt" && records.some((record) => record.addOn || record.playMode === "add");
     const draw = findDrawForRecord(first);
-    const drawExpanded = state.expandedWalletDraws.has(batch.batchId);
     const statusText = status === "won"
       ? prizeText
       : status === "float"
@@ -1907,7 +1910,7 @@
         ${isWinning ? `<div class="wallet-winning-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>` : ""}
         <div class="wallet-ticket-top">
           <div class="wallet-ticket-identity">
-            <button class="wallet-game-badge" type="button" data-wallet-draw="${batch.batchId}" aria-expanded="${drawExpanded}" aria-label="${draw ? `${drawExpanded ? "收起" : "查看"}第${issue}期开奖号` : `第${issue}期开奖号码尚未更新`}">${GAME_CONFIGS[gameKey]?.label || gameKey}</button>
+            <span class="wallet-game-badge" aria-label="${GAME_CONFIGS[gameKey]?.label || gameKey}">${GAME_CONFIGS[gameKey]?.label || gameKey}</span>
             <div class="wallet-ticket-info">
               <div class="wallet-ticket-issue">第 ${issue} 期</div>
               <div class="wallet-ticket-meta">
@@ -1926,12 +1929,12 @@
             <button class="delete-btn wallet-ticket-delete has-icon" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本张电子票">${ICON.trash}<span>删除</span></button>
           </div>
         </div>
-        ${drawExpanded && draw ? `
-          <div class="wallet-draw-panel">
-            <span class="wallet-draw-label">开奖号码</span>
-            ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))}
-          </div>
-        ` : ""}
+        <div class="wallet-draw-panel${draw ? "" : " is-pending"}">
+          <span class="wallet-draw-label">开奖<br>号码</span>
+          ${draw
+            ? renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))
+            : `<span class="wallet-draw-pending">本期开奖号码尚未更新</span>`}
+        </div>
         <div class="wallet-ticket-lines${gameKey === "k8" ? " wallet-ticket-lines-k8" : ""}">
           ${visible.map((record, lineIndex) => `
             <div class="wallet-ticket-line">
@@ -1951,18 +1954,6 @@
       const id = btn.dataset.walletExpand;
       if (state.expandedWalletBatches.has(id)) state.expandedWalletBatches.delete(id);
       else state.expandedWalletBatches.add(id);
-      rerender();
-    }));
-    container?.querySelectorAll("[data-wallet-draw]").forEach((btn) => btn.addEventListener("click", () => {
-      const id = btn.dataset.walletDraw;
-      const batch = groupRecordsByBatch(state.records).find((item) => item.batchId === id);
-      const draw = batch?.records?.length ? findDrawForRecord(batch.records[0]) : null;
-      if (!draw) {
-        toast("本期尚未开奖或开奖号码尚未更新");
-        return;
-      }
-      if (state.expandedWalletDraws.has(id)) state.expandedWalletDraws.delete(id);
-      else state.expandedWalletDraws.add(id);
       rerender();
     }));
     container?.querySelectorAll("[data-delete-batch]").forEach((btn) => btn.addEventListener("click", () => deleteRecordsByBatch(btn.dataset.deleteBatch)));
@@ -2733,6 +2724,11 @@
   async function handleTicketScanFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    /* 从“添加到票夹”直接选相册时，选中后再切换到识别界面。 */
+    if (els.ticketScan?.hidden) {
+      closeTicketAdd();
+      openTicketScan();
+    }
     if (!file.type.startsWith("image/")) {
       renderTicketScanIntro("请选择 JPG、PNG 或 HEIC 图片");
       return;

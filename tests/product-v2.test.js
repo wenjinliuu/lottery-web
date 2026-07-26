@@ -22,7 +22,7 @@ assert.match(html, /id="latestDraws" class="home-draw-carousel"/);
 assert.match(html, /class="home-floating-scan"/);
 assert.doesNotMatch(html, /class="home-brand"/);
 assert.doesNotMatch(html, /class="page-title"/);
-assert.match(html, /styles\.css\?v=3\.4\.1/);
+assert.match(html, /styles\.css\?v=3\.4\.2/);
 assert.match(html, /id="profitNetValue"/);
 assert.doesNotMatch(html, /id="profitSub"/);
 assert.match(html, /class="wallet-sticky-shell"/);
@@ -52,7 +52,7 @@ assert.match(headers, /\/sw\.js[\s\S]*no-cache/, "service worker updates should 
 assert.match(app, /LotteryPrizeRules\.evaluateTicket/, "app should use the standalone prize rules module");
 assert.match(app, /backupChecksum/, "backup v2 should include integrity checking");
 assert.match(app, /renderMonthlyStats/, "monthly statistics should be wired");
-assert.match(app, /const APP_VERSION = "3\.4\.1"/);
+assert.match(app, /const APP_VERSION = "3\.4\.2"/);
 assert.match(app, /renderWalletTickets/, "electronic ticket wallet should be wired");
 assert.match(app, /renderManualTool/, "all-game manual picker should be wired");
 assert.match(app, /scrollDrawCarouselToGame/, "latest draws should support swipe and dot navigation");
@@ -65,11 +65,13 @@ assert.doesNotMatch(app, /标记已兑奖|标记兑奖|已恢复为待兑奖/, "
 assert.match(app, /compactK8/, "Happy8 home cards should use a compact preview");
 assert.match(app, /month-stack-segment/, "annual statistics should stack costs by lottery game");
 assert.match(app, /openMonthStackDetails/, "monthly bars should expose game-level details");
-assert.match(app, /expandedWalletDraws/, "ticket logos should toggle the corresponding draw numbers");
+assert.doesNotMatch(app, /expandedWalletDraws|data-wallet-draw/, "wallet draw numbers should be visible without tapping the logo");
+assert.match(app, /loadAllGameHistories/, "all eight 50-period history files should load on startup");
+assert.match(app, /本期开奖号码尚未更新/, "pending tickets should keep a visible draw-data status");
 assert.match(app, /isBaseline:\s*true/, "the all-time chart should start from zero");
 assert.match(app, /开奖号码尚未更新，请稍后再试/, "stale same-day draw data should be visible");
 assert.doesNotMatch(app, /frontend_schedule_inference/, "the frontend must not invent draw issues");
-assert.match(sw, /lottery-pocket-v3\.4\.1/);
+assert.match(sw, /lottery-pocket-v3\.4\.2/);
 assert.match(sw, /self\.skipWaiting\(\)/, "new visual assets should activate immediately");
 assert.match(sw, /isVersionedAppAsset/, "CSS and JavaScript should prefer fresh network assets");
 assert.match(styles, /--safe-top:\s*env\(safe-area-inset-top/, "page safe area must always resolve");
@@ -78,5 +80,7 @@ assert.match(styles, /\.home-trend-card::after\s*\{\s*display:\s*none/, "profit 
 assert.match(styles, /\.wallet-filter-row[\s\S]*grid-template-columns:\s*repeat\(5/, "wallet filters should fit one row without horizontal scrolling");
 assert.match(styles, /@keyframes wallet-firework/, "winning tickets should use a firework celebration");
 assert.match(styles, /\.wallet-ticket-line \.ball[\s\S]*aspect-ratio:\s*1\s*\/\s*1/, "wallet number balls must stay circular");
+assert.match(styles, /\[data-theme="dark"\] \.wallet-ticket[\s\S]*linear-gradient\(145deg/, "dark tickets should use a clean grid-free surface");
+assert.match(styles, /\.wallet-draw-panel[\s\S]*border:\s*1px dashed/, "draw number panels need a complete dashed border");
 
-console.log("Product v3.4.1 tests passed");
+console.log("Product v3.4.2 tests passed");

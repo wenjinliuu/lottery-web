@@ -1,4 +1,4 @@
-const CACHE_VERSION = "lottery-pocket-v3.4.1";
+const CACHE_VERSION = "lottery-pocket-v3.4.2";
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 const APP_FILES = [

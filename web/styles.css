@@ -3893,6 +3893,9 @@ body.ticket-add-open { overflow: hidden; }
   padding: 8px 14px calc(14px + var(--safe-bottom));
 }
 .ticket-add-head { grid-template-columns: 36px minmax(0,1fr) 36px; }
+.ticket-add-back { grid-column: 1; }
+.ticket-add-head > div { grid-column: 2; width: 100%; }
+.ticket-add-close { grid-column: 3; }
 .ticket-add-title,
 .ticket-add-sub {
   overflow: hidden;
@@ -4885,11 +4888,10 @@ body { width: 100%; }
   min-width: 50px;
   padding: 4px;
   border: 0;
-  cursor: pointer;
+  cursor: default;
   font-size: 10.5px;
   transition: transform .16s ease, box-shadow .16s ease;
 }
-.wallet-game-badge:active { transform: scale(.94); }
 .wallet-ticket-info { min-width: 0; }
 .wallet-ticket-issue { font-size: 12px; }
 .wallet-ticket-meta {
@@ -4951,36 +4953,52 @@ body { width: 100%; }
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 21px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin-top: 9px;
-  padding: 8px 9px;
-  border-top: 1px dashed rgba(var(--wallet-rgb),.23);
-  border-bottom: 1px dashed rgba(var(--wallet-rgb),.23);
+  padding: 8px 0;
+  border: 1px dashed rgba(var(--wallet-rgb),.32);
   border-radius: 10px;
   background: rgba(var(--wallet-rgb),.045);
   animation: wallet-draw-reveal .2s ease-out both;
 }
 .wallet-draw-label {
   color: var(--muted);
-  font-size: 7.5px;
+  font-size: 6.5px;
   font-weight: 900;
-  white-space: nowrap;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
 }
 .wallet-draw-panel .balls {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 4px;
+  gap: clamp(5px, 1.7vw, 9px);
+  overflow: visible;
 }
 .wallet-draw-panel .ball {
-  width: 23px;
-  height: 23px;
-  min-width: 23px;
-  max-width: 23px;
-  flex: 0 0 23px;
-  aspect-ratio: 1;
+  inline-size: 27px;
+  block-size: 27px;
+  min-inline-size: 27px;
+  max-inline-size: 27px;
+  min-block-size: 27px;
+  max-block-size: 27px;
+  flex: 0 0 27px;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
   padding: 0;
+  border-radius: 50%;
+  font-size: 9px;
+}
+.wallet-draw-panel.is-pending { background: rgba(100,116,139,.035); }
+.wallet-draw-pending {
+  color: var(--muted);
   font-size: 8px;
+  font-weight: 850;
+  text-align: center;
 }
 @keyframes wallet-draw-reveal {
   from { opacity: 0; transform: translateY(-4px); }
@@ -5132,7 +5150,39 @@ body { width: 100%; }
     max-block-size: clamp(24px, 7vw, 27px);
     flex-basis: clamp(24px, 7vw, 27px);
   }
+  .wallet-draw-panel .balls { gap: 5px; }
+  .wallet-draw-panel .ball {
+    inline-size: clamp(24px, 7vw, 27px);
+    block-size: clamp(24px, 7vw, 27px);
+    min-inline-size: clamp(24px, 7vw, 27px);
+    max-inline-size: clamp(24px, 7vw, 27px);
+    min-block-size: clamp(24px, 7vw, 27px);
+    max-block-size: clamp(24px, 7vw, 27px);
+    flex-basis: clamp(24px, 7vw, 27px);
+  }
   .month-game-detail { grid-template-columns: 7px minmax(64px,1fr) repeat(3, minmax(42px,.65fr)); gap: 5px; padding: 9px 7px; }
+}
+
+/* v3.4.2：深色票面去除网格；侧边缺口补上随锯齿走向的彩色弧线。 */
+[data-theme="dark"] .wallet-ticket {
+  background:
+    radial-gradient(circle at 92% 4%, rgba(var(--wallet-rgb),.14), transparent 36%),
+    linear-gradient(145deg, rgba(var(--wallet-rgb),.09), rgba(13,18,31,.96) 62%);
+}
+[data-theme="dark"] .wallet-ticket.is-winning {
+  background:
+    radial-gradient(circle at 94% 0, rgba(250,204,21,.16), transparent 31%),
+    radial-gradient(circle at 4% 96%, rgba(16,185,129,.12), transparent 32%),
+    linear-gradient(145deg, rgba(254,240,138,.08), rgba(13,18,31,.96) 58%);
+}
+.wallet-ticket::before,
+.wallet-ticket::after {
+  background:
+    radial-gradient(circle at 50% 7px,
+      var(--page) 0 3.1px,
+      rgba(var(--wallet-rgb),.48) 3.2px 3.95px,
+      transparent 4.1px)
+    center top / 9px 14px repeat-y;
 }
 
 @media (prefers-reduced-motion: reduce) {
