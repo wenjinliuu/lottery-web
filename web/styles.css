@@ -2884,6 +2884,9 @@ body.scan-open { overflow: hidden; }
    彩票夹 3.0 — 首页 / 票夹 / 设置
    ========================================================================== */
 
+/* 部分组件使用 grid/flex，必须保留 hidden 的最高显示优先级。 */
+[hidden] { display: none !important; }
+
 .page {
   width: min(100%, 560px);
   padding-top: max(18px, env(safe-area-inset-top));
