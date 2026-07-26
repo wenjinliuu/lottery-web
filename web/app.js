@@ -10,7 +10,7 @@
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
-  const APP_VERSION = "3.4.2";
+  const APP_VERSION = "3.4.3";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -688,7 +688,10 @@
     if (!els.dataStatusGrid) return;
     state.pwaState = window.LotteryPWA?.getState?.() || state.pwaState || {};
     const model = getDataStatusModel();
-    if (els.dataStatusSummary) els.dataStatusSummary.textContent = model.summary;
+    if (els.dataStatusSummary) {
+      els.dataStatusSummary.textContent = model.summary;
+      els.dataStatusSummary.title = model.summary;
+    }
     if (els.dataStatusDot) els.dataStatusDot.dataset.tone = model.tone;
     els.dataStatusGrid.innerHTML = model.items.map((item) => `
       <div class="status-item">

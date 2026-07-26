@@ -5192,3 +5192,162 @@ body { width: 100%; }
   .wallet-winning-sparkles i { animation: none; opacity: .42; transform: scale(.72); }
   .wallet-draw-panel { animation: none; }
 }
+
+/* v3.4.3：压缩开奖奖项标签、统一设置排版，并重做电子票据边缘。 */
+.home-draw-carousel .draw-prize-tag {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 3px 8px;
+  line-height: 1.35;
+}
+
+/* 设置卡片始终使用相同的三列基线；数据状态为四列，长副标题单行省略。 */
+.settings-group-card .mine-menu-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: initial;
+  gap: 11px;
+  min-height: 70px;
+  padding: 12px 0;
+}
+.settings-group-card .mine-menu-item-last {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.settings-group-card .mine-menu-copy {
+  display: grid !important;
+  min-width: 0;
+  align-content: center;
+  justify-items: start;
+  text-align: left;
+}
+.settings-group-card .mine-menu-title,
+.settings-group-card .mine-menu-sub {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.settings-group-card .mine-menu-title {
+  line-height: 1.3;
+}
+.settings-group-card .mine-menu-sub {
+  margin-top: 4px;
+  overflow: hidden;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-group-card .theme-toggle,
+.settings-group-card .setting-state-pill,
+.settings-group-card .mini-blue,
+.settings-group-card .mini-green {
+  justify-self: end;
+}
+.settings-group-card .settings-entry-btn {
+  grid-template-columns: 42px minmax(0, 1fr) 12px 14px;
+}
+#dataStatusSummary {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-group-card .status-center-dot,
+.settings-group-card .settings-chevron {
+  justify-self: center;
+}
+
+/*
+ * 电子票采用单一纸面与随缺口延伸的边线：
+ * 主体只保留上下边线，左右边由重复半圆缺口绘制，避免矩形边框叠在锯齿外。
+ */
+.wallet-ticket {
+  --ticket-edge-color: rgba(var(--wallet-rgb), .34);
+  overflow: hidden;
+  border: 1px solid var(--ticket-edge-color);
+  border-right-color: transparent;
+  border-left-color: transparent;
+  background:
+    radial-gradient(circle at 93% 3%, rgba(var(--wallet-rgb), .11), transparent 35%),
+    linear-gradient(145deg, rgba(var(--wallet-rgb), .045), rgba(255, 255, 255, .78) 64%);
+  box-shadow:
+    0 10px 24px rgba(28, 40, 80, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .76);
+}
+.wallet-ticket::before,
+.wallet-ticket::after {
+  top: 7px;
+  bottom: 7px;
+  z-index: 4;
+  width: 11px;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% 7px,
+      var(--page) 0 3.35px,
+      var(--ticket-edge-color) 3.45px 4.2px,
+      transparent 4.3px)
+      center top / 11px 14px repeat-y,
+    linear-gradient(var(--ticket-edge-color), var(--ticket-edge-color))
+      center / 1px 100% no-repeat;
+  box-shadow: none;
+  transform: none;
+  pointer-events: none;
+}
+.wallet-ticket::before { left: -5px; }
+.wallet-ticket::after { right: -5px; }
+.wallet-ticket.is-winning {
+  --ticket-edge-color: #10b981;
+  border-top-color: var(--ticket-edge-color);
+  border-right-color: transparent;
+  border-bottom-color: var(--ticket-edge-color);
+  border-left-color: transparent;
+  background:
+    radial-gradient(circle at 94% 0, rgba(250, 204, 21, .13), transparent 31%),
+    radial-gradient(circle at 4% 96%, rgba(16, 185, 129, .10), transparent 32%),
+    linear-gradient(145deg, rgba(254, 240, 138, .07), rgba(255, 255, 255, .80) 60%);
+  box-shadow:
+    0 12px 28px rgba(16, 185, 129, .15),
+    inset 0 1px 0 rgba(255, 255, 255, .78);
+}
+[data-theme="dark"] .wallet-ticket {
+  background:
+    radial-gradient(circle at 93% 3%, rgba(var(--wallet-rgb), .12), transparent 35%),
+    linear-gradient(145deg, rgba(var(--wallet-rgb), .065), rgba(13, 18, 31, .96) 64%);
+  box-shadow:
+    0 11px 26px rgba(0, 0, 0, .25),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+[data-theme="dark"] .wallet-ticket.is-winning {
+  background:
+    radial-gradient(circle at 94% 0, rgba(250, 204, 21, .12), transparent 31%),
+    radial-gradient(circle at 4% 96%, rgba(16, 185, 129, .10), transparent 32%),
+    linear-gradient(145deg, rgba(16, 185, 129, .055), rgba(13, 18, 31, .96) 60%);
+  box-shadow:
+    0 12px 28px rgba(16, 185, 129, .13),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+/* 全年柱图的选中边线更柔和，金额与柱顶留出更清晰的呼吸距离。 */
+.month-stack-chart {
+  height: 188px;
+}
+.month-stack-item {
+  grid-template-rows: 18px 146px 16px;
+}
+.month-stack-total {
+  align-self: start;
+  line-height: 1;
+  transform: translateY(-2px);
+}
+.month-stack-item.is-active .month-stack-track {
+  border-color: rgba(245, 158, 11, .48);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, .07);
+}
