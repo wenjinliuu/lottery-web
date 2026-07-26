@@ -58,9 +58,13 @@
   if (state.supported) {
     global.addEventListener("load", async () => {
       try {
-        const registration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+        const registration = await navigator.serviceWorker.register("./sw.js", {
+          scope: "./",
+          updateViaCache: "none"
+        });
         state.registration = registration;
         state.registered = true;
+        await registration.update().catch(() => {});
         state.updateReady = Boolean(registration.waiting);
         registration.addEventListener("updatefound", () => {
           const worker = registration.installing;

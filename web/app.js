@@ -10,7 +10,7 @@
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
-  const APP_VERSION = "3.1.0";
+  const APP_VERSION = "3.2.0";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -79,18 +79,8 @@
     await Promise.all([loadCalendar(), loadDraws(), loadHealth()]);
     await loadRecords();
     await reconcileInferredRecords(false);
-    /* 首屏默认 ssq；若今日不开 ssq，自动切到今日开奖列表第一个 */
-    const todayGames = getTodayOpenGames();
-    if (todayGames.length && !todayGames.includes(state.gameKey)) {
-      state.gameKey = todayGames[0];
-      els.gameSelect.value = state.gameKey;
-      renderGameTabs();
-      syncPlayModeOptions();
-      syncDefaultPrice();
-      renderCountTabs();
-    }
-    state.drawCarouselIndex = Math.max(0, GAME_ORDER.indexOf(state.gameKey));
-    /* 自动确定首屏彩种后，再同步一次今日开奖 chip 的激活态。 */
+    /* 首页开奖轮播固定从双色球开始；选号工具的彩种状态与开奖浏览互不干扰。 */
+    state.drawCarouselIndex = 0;
     renderTodayRecommend();
     randomizeTickets();
     renderHomeDashboard();
@@ -380,6 +370,9 @@
     document.querySelectorAll("[data-stat-details]").forEach((btn) => btn.addEventListener("click", openGameStatsSheet));
     if (els.detailSheetBackdrop) els.detailSheetBackdrop.addEventListener("click", closeDetailSheet);
     if (els.detailSheetCloseBtn) els.detailSheetCloseBtn.addEventListener("click", closeDetailSheet);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && state.activeView === "home") scheduleDrawCarouselAuto(1600);
+    });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && els.detailSheet && !els.detailSheet.hidden) closeDetailSheet();
       if (event.key === "Escape" && els.ticketAdd && !els.ticketAdd.hidden) closeTicketAdd();
@@ -573,6 +566,7 @@
       if (view === "monthly") renderMonthlyStats();
     });
     window.requestAnimationFrame(resetPageScroll);
+    if (view === "home") scheduleDrawCarouselAuto();
   }
 
   function resetPageScroll() {
@@ -1629,17 +1623,17 @@
       btn.addEventListener("click", () => openGameHistory(btn.dataset.historyGame));
     });
     renderDrawCarouselDots();
+    els.latestDraws.onpointerdown = () => pauseDrawCarouselAuto();
+    els.latestDraws.ontouchstart = () => pauseDrawCarouselAuto();
     els.latestDraws.onscroll = () => {
       window.clearTimeout(renderDraws.scrollTimer);
       renderDraws.scrollTimer = window.setTimeout(syncDrawCarouselIndex, 70);
     };
     window.requestAnimationFrame(() => {
       const activeGame = GAME_ORDER[state.drawCarouselIndex] || GAME_ORDER[0];
-      const activeCard = els.latestDraws?.querySelector(`[data-draw-slide="${activeGame}"]`);
-      if (activeCard && state.drawCarouselIndex > 0) {
-        els.latestDraws.scrollLeft = Math.max(0, activeCard.offsetLeft - els.latestDraws.offsetLeft);
-      }
+      scrollDrawCarouselToGame(activeGame, { behavior: "auto", manual: false });
     });
+    scheduleDrawCarouselAuto();
 
     renderHistory();
   }
@@ -1671,7 +1665,7 @@
     els.drawCarouselDots.innerHTML = GAME_ORDER.map((gameKey, index) => `
       <button class="draw-carousel-dot${index === state.drawCarouselIndex ? " is-active" : ""}" type="button" data-draw-dot="${gameKey}" aria-label="查看${GAME_CONFIGS[gameKey]?.label || gameKey}" aria-pressed="${index === state.drawCarouselIndex}"></button>
     `).join("");
-    els.drawCarouselDots.querySelectorAll("[data-draw-dot]").forEach((btn) => btn.addEventListener("click", () => scrollDrawCarouselToGame(btn.dataset.drawDot)));
+    els.drawCarouselDots.querySelectorAll("[data-draw-dot]").forEach((btn) => btn.addEventListener("click", () => scrollDrawCarouselToGame(btn.dataset.drawDot, { manual: true })));
   }
 
   function syncDrawCarouselIndex() {
@@ -1690,20 +1684,43 @@
     });
     if (bestIndex === state.drawCarouselIndex) return;
     state.drawCarouselIndex = bestIndex;
-    state.gameKey = GAME_ORDER[bestIndex] || state.gameKey;
     renderDrawCarouselDots();
-    renderTodayRecommend();
   }
 
-  function scrollDrawCarouselToGame(gameKey) {
+  function scrollDrawCarouselToGame(gameKey, options = {}) {
     if (!els.latestDraws) return;
     const card = els.latestDraws.querySelector(`[data-draw-slide="${gameKey}"]`);
     if (!card) return;
     state.drawCarouselIndex = Math.max(0, GAME_ORDER.indexOf(gameKey));
-    state.gameKey = gameKey;
-    card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+    const trackRect = els.latestDraws.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const targetLeft = els.latestDraws.scrollLeft + cardRect.left - trackRect.left;
+    els.latestDraws.scrollTo({
+      left: Math.max(0, targetLeft),
+      behavior: options.behavior || "smooth"
+    });
     renderDrawCarouselDots();
-    renderTodayRecommend();
+    if (options.manual !== false) pauseDrawCarouselAuto();
+  }
+
+  function pauseDrawCarouselAuto(duration = 11000) {
+    scheduleDrawCarouselAuto.pausedUntil = Date.now() + duration;
+    scheduleDrawCarouselAuto(duration + 800);
+  }
+
+  function scheduleDrawCarouselAuto(delay = 5200) {
+    window.clearTimeout(scheduleDrawCarouselAuto.timer);
+    if (!els.latestDraws || document.hidden) return;
+    scheduleDrawCarouselAuto.timer = window.setTimeout(() => {
+      const pauseLeft = Number(scheduleDrawCarouselAuto.pausedUntil || 0) - Date.now();
+      if (pauseLeft > 0 || state.activeView !== "home" || !els.detailSheet?.hidden) {
+        scheduleDrawCarouselAuto(Math.max(1200, pauseLeft + 300));
+        return;
+      }
+      const nextIndex = (state.drawCarouselIndex + 1) % GAME_ORDER.length;
+      scrollDrawCarouselToGame(GAME_ORDER[nextIndex], { manual: false });
+      scheduleDrawCarouselAuto();
+    }, Math.max(800, delay));
   }
 
   async function openGameHistory(gameKey) {
@@ -2284,6 +2301,7 @@
 
   function openNotificationSheet() {
     if (!els.detailSheet || !els.detailSheetBody) return;
+    els.detailSheet.classList.remove("is-fullscreen");
     const pendingBatches = groupRecordsByBatch(state.records).filter((batch) => getWalletBatchStatus(batch) === "pending");
     const backup = getBackupHealth();
     const dataModel = getDataStatusModel();
@@ -2316,6 +2334,7 @@
 
   function openLatestDrawsSheet() {
     if (!els.detailSheet || !els.detailSheetBody) return;
+    els.detailSheet.classList.add("is-fullscreen");
     els.detailSheetTitle.textContent = "全部最新开奖";
     els.detailSheetSub.textContent = state.latestUpdatedAt ? `开奖仓库更新于 ${formatDateTime(state.latestUpdatedAt)}` : "等待开奖仓库数据";
     els.detailSheetBody.innerHTML = `
@@ -2338,6 +2357,7 @@
 
   function openDataStatusSheet() {
     if (!els.detailSheet || !els.detailSheetBody) return;
+    els.detailSheet.classList.remove("is-fullscreen");
     renderDataStatus();
     const model = getDataStatusModel();
     els.detailSheetTitle.textContent = "数据状态";
@@ -2371,6 +2391,7 @@
 
   function openGameStatsSheet() {
     if (!els.detailSheet || !els.detailSheetBody) return;
+    els.detailSheet.classList.remove("is-fullscreen");
     const groups = groupRecordsByGame(state.records);
     els.detailSheetTitle.textContent = "各彩种统计";
     els.detailSheetSub.textContent = "按已保存的全部本地彩票记录汇总";
@@ -2400,6 +2421,7 @@
   function closeDetailSheet() {
     if (!els.detailSheet) return;
     els.detailSheet.hidden = true;
+    els.detailSheet.classList.remove("is-fullscreen");
     document.body.classList.remove("sheet-open");
   }
 
@@ -3221,6 +3243,9 @@
       const stroke = previousColor === color ? color : `url(#profit-gradient-${index})`;
       return `<line class="profit-line-segment" x1="${xOf(index).toFixed(1)}" y1="${yOf(days[index].close).toFixed(1)}" x2="${xOf(index + 1).toFixed(1)}" y2="${yOf(day.close).toFixed(1)}" stroke="${stroke}"/>`;
     }).join("");
+    const areaColor = days[days.length - 1].close > days[0].close ? GREEN : RED;
+    const areaLine = days.map((day, index) => `${index ? "L" : "M"} ${xOf(index).toFixed(1)} ${yOf(day.close).toFixed(1)}`).join(" ");
+    const areaPath = `${areaLine} L ${xOf(days.length - 1).toFixed(1)} ${(padT + innerH).toFixed(1)} L ${xOf(0).toFixed(1)} ${(padT + innerH).toFixed(1)} Z`;
 
     const points = days.map((day, index) => {
       const x = xOf(index);
@@ -3240,9 +3265,16 @@
 
     return `
       <svg class="profit-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="累计盈亏折线图">
-        <defs>${gradients}</defs>
+        <defs>
+          ${gradients}
+          <linearGradient id="profit-area-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${areaColor}" stop-opacity=".16"/>
+            <stop offset="100%" stop-color="${areaColor}" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
         ${grid}
         ${zeroLine}
+        <path class="profit-area-fill" d="${areaPath}"/>
         ${lineSegments}
         ${singlePoint}
         ${points}

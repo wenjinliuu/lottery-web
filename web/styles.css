@@ -90,6 +90,7 @@
   --shadow: var(--shadow-l1);
 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -3958,4 +3959,248 @@ body.ticket-add-open { overflow: hidden; }
 @media (min-width: 760px) {
   .page { width: min(100% - 32px, 560px); }
   .home-draw-carousel .draw-card { flex-basis: 100%; }
+}
+
+/* ==========================================================================
+   彩票夹 3.2 — 留白、单卡开奖轮播、交易式收益图与全屏开奖抽屉
+   ========================================================================== */
+
+html,
+body { width: 100%; }
+
+.page {
+  width: 100%;
+  max-width: 560px;
+  min-width: 0;
+  padding:
+    calc(14px + var(--safe-top))
+    clamp(18px, 5vw, 24px)
+    calc(120px + var(--safe-bottom));
+  overflow-x: clip;
+}
+
+.view-section,
+.home-page,
+.wallet-page,
+.settings-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.home-page,
+.wallet-page,
+.settings-page { gap: 20px; }
+
+.page-action-row,
+.home-header,
+.wallet-header {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.wallet-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 收益区不再是悬浮玻璃卡：像账户资产页一样直接融入底色。 */
+.home-trend-card {
+  overflow: visible;
+  margin: -2px 0 2px;
+  padding: 4px 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.home-trend-card::after { display: none; }
+.home-profit-card .profit-head {
+  align-items: flex-start;
+  margin: 0 0 2px;
+}
+.home-profit-card .profit-title {
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .04em;
+}
+.home-profit-card .profit-sub {
+  margin-top: 5px;
+  font-size: 10px;
+}
+.home-profit-card .profit-net-value {
+  font-size: clamp(28px, 8vw, 36px);
+  letter-spacing: -.045em;
+  line-height: .95;
+}
+.home-profit-card .profit-chart-wrap {
+  height: 178px;
+  min-height: 178px;
+  margin: 4px 0 0;
+}
+.profit-area-fill { fill: url(#profit-area-gradient); }
+.home-profit-card .profit-grid-line {
+  stroke: rgba(100, 116, 139, .13);
+  stroke-dasharray: 2 5;
+}
+.home-profit-card .profit-zero-line { stroke: rgba(100,116,139,.24); }
+.home-profit-card .profit-line-segment { stroke-width: 2.4; }
+.home-profit-card .profit-axis-label {
+  fill: rgba(71, 85, 105, .66);
+  font-size: 9px;
+}
+[data-theme="dark"] .home-profit-card .profit-axis-label { fill: rgba(203,213,225,.58); }
+.home-profit-card .profit-range-tabs {
+  justify-content: flex-start;
+  gap: 4px;
+  margin: 2px 0 0 34px;
+}
+.home-profit-card .profit-range-btn {
+  min-width: 54px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(100,116,139,.08);
+  box-shadow: none;
+  font-size: 10px;
+}
+.home-profit-card .profit-range-btn.is-active {
+  color: var(--ink);
+  background: rgba(100,116,139,.17);
+  box-shadow: none;
+}
+.home-profit-card .profit-chart-hint {
+  margin: 8px 0 0 34px;
+  text-align: left;
+  font-size: 8px;
+}
+
+/* 开奖轨道必须始终横向；一屏严格只露出一张。 */
+.home-draw-carousel {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  gap: 0 !important;
+  width: 100%;
+  max-width: 100%;
+  margin: 10px 0 0;
+  padding: 2px 0 8px;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+}
+.home-draw-carousel > .draw-card {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 100% !important;
+  margin: 0 !important;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.draw-carousel-dots {
+  min-height: 17px;
+  margin-top: 1px;
+  gap: 6px;
+}
+.draw-carousel-dot {
+  width: 6px;
+  height: 6px;
+  background: rgba(100,116,139,.27);
+}
+.draw-carousel-dot.is-active {
+  width: 16px;
+  background: rgba(71,85,105,.78);
+}
+[data-theme="dark"] .draw-carousel-dot { background: rgba(203,213,225,.25); }
+[data-theme="dark"] .draw-carousel-dot.is-active { background: rgba(226,232,240,.78); }
+
+/* 首页扫描入口统一为右下悬浮按钮。 */
+.home-floating-scan {
+  position: fixed;
+  right: max(22px, calc((100vw - 560px) / 2 + 22px));
+  bottom: calc(96px + var(--safe-bottom));
+  z-index: 18;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(180deg, #4b92ff, #1769ee);
+  box-shadow: 0 15px 30px rgba(37,99,235,.35), inset 0 1px 0 rgba(255,255,255,.34);
+}
+.home-floating-scan .icn { width: 25px; height: 25px; stroke-width: 2; }
+
+/* “更多开奖”是完整页面，其余详情继续使用底部抽屉。 */
+.detail-sheet.is-fullscreen {
+  align-items: stretch;
+  padding: 0;
+}
+.detail-sheet.is-fullscreen .detail-sheet-panel {
+  display: flex;
+  width: min(100%, 560px);
+  height: 100dvh;
+  max-height: 100dvh;
+  flex-direction: column;
+  padding:
+    calc(16px + var(--safe-top))
+    clamp(18px, 5vw, 24px)
+    calc(20px + var(--safe-bottom));
+  border: 0;
+  border-radius: 0;
+  background: var(--page);
+  box-shadow: none;
+}
+.detail-sheet.is-fullscreen .detail-sheet-head {
+  flex: 0 0 auto;
+  margin-bottom: 15px;
+}
+.detail-sheet.is-fullscreen .detail-sheet-body {
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 auto;
+  gap: 13px;
+  padding-bottom: 10px;
+}
+.detail-sheet.is-fullscreen .latest-draw-sheet-list { gap: 13px; }
+
+/* 统一卡片重量与页面呼吸感。 */
+.home-block,
+.home-monthly-card,
+.wallet-summary-card,
+.settings-group-card { min-width: 0; }
+.home-section-head-outside { padding: 0 2px; }
+.home-monthly-card,
+.wallet-summary-card,
+.settings-group-card {
+  box-shadow: 0 10px 28px rgba(28,40,80,.08), inset 0 1px 0 var(--glass-stroke-inner);
+}
+
+@media (max-width: 390px) {
+  .page {
+    padding-right: 17px;
+    padding-left: 17px;
+  }
+  .home-profit-card .profit-chart-wrap {
+    height: 166px;
+    min-height: 166px;
+  }
+}
+
+@media (min-width: 760px) {
+  .page {
+    width: min(100% - 40px, 560px);
+    padding-right: 22px;
+    padding-left: 22px;
+  }
 }

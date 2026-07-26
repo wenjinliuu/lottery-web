@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="彩票夹">
-    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="manifest" href="./manifest.webmanifest?v=3.2.0">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <style>[hidden] { display: none !important; }</style>
     <script>
@@ -24,15 +24,14 @@
         if (themeColor) themeColor.setAttribute("content", theme === "dark" ? "#0b0f1c" : "#f7f7f7");
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=3.2.0">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%A4%B9%3C/text%3E%3C/svg%3E">
   </head>
   <body>
     <main class="page">
       <section class="view-section" data-view-panel="home">
         <div class="home-page">
-          <header class="home-header">
-            <div class="home-brand">彩票夹</div>
+          <header class="page-action-row home-header">
             <button class="home-notification-btn" id="homeNotificationBtn" type="button" aria-label="查看提醒">
               <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
               <span class="home-notification-badge" id="homeNotificationBadge" hidden>0</span>
@@ -71,7 +70,7 @@
               <button class="home-more-btn" id="latestDrawMoreBtn" type="button"><span>更多</span><span aria-hidden="true">›</span></button>
             </div>
             <div class="draw-update-notice" id="drawUpdateNotice" role="status" hidden></div>
-            <div id="latestDraws" class="check-card-list home-draw-carousel"></div>
+            <div id="latestDraws" class="home-draw-carousel"></div>
             <div class="draw-carousel-dots" id="drawCarouselDots" role="group" aria-label="开奖卡片分页"></div>
             <button id="toggleDrawsBtn" type="button" hidden>展开</button>
             <button id="reloadDrawsBtn" type="button" hidden>刷新</button>
@@ -96,10 +95,8 @@
             <button id="monthlyStatsBtn" type="button" hidden>查看日历</button>
           </section>
 
-          <button class="home-scan-cta" id="homeScanTicketBtn" type="button">
-            <span class="home-scan-icon"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg></span>
-            <span><strong>扫描实体彩票</strong><small>拍照识别后加入本地票夹</small></span>
-            <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          <button class="home-floating-scan" id="homeScanTicketBtn" type="button" aria-label="扫描实体彩票">
+            <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
           </button>
 
           <aside class="responsible-note" aria-label="理性购彩说明">
@@ -111,11 +108,8 @@
 
       <section class="view-section" data-view-panel="check" hidden>
         <div class="wallet-page">
-          <header class="wallet-header">
-            <div>
-              <div class="page-title">票夹</div>
-              <div class="page-subtitle" id="walletSubtitle">本地记录 · 自动核对</div>
-            </div>
+          <header class="page-action-row wallet-header">
+            <span class="sr-only" id="walletSubtitle">本地记录 · 自动核对</span>
             <div class="wallet-header-actions">
               <button class="round-action-btn" id="scanTicketBtn" type="button" aria-label="直接扫描彩票">
                 <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
@@ -142,11 +136,6 @@
 
       <section class="view-section" data-view-panel="mine" hidden>
         <div class="settings-page">
-          <header class="settings-header">
-            <div class="page-title">设置</div>
-            <div class="page-subtitle">自动核对、数据备份与应用状态</div>
-          </header>
-
           <section class="card settings-group-card">
             <div class="settings-group-title">核对与提醒</div>
             <div class="mine-menu-item">
@@ -455,9 +444,9 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./rules.js"></script>
-    <script src="./ocr.js"></script>
-    <script src="./pwa.js"></script>
-    <script src="./app.js"></script>
+    <script src="./rules.js?v=3.2.0"></script>
+    <script src="./ocr.js?v=3.2.0"></script>
+    <script src="./pwa.js?v=3.2.0"></script>
+    <script src="./app.js?v=3.2.0"></script>
   </body>
 </html>
