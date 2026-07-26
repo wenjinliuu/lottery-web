@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" id="themeColorMeta" content="#f7f7f7">
     <title>彩票夹</title>
-    <meta name="description" content="本地优先的彩票号码试玩、票据记录、开奖核对与月度统计工具。">
+    <meta name="description" content="本地优先的实体彩票记录、自动核对、开奖信息与月度统计工具。">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="彩票夹">
@@ -24,244 +24,173 @@
       })();
     </script>
     <link rel="stylesheet" href="./styles.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%BD%A9%3C/text%3E%3C/svg%3E">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%A4%B9%3C/text%3E%3C/svg%3E">
   </head>
   <body>
     <main class="page">
-      <header class="hero">
-        <div class="hero-main">
-          <div class="date-row">
-            <span class="date" id="todayTitle">今日号码</span>
-            <span class="week-inline" id="weekTitle">星期</span>
-          </div>
+      <section class="view-section" data-view-panel="home">
+        <div class="home-page">
+          <header class="home-header">
+            <div class="home-title-wrap">
+              <div class="home-brand">彩票夹</div>
+              <div class="date-row">
+                <span class="date" id="todayTitle">今天</span>
+                <span class="week-inline" id="weekTitle">星期</span>
+              </div>
+            </div>
+            <button class="home-notification-btn" id="homeNotificationBtn" type="button" aria-label="查看提醒">
+              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+              <span class="home-notification-badge" id="homeNotificationBadge" hidden>0</span>
+            </button>
+          </header>
+
           <div class="today-recommend" id="todayRecommend">
             <span class="today-recommend-label">今日开奖</span>
             <div class="today-recommend-chips" id="todayRecommendChips"><span class="today-recommend-empty">加载中…</span></div>
           </div>
-        </div>
-      </header>
 
-      <section class="view-section" data-view-panel="random">
-        <div class="custom-random-panel">
-          <section class="card">
-            <div class="section-title">彩种</div>
-            <div class="tab-grid" id="gameTabs"></div>
-            <select id="gameSelect" class="sr-only" aria-label="彩种"></select>
-          </section>
-
-          <section class="card" id="playModeField">
-            <div class="section-title">玩法</div>
-            <div class="segment-row play-row" id="playModeTabs"></div>
-            <select id="playModeSelect" class="sr-only" aria-label="玩法"></select>
-          </section>
-
-          <section class="card compact-card" id="countCard">
-            <div class="section-title">注数</div>
-            <div class="segment-row count-row" id="countTabs"></div>
-            <input id="countInput" class="sr-only" type="number" min="1" max="10" value="1">
-            <input id="priceInput" class="sr-only" type="number" min="0" step="0.5" value="2">
-            <input id="multipleInput" class="sr-only" type="number" min="1" max="99" value="1">
-          </section>
-
-          <section class="card action-card">
-            <div class="toolbar toolbar-primary">
-              <button class="tool-btn tool-btn-light has-icon" id="randomBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-                <span>重新随机</span>
-              </button>
-              <button class="dlt-addon-btn" id="dltAddOnBtn" type="button" aria-pressed="false" hidden>追加</button>
-              <div class="multiplier-control" aria-label="倍数">
-                <button class="multiplier-btn" id="decreaseMultiplierBtn" type="button">-</button>
-                <span class="multiplier-value" id="multiplierText">1倍</span>
-                <button class="multiplier-btn" id="increaseMultiplierBtn" type="button">+</button>
+          <section class="card home-overview-card">
+            <div class="home-section-head">
+              <div>
+                <div class="home-section-title">本月概览</div>
+                <div class="home-section-sub" id="homeOverviewSub">统计本机保存的彩票记录</div>
               </div>
+              <button class="text-link-btn" id="homeOverviewMoreBtn" type="button">月度详情</button>
             </div>
-            <div class="toolbar toolbar-secondary">
-              <button class="tool-btn tool-btn-primary has-icon" id="saveBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21V13H7V21M7 3v5h8"/></svg>
-                <span>保存记录复制</span>
+            <div class="home-kpi-grid">
+              <button class="home-kpi" type="button" data-stat-details>
+                <span class="home-kpi-value" id="mineTotalCost">0元</span>
+                <span class="home-kpi-label">本月花费</span>
+              </button>
+              <button class="home-kpi" type="button" data-stat-details>
+                <span class="home-kpi-value" id="minePrizeTotal">0元</span>
+                <span class="home-kpi-label">本月中奖</span>
+              </button>
+              <button class="home-kpi" type="button" data-stat-details>
+                <span class="home-kpi-value" id="mineWinRate">0%</span>
+                <span class="home-kpi-label">中奖率</span>
+              </button>
+              <button class="home-kpi" id="mineWonRecordsBtn" type="button">
+                <span class="home-kpi-value" id="mineWonCount">0</span>
+                <span class="home-kpi-label">待核对票</span>
               </button>
             </div>
-          </section>
 
-          <section class="card">
-            <div class="draft-head">
-            <div class="section-title section-title-no-margin">试玩号码</div>
-              <div class="draft-head-second-row">
-                <div class="draft-draw-actions">
-                  <span class="draft-draw-tag" id="draftDrawTag" data-tone="muted">等待开奖数据</span>
-                  <button class="draft-draw-refresh has-icon" id="draftDrawRefreshBtn" type="button" aria-label="刷新下一期开奖数据" title="刷新下一期开奖数据" hidden>
-                    <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
-                  </button>
+            <div class="home-profit-divider"></div>
+            <div class="profit-card home-profit-card" id="profitCard">
+              <div class="profit-head">
+                <div class="profit-head-left">
+                  <div class="profit-title">累计盈亏</div>
+                  <div class="profit-sub" id="profitSub">本月记录</div>
                 </div>
-                <button class="mini-clear has-icon" id="clearDraftBtn" type="button">
-                  <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                  <span>清空</span>
-                </button>
+                <div class="profit-net"><div class="profit-net-value" id="profitNetValue">0元</div></div>
               </div>
+              <div class="profit-chart-wrap" id="profitChartWrap">
+                <div class="profit-empty" id="profitEmpty">暂无完整数据</div>
+              </div>
+              <div class="profit-range-tabs" id="profitRangeTabs" aria-label="收益趋势时间范围">
+                <button class="profit-range-btn is-active" type="button" data-profit-range="month" aria-pressed="true">本月</button>
+                <button class="profit-range-btn" type="button" data-profit-range="90" aria-pressed="false">90天</button>
+                <button class="profit-range-btn" type="button" data-profit-range="all" aria-pressed="false">全部</button>
+              </div>
+              <div class="profit-chart-hint">点击或长按折线查看当日花费、中奖和累计盈亏</div>
             </div>
-            <div class="meta meta-row ticket-meta-row">
-              <div id="draftSummary">暂无号码</div>
-            </div>
-            <div id="draftList" class="ticket-list empty" aria-live="polite">点击“重新随机”生成号码</div>
           </section>
 
-          <aside class="responsible-note" aria-label="理性参与提示">
-            <strong>理性参与 · 仅供试玩与记录</strong>
-            <span>本工具不销售、不代购彩票，也不提供网络购彩入口。实际开奖结果以官方公布为准；如需购买，请通过当地合法、正规线下彩票销售渠道，并量力而行。</span>
+          <button class="home-scan-cta" id="homeScanTicketBtn" type="button">
+            <span class="home-scan-icon">
+              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
+            </span>
+            <span><strong>扫描实体彩票</strong><small>拍照识别后加入本地票夹</small></span>
+            <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+
+          <section class="home-block">
+            <div class="home-section-head home-section-head-outside">
+              <div>
+                <div class="home-section-title">最新开奖</div>
+                <div class="home-section-sub" id="latestDrawsUpdated">暂无更新时间</div>
+              </div>
+              <button class="text-link-btn" id="latestDrawMoreBtn" type="button">更多</button>
+            </div>
+            <div class="draw-update-notice" id="drawUpdateNotice" role="status" hidden></div>
+            <div id="latestDraws" class="check-card-list home-draw-carousel"></div>
+            <div class="draw-carousel-dots" id="drawCarouselDots" aria-label="开奖卡片分页"></div>
+            <button id="toggleDrawsBtn" type="button" hidden>展开</button>
+            <button id="reloadDrawsBtn" type="button" hidden>刷新</button>
+          </section>
+
+          <section class="card home-monthly-card">
+            <div class="home-section-head">
+              <div>
+                <div class="home-section-title">月度统计</div>
+                <div class="home-section-sub" id="homeMonthlySub">各彩种花费占比</div>
+              </div>
+              <button class="text-link-btn" id="monthlyStatsBtn" type="button">查看日历</button>
+            </div>
+            <div class="home-monthly-content" id="homeMonthlyChart"></div>
+          </section>
+
+          <aside class="responsible-note">
+            <strong>本地记录 · 理性参与</strong>
+            <span>本工具不销售、不代购彩票。开奖结果仅供辅助核对，请以官方公布为准；如需购买，请通过当地合法、正规线下彩票销售渠道。</span>
           </aside>
         </div>
       </section>
 
       <section class="view-section" data-view-panel="check" hidden>
-        <div class="check-page">
-          <div class="check-page-head">
+        <div class="wallet-page">
+          <header class="wallet-header">
             <div>
-              <div class="section-title check-page-title">票夹与最新开奖</div>
-              <div class="draw-update-time" id="latestDrawsUpdated">暂无更新时间</div>
-              <div class="draw-update-notice" id="drawUpdateNotice" role="status" hidden></div>
+              <div class="page-title">票夹</div>
+              <div class="page-subtitle" id="walletSubtitle">本地记录 · 自动核对</div>
             </div>
-            <div class="check-title-actions">
-              <button class="check-expand-btn has-icon" id="toggleDrawsBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-                <span>展开</span>
-              </button>
-              <button class="check-expand-btn has-icon" id="reloadDrawsBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
-                <span>刷新</span>
-              </button>
-            </div>
-          </div>
-          <div id="latestDraws" class="check-card-list"></div>
-
-          <div class="check-records-head">
-            <div class="section-title check-page-title check-records-title-fixed">彩票记录</div>
-            <div class="check-records-actions">
-              <button class="check-records-scan has-icon" id="scanTicketBtn" type="button">
+            <div class="wallet-header-actions">
+              <button class="round-action-btn" id="scanTicketBtn" type="button" aria-label="直接扫描彩票">
                 <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
-                <span>扫描彩票</span>
               </button>
-              <button class="check-records-refresh has-icon" id="checkRecordsBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
-                <span>重新核对</span>
-              </button>
+              <button class="wallet-add-btn" id="addTicketBtn" type="button">＋ 添加</button>
             </div>
-          </div>
-          <section class="card check-records-card">
-            <div id="recordList" class="record-list empty" aria-live="polite">暂无保存记录</div>
-          </section>
-        </div>
-      </section>
+          </header>
 
-      <section class="view-section" data-view-panel="history" hidden>
-        <div class="history-page">
-          <div class="history-head">
-            <div class="history-title-wrap">
-              <div class="history-title">往期开奖</div>
-              <div class="history-sub" id="historySummary">读取本地开奖 JSON</div>
-            </div>
-            <button class="mini-blue has-icon" id="historyBackBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-              <span>返回</span>
+          <section class="wallet-summary-card">
+            <div><span>全部票据</span><strong id="walletTotalTickets">0</strong></div>
+            <div><span>待核对</span><strong id="walletPendingTickets">0</strong></div>
+            <div><span>已中奖</span><strong id="walletWonTickets">0</strong></div>
+            <button class="wallet-recheck-btn" id="checkRecordsBtn" type="button">
+              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
+              <span>重新核对</span>
             </button>
-          </div>
-          <div id="historyList" class="history-list"></div>
-        </div>
-      </section>
+          </section>
 
-      <section class="view-section" data-view-panel="myRecords" hidden>
-        <div class="history-page">
-          <div class="history-head">
-            <div class="history-title-wrap">
-              <div class="history-title">完整彩票记录</div>
-              <div class="history-sub" id="myRecordsSummary">共 0 条</div>
-            </div>
-            <button class="mini-blue has-icon" id="myRecordsBackBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-              <span>返回</span>
-            </button>
-          </div>
-          <section class="record-filter-panel" aria-label="按彩种筛选彩票记录">
-            <div class="record-filter-chips" id="recordFilterChips"></div>
-            <div class="record-filter-summary" id="recordFilterSummary">全部彩种 · 暂无记录</div>
-          </section>
-          <section class="card check-records-card">
-            <div id="mineRecordList" class="record-list empty" aria-live="polite">暂无保存记录</div>
-          </section>
-        </div>
-      </section>
-
-      <section class="view-section" data-view-panel="wins" hidden>
-        <div class="history-page">
-          <div class="history-head">
-            <div class="history-title-wrap">
-              <div class="history-title">中奖票据</div>
-              <div class="history-sub" id="wonRecordsSummary">共 0 条</div>
-            </div>
-            <button class="mini-blue has-icon" id="wonRecordsBackBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-              <span>返回</span>
-            </button>
-          </div>
-          <section class="card check-records-card">
-            <div id="wonRecordList" class="record-list empty" aria-live="polite">暂无中奖记录</div>
-          </section>
+          <div class="wallet-filter-chips" id="walletFilterChips" aria-label="筛选票据状态"></div>
+          <div id="recordList" class="wallet-ticket-list empty" aria-live="polite">暂无彩票记录</div>
         </div>
       </section>
 
       <section class="view-section" data-view-panel="mine" hidden>
-        <div class="mine-page">
-          <section class="card mine-hero-card">
-            <div class="mine-hero-top">
-              <div class="mine-avatar">我</div>
-              <div class="mine-user-copy">
-                <div class="mine-user-name">本地账户</div>
-                <div class="mine-user-sub">数据保存在当前浏览器，记得定期导出备份。</div>
-              </div>
-            </div>
-            <div class="mine-stat-row">
-              <button class="mine-stat" type="button" data-stat-details aria-label="查看各彩种花费明细">
-                <div class="mine-stat-value" id="mineTotalCost">0元</div>
-                <div class="mine-stat-label">总花费</div>
-              </button>
-              <button class="mine-stat" type="button" data-stat-details aria-label="查看各彩种中奖金额明细">
-                <div class="mine-stat-value" id="minePrizeTotal">0元</div>
-                <div class="mine-stat-label">中奖金额</div>
-              </button>
-              <button class="mine-stat" type="button" data-stat-details aria-label="查看各彩种中奖率明细">
-                <div class="mine-stat-value" id="mineWinRate">0%</div>
-                <div class="mine-stat-label">中奖率</div>
-              </button>
-              <button class="mine-stat" id="mineWonRecordsBtn" type="button" aria-label="打开中奖记录">
-                <div class="mine-stat-value" id="mineWonCount">0</div>
-                <div class="mine-stat-label">中奖记录</div>
-              </button>
-            </div>
-          </section>
+        <div class="settings-page">
+          <header class="settings-header">
+            <div class="page-title">设置</div>
+            <div class="page-subtitle">自动核对、数据备份与应用状态</div>
+          </header>
 
-          <section class="card profit-card" id="profitCard">
-            <div class="profit-head">
-              <div class="profit-head-left">
-                <div class="profit-title">累计盈亏</div>
-                <div class="profit-sub" id="profitSub">全部记录</div>
+          <section class="card settings-group-card">
+            <div class="settings-group-title">核对与提醒</div>
+            <div class="mine-menu-item">
+              <div class="mine-menu-copy">
+                <div class="mine-menu-title">打开应用时自动核对</div>
+                <div class="mine-menu-sub" id="autoCheckToggleSub">已开启</div>
               </div>
-              <div class="profit-net">
-                <div class="profit-net-value" id="profitNetValue">0元</div>
+              <button class="theme-toggle" id="autoCheckToggleBtn" type="button" role="switch" aria-checked="true" aria-label="切换自动核对"></button>
+            </div>
+            <div class="mine-menu-item mine-menu-item-last">
+              <div class="mine-menu-copy">
+                <div class="mine-menu-title">开奖提醒</div>
+                <div class="mine-menu-sub">网页通知能力准备中，App 版可扩展</div>
               </div>
+              <span class="setting-state-pill">规划中</span>
             </div>
-            <div class="profit-chart-wrap" id="profitChartWrap">
-              <div class="profit-empty" id="profitEmpty">暂无数据，先去试玩吧</div>
-            </div>
-            <div class="profit-range-tabs" id="profitRangeTabs" aria-label="收益趋势时间范围">
-              <button class="profit-range-btn" type="button" data-profit-range="30" aria-pressed="false">30天</button>
-              <button class="profit-range-btn" type="button" data-profit-range="90" aria-pressed="false">90天</button>
-              <button class="profit-range-btn is-active" type="button" data-profit-range="all" aria-pressed="true">全部</button>
-            </div>
-            <button class="monthly-entry has-icon" id="monthlyStatsBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
-              <span>打开月度统计日历</span>
-            </button>
-            <div class="profit-chart-hint">点击或长按折线查看当日明细和累计盈亏</div>
           </section>
 
           <section class="card status-center-card" id="dataStatusCard">
@@ -285,8 +214,8 @@
             </div>
           </section>
 
-          <section class="card mine-section-card">
-            <div class="section-title section-title-no-margin">外观</div>
+          <section class="card settings-group-card">
+            <div class="settings-group-title">外观</div>
             <div class="mine-menu-item mine-menu-item-last">
               <div class="mine-menu-copy">
                 <div class="mine-menu-title">深色模式</div>
@@ -296,16 +225,15 @@
             </div>
           </section>
 
-          <section class="card mine-section-card">
-            <div class="section-title section-title-no-margin">记录与备份</div>
+          <section class="card settings-group-card">
+            <div class="settings-group-title">记录与备份</div>
             <div class="mine-menu-item">
               <div class="mine-menu-copy">
-                <div class="mine-menu-title">彩票记录</div>
+                <div class="mine-menu-title">完整彩票记录</div>
                 <div class="mine-menu-sub" id="mineRecordSummary">共 0 条记录</div>
               </div>
               <button class="mini-blue has-icon" id="mineRecordToggleBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-                <span>查看</span>
+                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg><span>查看</span>
               </button>
             </div>
             <div class="mine-menu-item">
@@ -314,8 +242,7 @@
                 <div class="mine-menu-sub" id="lastBackupHint">生成 JSON 文件，换设备时可以恢复。</div>
               </div>
               <button class="mini-green has-icon" id="exportBackupBtn" type="button">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-                <span>导出</span>
+                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg><span>导出</span>
               </button>
             </div>
             <label class="mine-menu-item mine-menu-item-last">
@@ -324,8 +251,7 @@
                 <div class="mine-menu-sub">选择之前导出的备份文件。</div>
               </div>
               <span class="mini-blue has-icon">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-                <span>导入</span>
+                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span>导入</span>
               </span>
               <input id="importBackupInput" class="sr-only" type="file" accept="application/json">
             </label>
@@ -333,22 +259,50 @@
 
           <aside class="responsible-note responsible-note-mine">
             <strong>重要说明</strong>
-            <span>开奖信息、奖金和日期仅供辅助核对，最终结果以中国福利彩票、中国体育彩票等官方渠道公布为准。请理性参与，不向未成年人提供购彩协助。</span>
+            <span>电子票卡仅为本地记录，不是官方票据或兑奖凭证。开奖信息、奖金和日期以中国福利彩票、中国体育彩票等官方渠道公布为准。</span>
           </aside>
+        </div>
+      </section>
+
+      <section class="view-section" data-view-panel="history" hidden>
+        <div class="history-page">
+          <div class="history-head">
+            <div class="history-title-wrap"><div class="history-title">往期开奖</div><div class="history-sub" id="historySummary">读取本地开奖 JSON</div></div>
+            <button class="mini-blue has-icon" id="historyBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </div>
+      </section>
+
+      <section class="view-section" data-view-panel="myRecords" hidden>
+        <div class="history-page">
+          <div class="history-head">
+            <div class="history-title-wrap"><div class="history-title">完整彩票记录</div><div class="history-sub" id="myRecordsSummary">共 0 条</div></div>
+            <button class="mini-blue has-icon" id="myRecordsBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
+          </div>
+          <section class="record-filter-panel" aria-label="按彩种筛选彩票记录">
+            <div class="record-filter-chips" id="recordFilterChips"></div>
+            <div class="record-filter-summary" id="recordFilterSummary">全部彩种 · 暂无记录</div>
+          </section>
+          <section class="card check-records-card"><div id="mineRecordList" class="record-list empty" aria-live="polite">暂无保存记录</div></section>
+        </div>
+      </section>
+
+      <section class="view-section" data-view-panel="wins" hidden>
+        <div class="history-page">
+          <div class="history-head">
+            <div class="history-title-wrap"><div class="history-title">中奖票据</div><div class="history-sub" id="wonRecordsSummary">共 0 条</div></div>
+            <button class="mini-blue has-icon" id="wonRecordsBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
+          </div>
+          <section class="card check-records-card"><div id="wonRecordList" class="record-list empty" aria-live="polite">暂无中奖记录</div></section>
         </div>
       </section>
 
       <section class="view-section" data-view-panel="monthly" hidden>
         <div class="monthly-page">
           <div class="history-head monthly-head">
-            <div class="history-title-wrap">
-              <div class="history-title">月度统计</div>
-              <div class="history-sub" id="monthlySummary">按开奖日期汇总本地记录</div>
-            </div>
-            <button class="mini-blue has-icon" id="monthlyBackBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-              <span>返回</span>
-            </button>
+            <div class="history-title-wrap"><div class="history-title">月度统计</div><div class="history-sub" id="monthlySummary">按开奖日期汇总本地记录</div></div>
+            <button class="mini-blue has-icon" id="monthlyBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
           </div>
           <section class="card monthly-toolbar" aria-label="选择统计月份">
             <button class="month-nav-btn" id="monthPrevBtn" type="button" aria-label="上一个月">‹</button>
@@ -361,14 +315,8 @@
             <div class="monthly-calendar" id="monthlyCalendar"></div>
           </section>
           <section class="monthly-chart-grid">
-            <article class="card monthly-chart-card">
-              <div class="section-title section-title-no-margin">彩种花费占比</div>
-              <div id="monthlyGameChart"></div>
-            </article>
-            <article class="card monthly-chart-card">
-              <div class="section-title section-title-no-margin">近六个月对比</div>
-              <div id="monthlyCompareChart"></div>
-            </article>
+            <article class="card monthly-chart-card"><div class="section-title section-title-no-margin">彩种花费占比</div><div id="monthlyGameChart"></div></article>
+            <article class="card monthly-chart-card"><div class="section-title section-title-no-margin">近六个月对比</div><div id="monthlyCompareChart"></div></article>
           </section>
           <aside class="responsible-note"><strong>统计说明</strong><span>统计基于本机已保存记录，开奖结果与奖金请以官方渠道为准。</span></aside>
         </div>
@@ -377,37 +325,131 @@
 
     <nav class="dock-wrap" aria-label="底部导航">
       <div class="dock">
-        <button class="dock-item dock-item-active" type="button" data-view="random" aria-label="试玩" aria-current="page">
-          <span class="dock-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12"   cy="12"  r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>
-          </span>
-          <span class="dock-label">试玩</span>
+        <button class="dock-item dock-item-active" type="button" data-view="home" aria-label="首页" aria-current="page">
+          <span class="dock-icon"><svg viewBox="0 0 24 24"><path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M5.5 10v10h13V10M9.5 20v-6h5v6"/></svg></span><span class="dock-label">首页</span>
         </button>
         <button class="dock-item" type="button" data-view="check" aria-label="票夹">
-          <span class="dock-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="3.5" y="6.5" width="17" height="11" rx="2.5"/><path d="M9 12.4l1.9 1.9 4-4.4"/></svg>
-          </span>
-          <span class="dock-label">票夹</span>
+          <span class="dock-icon"><svg viewBox="0 0 24 24"><path d="M4 7.5h16v11H4z"/><path d="M7 7.5V5h10v2.5M8 12h8"/></svg></span><span class="dock-label">票夹</span>
         </button>
-        <button class="dock-item" type="button" data-view="mine" aria-label="我的">
-          <span class="dock-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 19.5c.8-3.6 3.7-6 7.5-6s6.7 2.4 7.5 6"/></svg>
-          </span>
-          <span class="dock-label">我的</span>
+        <button class="dock-item" type="button" data-view="mine" aria-label="设置">
+          <span class="dock-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg></span><span class="dock-label">设置</span>
         </button>
       </div>
     </nav>
 
+    <div class="ticket-add" id="ticketAdd" hidden>
+      <button class="ticket-add-backdrop" id="ticketAddBackdrop" type="button" aria-label="关闭添加票据"></button>
+      <section class="ticket-add-panel" role="dialog" aria-modal="true" aria-labelledby="ticketAddTitle">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <header class="ticket-add-head">
+          <button class="ticket-add-back" id="ticketAddBackBtn" type="button" aria-label="返回" hidden>‹</button>
+          <div>
+            <div class="ticket-add-title" id="ticketAddTitle">添加到票夹</div>
+            <div class="ticket-add-sub" id="ticketAddSub">记录已经在线下正规渠道购买的彩票</div>
+          </div>
+          <button class="ticket-add-close" id="ticketAddCloseBtn" type="button" aria-label="关闭">×</button>
+        </header>
+        <div class="ticket-add-scroll">
+          <div class="ticket-add-intro" id="ticketAddIntro">
+            <button class="add-option add-option-primary" id="addScanTicketBtn" type="button">
+              <span class="add-option-icon"><svg class="icn" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg></span>
+              <span><strong>扫描实体彩票</strong><small>本地 OCR 识别号码、期号、日期与金额</small></span>
+              <svg class="icn" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <button class="add-option" id="addAlbumTicketBtn" type="button">
+              <span class="add-option-icon"><svg class="icn" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8" cy="9" r="1.5"/><path d="m5 18 5-5 3 3 2-2 4 4"/></svg></span>
+              <span><strong>从相册选择</strong><small>选择之前拍摄的清晰票面照片</small></span>
+              <svg class="icn" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <button class="add-option" id="openManualToolBtn" type="button">
+              <span class="add-option-icon"><svg class="icn" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg></span>
+              <span><strong>手动录入号码</strong><small>支持全部八个彩种的普通号码</small></span>
+              <svg class="icn" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <div class="number-tools-label"><strong>选号工具</strong><span>仅用于生成或整理号码，不代表购买</span></div>
+            <button class="add-option" id="openRandomToolBtn" type="button">
+              <span class="add-option-icon"><svg class="icn" viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-8 8M3 21l8-8M16 21h5v-5M3 3l5 5"/></svg></span>
+              <span><strong>随机选号</strong><small>迁移原有完整随机选号功能</small></span>
+              <svg class="icn" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <div class="future-tool-grid"><span>复式 <em>后续支持</em></span><span>胆拖 <em>后续支持</em></span></div>
+            <div class="add-responsible-note">请通过当地合法、正规线下彩票销售渠道购买，请勿参与网络售彩、代购或非法投注平台。</div>
+          </div>
+
+          <div class="ticket-tool-view" id="randomToolView" hidden>
+            <div class="custom-random-panel">
+              <section class="card">
+                <div class="section-title">彩种</div>
+                <div class="tab-grid" id="gameTabs"></div>
+                <select id="gameSelect" class="sr-only" aria-label="彩种"></select>
+              </section>
+              <section class="card" id="playModeField">
+                <div class="section-title">玩法</div>
+                <div class="segment-row play-row" id="playModeTabs"></div>
+                <select id="playModeSelect" class="sr-only" aria-label="玩法"></select>
+              </section>
+              <section class="card compact-card" id="countCard">
+                <div class="section-title">注数</div>
+                <div class="segment-row count-row" id="countTabs"></div>
+                <input id="countInput" class="sr-only" type="number" min="1" max="10" value="1">
+                <input id="priceInput" class="sr-only" type="number" min="0" step="0.5" value="2">
+                <input id="multipleInput" class="sr-only" type="number" min="1" max="99" value="1">
+              </section>
+              <section class="card action-card">
+                <div class="toolbar toolbar-primary">
+                  <button class="tool-btn tool-btn-light has-icon" id="randomBtn" type="button"><svg class="icn" viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-8 8M3 21l8-8M16 21h5v-5M3 3l5 5"/></svg><span>重新随机</span></button>
+                  <button class="dlt-addon-btn" id="dltAddOnBtn" type="button" aria-pressed="false" hidden>追加</button>
+                  <div class="multiplier-control" aria-label="倍数">
+                    <button class="multiplier-btn" id="decreaseMultiplierBtn" type="button">-</button><span class="multiplier-value" id="multiplierText">1倍</span><button class="multiplier-btn" id="increaseMultiplierBtn" type="button">+</button>
+                  </div>
+                </div>
+                <button class="tool-btn tool-btn-primary has-icon random-save-btn" id="saveBtn" type="button"><svg class="icn" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21V13H7V21M7 3v5h8"/></svg><span>确认已购买并加入票夹</span></button>
+              </section>
+              <section class="card">
+                <div class="draft-head">
+                  <div class="section-title section-title-no-margin">选号结果</div>
+                  <div class="draft-head-second-row">
+                    <div class="draft-draw-actions"><span class="draft-draw-tag" id="draftDrawTag" data-tone="muted">等待开奖数据</span><button class="draft-draw-refresh has-icon" id="draftDrawRefreshBtn" type="button" hidden><svg class="icn" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg></button></div>
+                    <button class="mini-clear has-icon" id="clearDraftBtn" type="button"><svg class="icn" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg><span>清空</span></button>
+                  </div>
+                </div>
+                <div class="meta meta-row ticket-meta-row"><div id="draftSummary">暂无号码</div></div>
+                <div id="draftList" class="ticket-list empty" aria-live="polite">点击“重新随机”生成号码</div>
+              </section>
+            </div>
+          </div>
+
+          <div class="ticket-tool-view" id="manualToolView" hidden>
+            <section class="card manual-card">
+              <div class="section-title">选择彩种</div>
+              <div class="manual-game-tabs" id="manualGameTabs"></div>
+            </section>
+            <section class="card manual-card" id="manualPlayModeField">
+              <div class="section-title">玩法</div>
+              <div class="segment-row manual-play-tabs" id="manualPlayModeTabs"></div>
+            </section>
+            <section class="card manual-picker-card">
+              <div class="manual-picker-head">
+                <div><div class="section-title section-title-no-margin">手动选择号码</div><div class="manual-picker-sub" id="manualPickerHint">按规则选择一注号码</div></div>
+                <button class="mini-clear" id="manualClearBtn" type="button">清空</button>
+              </div>
+              <div class="manual-picker" id="manualPicker"></div>
+              <button class="manual-add-line-btn" id="manualAddLineBtn" type="button" disabled>＋ 加入这一注</button>
+            </section>
+            <section class="card manual-draft-card">
+              <div class="manual-draft-head"><div><strong>待加入票夹</strong><span id="manualDraftSummary">暂无号码</span></div><div class="manual-multiple"><button id="manualMultipleMinusBtn" type="button">−</button><span id="manualMultipleText">1倍</span><button id="manualMultiplePlusBtn" type="button">＋</button></div></div>
+              <div id="manualDraftList" class="ticket-list empty">请先完成一注号码</div>
+              <button class="tool-btn tool-btn-primary manual-save-btn" id="manualSaveBtn" type="button" disabled>确认已购买并加入票夹</button>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+
     <div class="detail-sheet" id="detailSheet" hidden>
       <button class="detail-sheet-backdrop" id="detailSheetBackdrop" type="button" aria-label="关闭详情"></button>
       <section class="detail-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="detailSheetTitle">
-        <div class="detail-sheet-head">
-          <div>
-            <div class="detail-sheet-title" id="detailSheetTitle">彩种统计</div>
-            <div class="detail-sheet-sub" id="detailSheetSub">本地记录汇总</div>
-          </div>
-          <button class="detail-sheet-close" id="detailSheetCloseBtn" type="button" aria-label="关闭">×</button>
-        </div>
+        <div class="detail-sheet-head"><div><div class="detail-sheet-title" id="detailSheetTitle">统计详情</div><div class="detail-sheet-sub" id="detailSheetSub">本地记录汇总</div></div><button class="detail-sheet-close" id="detailSheetCloseBtn" type="button" aria-label="关闭">×</button></div>
         <div class="detail-sheet-body" id="detailSheetBody"></div>
       </section>
     </div>
@@ -415,13 +457,7 @@
     <div class="ticket-scan" id="ticketScan" hidden>
       <button class="ticket-scan-backdrop" id="ticketScanBackdrop" type="button" aria-label="关闭扫描彩票"></button>
       <section class="ticket-scan-panel" role="dialog" aria-modal="true" aria-labelledby="ticketScanTitle">
-        <header class="ticket-scan-head">
-          <div>
-            <div class="ticket-scan-title" id="ticketScanTitle">扫描彩票</div>
-            <div class="ticket-scan-sub" id="ticketScanSub">图片只在本机识别，不会上传</div>
-          </div>
-          <button class="ticket-scan-close" id="ticketScanCloseBtn" type="button" aria-label="关闭">×</button>
-        </header>
+        <header class="ticket-scan-head"><div><div class="ticket-scan-title" id="ticketScanTitle">扫描彩票</div><div class="ticket-scan-sub" id="ticketScanSub">图片只在本机识别，不会上传</div></div><button class="ticket-scan-close" id="ticketScanCloseBtn" type="button" aria-label="关闭">×</button></header>
         <div class="ticket-scan-body" id="ticketScanBody"></div>
         <div class="ticket-scan-overlay" id="ticketScanOverlay"></div>
         <input id="ticketScanInput" type="file" accept="image/*" hidden>

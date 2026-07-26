@@ -10,8 +10,15 @@ const headers = fs.readFileSync(path.join(root, "web/_headers"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "web/manifest.webmanifest"), "utf8"));
 
 assert.match(html, /<title>彩票夹<\/title>/);
-assert.match(html, /data-view="random" aria-label="试玩"/);
+assert.match(html, /data-view="home" aria-label="首页"/);
 assert.match(html, /data-view="check" aria-label="票夹"/);
+assert.match(html, /data-view="mine" aria-label="设置"/);
+assert.doesNotMatch(html, /data-view="random" aria-label="试玩"/);
+assert.match(html, /id="ticketAdd"/);
+assert.match(html, /id="manualGameTabs"/);
+assert.match(html, /id="drawCarouselDots"/);
+assert.match(html, /data-profit-range="month"/);
+assert.match(html, /id="homeMonthlyChart"/);
 assert.match(html, /data-view-panel="monthly"/);
 assert.match(html, /数据状态中心/);
 assert.match(html, /id="drawUpdateNotice"/);
@@ -28,7 +35,12 @@ assert.match(headers, /\/sw\.js[\s\S]*no-cache/, "service worker updates should 
 assert.match(app, /LotteryPrizeRules\.evaluateTicket/, "app should use the standalone prize rules module");
 assert.match(app, /backupChecksum/, "backup v2 should include integrity checking");
 assert.match(app, /renderMonthlyStats/, "monthly statistics should be wired");
+assert.match(app, /const APP_VERSION = "3\.0\.0"/);
+assert.match(app, /renderWalletTickets/, "electronic ticket wallet should be wired");
+assert.match(app, /renderManualTool/, "all-game manual picker should be wired");
+assert.match(app, /scrollDrawCarouselToGame/, "latest draws should support swipe and dot navigation");
+assert.match(app, /本地记录 · 非官方票据 · 不作为兑奖凭证/, "wallet tickets must be clearly marked as local records");
 assert.match(app, /开奖号码尚未更新，请稍后再试/, "stale same-day draw data should be visible");
 assert.doesNotMatch(app, /frontend_schedule_inference/, "the frontend must not invent draw issues");
 
-console.log("Product v2 tests passed");
+console.log("Product v3 tests passed");

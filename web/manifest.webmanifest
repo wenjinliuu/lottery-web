@@ -2,7 +2,7 @@
   "id": "./",
   "name": "彩票夹",
   "short_name": "彩票夹",
-  "description": "本地优先的彩票号码试玩、票据记录、开奖核对与月度统计工具。",
+  "description": "本地优先的彩票扫描、电子票夹、开奖核对与月度统计工具。",
   "lang": "zh-CN",
   "start_url": "./?source=pwa",
   "scope": "./",

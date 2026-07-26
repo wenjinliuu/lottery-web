@@ -9,8 +9,8 @@
   const GAME_ORDER = GAME_ROWS.flat();
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
-  const DEFAULT_VISIBLE_DRAWS = new Set(["ssq", "dlt"]);
-  const APP_VERSION = "2.0.0";
+  const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
+  const APP_VERSION = "3.0.0";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -36,7 +36,7 @@
     draftTickets: [],
     draws: [],
     records: [],
-    activeView: "random",
+    activeView: "home",
     showAllDraws: false,
     latestUpdatedAt: "",
     historyGameKey: "ssq",
@@ -45,7 +45,16 @@
     loadedHistoryGames: new Set(),
     historyLoadingGames: new Set(),
     recordFilterGame: "all",
-    profitRange: "all",
+    profitRange: "month",
+    walletStatusFilter: "all",
+    expandedWalletBatches: new Set(),
+    drawCarouselIndex: 0,
+    ticketAddStep: "intro",
+    manualGameKey: "ssq",
+    manualPlayMode: "",
+    manualSelection: {},
+    manualTickets: [],
+    manualMultiple: 1,
     ticketScanResult: null,
     ticketScanPreview: "",
     ticketScanBusy: false,
@@ -83,6 +92,7 @@
     /* 自动确定首屏彩种后，再同步一次今日开奖 chip 的激活态。 */
     renderTodayRecommend();
     randomizeTickets();
+    renderHomeDashboard();
     renderBackupHint();
     renderDataStatus();
   }
@@ -109,7 +119,14 @@
       "lastBackupHint",
       "draftDrawTag", "draftDrawRefreshBtn",
       "monthlyStatsBtn", "monthlyBackBtn", "monthPrevBtn", "monthNextBtn", "monthCurrentLabel", "monthlySummary", "monthlyKpis", "monthlyCalendar", "monthlyGameChart", "monthlyCompareChart",
-      "dataStatusCard", "dataStatusSummary", "dataStatusDot", "dataStatusGrid", "dataStatusRefreshBtn", "pwaInstallBtn"
+      "dataStatusCard", "dataStatusSummary", "dataStatusDot", "dataStatusGrid", "dataStatusRefreshBtn", "pwaInstallBtn",
+      "homeNotificationBtn", "homeNotificationBadge", "homeOverviewSub", "homeOverviewMoreBtn", "homeScanTicketBtn", "latestDrawMoreBtn", "drawCarouselDots", "homeMonthlyChart", "homeMonthlySub",
+      "walletSubtitle", "walletTotalTickets", "walletPendingTickets", "walletWonTickets", "walletFilterChips", "addTicketBtn",
+      "autoCheckToggleBtn", "autoCheckToggleSub",
+      "ticketAdd", "ticketAddBackdrop", "ticketAddBackBtn", "ticketAddCloseBtn", "ticketAddTitle", "ticketAddSub", "ticketAddIntro", "randomToolView", "manualToolView",
+      "addScanTicketBtn", "addAlbumTicketBtn", "openRandomToolBtn", "openManualToolBtn",
+      "manualGameTabs", "manualPlayModeField", "manualPlayModeTabs", "manualPickerHint", "manualPicker", "manualClearBtn", "manualAddLineBtn",
+      "manualDraftSummary", "manualDraftList", "manualMultipleMinusBtn", "manualMultiplePlusBtn", "manualMultipleText", "manualSaveBtn"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -157,6 +174,64 @@
     if (themeColor) themeColor.setAttribute("content", isDark ? "#0b0f1c" : "#f7f7f7");
     if (els.themeToggleBtn) els.themeToggleBtn.setAttribute("aria-checked", String(isDark));
     if (els.themeToggleSub) els.themeToggleSub.textContent = THEME_LABELS[normalizedMode];
+  }
+
+  const AUTO_CHECK_STORAGE_KEY = "lottery-auto-check-v1";
+
+  function getAutoCheckEnabled() {
+    try { return localStorage.getItem(AUTO_CHECK_STORAGE_KEY) !== "off"; }
+    catch (error) { return true; }
+  }
+
+  function setAutoCheckEnabled(enabled) {
+    try { localStorage.setItem(AUTO_CHECK_STORAGE_KEY, enabled ? "on" : "off"); }
+    catch (error) { /* private mode */ }
+  }
+
+  function renderAutoCheckPreference() {
+    const enabled = getAutoCheckEnabled();
+    if (els.autoCheckToggleBtn) {
+      els.autoCheckToggleBtn.setAttribute("aria-checked", String(enabled));
+      els.autoCheckToggleBtn.classList.toggle("is-on", enabled);
+    }
+    if (els.autoCheckToggleSub) els.autoCheckToggleSub.textContent = enabled ? "已开启 · 每次打开时核对待开奖票据" : "已关闭 · 仅手动核对";
+  }
+
+  function openTicketAdd(step = "intro") {
+    if (!els.ticketAdd) return;
+    els.ticketAdd.hidden = false;
+    document.body.classList.add("ticket-add-open");
+    showTicketAddStep(step);
+  }
+
+  function closeTicketAdd() {
+    if (!els.ticketAdd) return;
+    els.ticketAdd.hidden = true;
+    document.body.classList.remove("ticket-add-open");
+    state.ticketAddStep = "intro";
+  }
+
+  function showTicketAddStep(step = "intro") {
+    state.ticketAddStep = ["random", "manual"].includes(step) ? step : "intro";
+    const intro = state.ticketAddStep === "intro";
+    if (els.ticketAddIntro) els.ticketAddIntro.hidden = !intro;
+    if (els.randomToolView) els.randomToolView.hidden = state.ticketAddStep !== "random";
+    if (els.manualToolView) els.manualToolView.hidden = state.ticketAddStep !== "manual";
+    if (els.ticketAddBackBtn) els.ticketAddBackBtn.hidden = intro;
+    if (els.ticketAddTitle) els.ticketAddTitle.textContent = intro ? "添加到票夹" : state.ticketAddStep === "random" ? "随机选号" : "手动录入号码";
+    if (els.ticketAddSub) {
+      els.ticketAddSub.textContent = intro
+        ? "记录已经在线下正规渠道购买的彩票"
+        : state.ticketAddStep === "random"
+          ? "生成号码后，请确认已在线下完成购买再加入票夹"
+          : "选择一张普通单式票的号码并加入票夹";
+    }
+    if (state.ticketAddStep === "random") {
+      renderDraftHead();
+      renderDraft();
+    }
+    if (state.ticketAddStep === "manual") renderManualTool();
+    els.ticketAdd?.querySelector(".ticket-add-scroll")?.scrollTo({ top: 0, behavior: "auto" });
   }
 
   /* ===== iOS 26 Liquid Glass — View Transitions (with reduce-motion fallback) ===== */
@@ -217,19 +292,19 @@
       applyPlayModeChange();
     });
     els.randomBtn.addEventListener("click", randomizeTickets);
-    els.saveBtn.addEventListener("click", () => saveDraftRecords(true));
+    els.saveBtn.addEventListener("click", () => saveDraftRecords(true, "random"));
     els.clearDraftBtn.addEventListener("click", () => {
       if (state.draftTickets.length && !window.confirm(`清空当前 ${state.draftTickets.length} 注未保存号码？`)) return;
       state.draftTickets = [];
       renderDraft();
     });
-    els.reloadDrawsBtn.addEventListener("click", async () => {
+    els.reloadDrawsBtn?.addEventListener("click", async () => {
       await refreshNextDrawData(false);
       await ensurePendingRecordDraws();
       await checkAllRecords();
       toast("开奖与日历数据已刷新");
     });
-    els.toggleDrawsBtn.addEventListener("click", () => {
+    els.toggleDrawsBtn?.addEventListener("click", () => {
       state.showAllDraws = !state.showAllDraws;
       renderDraws();
     });
@@ -242,20 +317,51 @@
     });
     if (els.draftDrawRefreshBtn) els.draftDrawRefreshBtn.addEventListener("click", () => refreshNextDrawData(true));
     if (els.scanTicketBtn) els.scanTicketBtn.addEventListener("click", openTicketScan);
+    if (els.homeScanTicketBtn) els.homeScanTicketBtn.addEventListener("click", openTicketScan);
+    if (els.addTicketBtn) els.addTicketBtn.addEventListener("click", () => openTicketAdd("intro"));
+    if (els.ticketAddBackdrop) els.ticketAddBackdrop.addEventListener("click", closeTicketAdd);
+    if (els.ticketAddCloseBtn) els.ticketAddCloseBtn.addEventListener("click", closeTicketAdd);
+    if (els.ticketAddBackBtn) els.ticketAddBackBtn.addEventListener("click", () => showTicketAddStep("intro"));
+    if (els.addScanTicketBtn) els.addScanTicketBtn.addEventListener("click", () => {
+      closeTicketAdd();
+      openTicketScan();
+    });
+    if (els.addAlbumTicketBtn) els.addAlbumTicketBtn.addEventListener("click", () => {
+      closeTicketAdd();
+      openTicketScan();
+      window.setTimeout(() => els.ticketScanInput?.click(), 80);
+    });
+    if (els.openRandomToolBtn) els.openRandomToolBtn.addEventListener("click", () => showTicketAddStep("random"));
+    if (els.openManualToolBtn) els.openManualToolBtn.addEventListener("click", () => showTicketAddStep("manual"));
+    if (els.homeOverviewMoreBtn) els.homeOverviewMoreBtn.addEventListener("click", openMonthlyStatsView);
+    if (els.latestDrawMoreBtn) els.latestDrawMoreBtn.addEventListener("click", () => openGameHistory(GAME_ORDER[state.drawCarouselIndex] || "ssq"));
+    if (els.homeNotificationBtn) els.homeNotificationBtn.addEventListener("click", openNotificationSheet);
     if (els.ticketScanBackdrop) els.ticketScanBackdrop.addEventListener("click", closeTicketScan);
     if (els.ticketScanCloseBtn) els.ticketScanCloseBtn.addEventListener("click", closeTicketScan);
     if (els.ticketScanInput) els.ticketScanInput.addEventListener("change", handleTicketScanFile);
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
     if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
     if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
-    if (els.wonRecordsBackBtn) els.wonRecordsBackBtn.addEventListener("click", () => switchView("mine"));
-    if (els.mineWonRecordsBtn) els.mineWonRecordsBtn.addEventListener("click", openWonRecordsView);
+    if (els.wonRecordsBackBtn) els.wonRecordsBackBtn.addEventListener("click", () => switchView("home"));
+    if (els.mineWonRecordsBtn) els.mineWonRecordsBtn.addEventListener("click", () => {
+      state.walletStatusFilter = "pending";
+      switchView("check");
+      renderWalletTickets();
+    });
     if (els.monthlyStatsBtn) els.monthlyStatsBtn.addEventListener("click", openMonthlyStatsView);
-    if (els.monthlyBackBtn) els.monthlyBackBtn.addEventListener("click", () => switchView("mine"));
+    if (els.monthlyBackBtn) els.monthlyBackBtn.addEventListener("click", () => switchView("home"));
     if (els.monthPrevBtn) els.monthPrevBtn.addEventListener("click", () => changeStatsMonth(-1));
     if (els.monthNextBtn) els.monthNextBtn.addEventListener("click", () => changeStatsMonth(1));
     if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.addEventListener("click", refreshDataStatus);
     if (els.pwaInstallBtn) els.pwaInstallBtn.addEventListener("click", installPwa);
+    if (els.autoCheckToggleBtn) {
+      els.autoCheckToggleBtn.addEventListener("click", () => {
+        const enabled = !getAutoCheckEnabled();
+        setAutoCheckEnabled(enabled);
+        renderAutoCheckPreference();
+        toast(enabled ? "已开启打开应用时自动核对" : "已关闭自动核对，可在票夹手动核对");
+      });
+    }
     window.addEventListener("online", renderDataStatus);
     window.addEventListener("offline", renderDataStatus);
     window.addEventListener("lottery:pwa-state", (event) => {
@@ -268,6 +374,7 @@
     if (els.detailSheetCloseBtn) els.detailSheetCloseBtn.addEventListener("click", closeDetailSheet);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && els.detailSheet && !els.detailSheet.hidden) closeDetailSheet();
+      if (event.key === "Escape" && els.ticketAdd && !els.ticketAdd.hidden) closeTicketAdd();
       if (event.key === "Escape" && els.ticketScan && !els.ticketScan.hidden) {
         const expandedPreview = els.ticketScanBody?.querySelector(".scan-preview-zoom.is-expanded");
         if (expandedPreview) expandedPreview.classList.remove("is-expanded");
@@ -304,6 +411,8 @@
         renderProfitChart();
       });
     }
+    bindManualToolEvents();
+    renderAutoCheckPreference();
   }
 
   function syncPlayModeOptions() {
@@ -431,6 +540,10 @@
   }
 
   function switchView(view) {
+    if (view === "random" || view === "numberTool") {
+      openTicketAdd("random");
+      return;
+    }
     withViewTransition(() => {
       state.activeView = view;
       document.querySelectorAll("[data-view-panel]").forEach((panel) => {
@@ -443,8 +556,7 @@
         else btn.removeAttribute("aria-current");
       });
       renderHero();
-      /* 进 random 时刷新开奖日期标注（处理停售时刻跨越） */
-      if (view === "random") renderDraftHead();
+      if (view === "home") renderHomeDashboard();
       if (view === "mine") {
         renderBackupHint();
         renderDataStatus();
@@ -553,6 +665,7 @@
       const label = els.pwaInstallBtn.querySelector("span");
       if (label) label.textContent = state.pwaState.manualInstall ? "查看安装方法" : "安装到桌面";
     }
+    renderHomeNotificationBadge();
   }
 
   function getChinaNowParts(now = new Date()) {
@@ -660,20 +773,11 @@
     els.todayRecommendChips.querySelectorAll("[data-today-game]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const g = btn.dataset.todayGame;
-        if (!g || g === state.gameKey) {
-          if (state.activeView !== "random") switchView("random");
-          return;
-        }
+        if (!g) return;
         state.gameKey = g;
-        els.gameSelect.value = g;
-        renderGameTabs();
-        syncPlayModeOptions();
-        syncDefaultPrice();
-        renderCountTabs();
-        state.draftTickets = [];
-        randomizeTickets();
-        renderAll();
-        if (state.activeView !== "random") switchView("random");
+        renderTodayRecommend();
+        if (state.activeView !== "home") switchView("home");
+        requestAnimationFrame(() => scrollDrawCarouselToGame(g));
       });
     });
   }
@@ -916,7 +1020,8 @@
 
   async function loadRecords() {
     state.records = await dbGetAll();
-    await checkAllRecords(false);
+    if (getAutoCheckEnabled()) await checkAllRecords(false);
+    else renderRecords();
   }
 
   async function reconcileInferredRecords(showToast = true) {
@@ -1006,12 +1111,12 @@
     renderDraft();
   }
 
-  async function saveDraftRecords(copyAfter = false) {
+  async function saveDraftRecords(copyAfter = false, source = "number-tool") {
     if (!state.draftTickets.length) {
       toast("请先生成号码");
-      return;
+      return false;
     }
-    if (!ensureResponsibleAcknowledgement()) return;
+    if (!ensureResponsibleAcknowledgement()) return false;
 
     const now = new Date().toISOString();
     const multiple = clampInt(els.multipleInput.value, 1, 99);
@@ -1020,7 +1125,7 @@
     const targetDraw = getNextDrawTarget(state.gameKey);
     if (!targetDraw.available) {
       toast(targetDraw.message);
-      return;
+      return false;
     }
 
     /* iOS Safari 修复：剪贴板必须在 await 之前同步触发，
@@ -1059,6 +1164,7 @@
         status: "pending",
         resultText: "待核对",
         prizeAmount: 0,
+        source,
         createdAt: now,
         updatedAt: now
       };
@@ -1067,7 +1173,9 @@
     for (const record of records) await dbPut(record);
     state.records = await dbGetAll();
     renderRecords();
-    const viewAction = { label: "查看", onClick: () => switchView("check") };
+    closeTicketAdd();
+    switchView("check");
+    const viewAction = { label: "查看票夹", onClick: () => switchView("check") };
     if (copyAfter) {
       if (copyOk) {
         toast(`已保存并复制 ${records.length} 注`, viewAction);
@@ -1084,6 +1192,7 @@
     } else {
       toast(`已保存 ${records.length} 注`, viewAction);
     }
+    return true;
   }
 
   function ensureResponsibleAcknowledgement() {
@@ -1463,7 +1572,7 @@
       : "暂无号码";
     if (!state.draftTickets.length) {
       els.draftList.className = "ticket-list empty-state";
-      els.draftList.textContent = "点击“重新随机”生成试玩号码";
+      els.draftList.textContent = "点击“重新随机”生成号码";
       return;
     }
     els.draftList.className = "ticket-list";
@@ -1491,18 +1600,16 @@
   }
 
   function renderDraws() {
-    els.toggleDrawsBtn.innerHTML = state.showAllDraws
-      ? `${ICON.chevronUp}<span>收起</span>`
-      : `${ICON.chevronDown}<span>展开</span>`;
-    const visibleGames = state.showAllDraws ? GAME_ORDER : GAME_ORDER.filter((gameKey) => DEFAULT_VISIBLE_DRAWS.has(gameKey));
+    if (!els.latestDraws) return;
+    const visibleGames = GAME_ORDER.filter((gameKey) => DEFAULT_VISIBLE_DRAWS.has(gameKey));
     const latestCards = visibleGames.map((gameKey, idx) => {
       const draw = getLatestDraw(gameKey);
       const config = GAME_CONFIGS[gameKey];
       if (!draw) {
-        return `<article class="draw-card draw-card-${gameKey}" style="--stagger-i:${idx}"><div class="draw-head"><div class="draw-title">${config.label}</div><span class="draw-meta-tag">暂无数据</span></div></article>`;
+        return `<article class="draw-card draw-card-${gameKey}" data-draw-slide="${gameKey}" style="--stagger-i:${idx}"><div class="draw-head"><div class="draw-title">${config.label}</div><span class="draw-meta-tag">暂无数据</span></div><div class="draw-card-empty">等待开奖仓库更新</div></article>`;
       }
       return `
-        <article class="draw-card draw-card-${gameKey}" style="--stagger-i:${idx}">
+        <article class="draw-card draw-card-${gameKey}" data-draw-slide="${gameKey}" style="--stagger-i:${idx}">
           <div class="draw-top">
             <div class="draw-title">${config.label}</div>
             <span class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</span>
@@ -1519,8 +1626,60 @@
     els.latestDraws.querySelectorAll("[data-history-game]").forEach((btn) => {
       btn.addEventListener("click", () => openGameHistory(btn.dataset.historyGame));
     });
+    renderDrawCarouselDots();
+    els.latestDraws.onscroll = () => {
+      window.clearTimeout(renderDraws.scrollTimer);
+      renderDraws.scrollTimer = window.setTimeout(syncDrawCarouselIndex, 70);
+    };
+    window.requestAnimationFrame(() => {
+      const activeGame = GAME_ORDER[state.drawCarouselIndex] || GAME_ORDER[0];
+      const activeCard = els.latestDraws?.querySelector(`[data-draw-slide="${activeGame}"]`);
+      if (activeCard && state.drawCarouselIndex > 0) {
+        els.latestDraws.scrollLeft = Math.max(0, activeCard.offsetLeft - els.latestDraws.offsetLeft);
+      }
+    });
 
     renderHistory();
+  }
+
+  function renderDrawCarouselDots() {
+    if (!els.drawCarouselDots) return;
+    els.drawCarouselDots.innerHTML = GAME_ORDER.map((gameKey, index) => `
+      <button class="draw-carousel-dot${index === state.drawCarouselIndex ? " is-active" : ""}" type="button" data-draw-dot="${gameKey}" aria-label="查看${GAME_CONFIGS[gameKey]?.label || gameKey}" aria-pressed="${index === state.drawCarouselIndex}"></button>
+    `).join("");
+    els.drawCarouselDots.querySelectorAll("[data-draw-dot]").forEach((btn) => btn.addEventListener("click", () => scrollDrawCarouselToGame(btn.dataset.drawDot)));
+  }
+
+  function syncDrawCarouselIndex() {
+    if (!els.latestDraws) return;
+    const cards = Array.from(els.latestDraws.querySelectorAll("[data-draw-slide]"));
+    if (!cards.length) return;
+    const left = els.latestDraws.getBoundingClientRect().left;
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+    cards.forEach((card, index) => {
+      const distance = Math.abs(card.getBoundingClientRect().left - left);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    });
+    if (bestIndex === state.drawCarouselIndex) return;
+    state.drawCarouselIndex = bestIndex;
+    state.gameKey = GAME_ORDER[bestIndex] || state.gameKey;
+    renderDrawCarouselDots();
+    renderTodayRecommend();
+  }
+
+  function scrollDrawCarouselToGame(gameKey) {
+    if (!els.latestDraws) return;
+    const card = els.latestDraws.querySelector(`[data-draw-slide="${gameKey}"]`);
+    if (!card) return;
+    state.drawCarouselIndex = Math.max(0, GAME_ORDER.indexOf(gameKey));
+    state.gameKey = gameKey;
+    card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+    renderDrawCarouselDots();
+    renderTodayRecommend();
   }
 
   async function openGameHistory(gameKey) {
@@ -1559,11 +1718,7 @@
   }
 
   function renderRecords() {
-    const visibleRecords = getCheckVisibleRecords();
-    renderRecordGroups(els.recordList, visibleRecords, {
-      emptyText: "暂无本期或上期彩票记录，完整记录在“我的”页查看",
-      deleteScope: "check"
-    });
+    renderWalletTickets();
     renderMyRecordsList();
     renderWonRecordsList();
     renderMineStats();
@@ -1586,6 +1741,139 @@
     const latestTime = parseApiDate(latest.openDate || latest.time || "");
     if (targetTime && latestTime) return latestTime <= targetTime;
     return formatDate(record.createdAt) === formatDate(new Date());
+  }
+
+  function getWalletBatchStatus(batch) {
+    const records = batch?.records || [];
+    if (records.some((record) => record.status === "pending" || !record.status)) return "pending";
+    if (records.some((record) => record.status === "prize_float")) return "float";
+    const won = records.filter((record) => record.status === "won");
+    if (won.length && won.every((record) => record.redeemedAt)) return "redeemed";
+    if (won.length) return "won";
+    return "lost";
+  }
+
+  function getWalletStatusLabel(status) {
+    return { pending: "待开奖", won: "已中奖", lost: "未中奖", redeemed: "已兑奖", float: "奖金待定" }[status] || "待核对";
+  }
+
+  function renderWalletFilters() {
+    if (!els.walletFilterChips) return;
+    const options = [
+      { key: "all", label: "全部" },
+      { key: "pending", label: "待开奖" },
+      { key: "won", label: "已中奖" },
+      { key: "lost", label: "未中奖" },
+      { key: "redeemed", label: "已兑奖" }
+    ];
+    els.walletFilterChips.innerHTML = options.map((option) => {
+      const active = state.walletStatusFilter === option.key;
+      return `<button class="wallet-filter-btn${active ? " is-active" : ""}" type="button" data-wallet-filter="${option.key}" aria-pressed="${active}">${option.label}</button>`;
+    }).join("");
+    els.walletFilterChips.querySelectorAll("[data-wallet-filter]").forEach((btn) => btn.addEventListener("click", () => {
+      state.walletStatusFilter = btn.dataset.walletFilter || "all";
+      renderWalletTickets();
+    }));
+  }
+
+  function renderWalletTickets() {
+    if (!els.recordList) return;
+    renderWalletFilters();
+    const allBatches = groupRecordsByBatch(state.records);
+    const pendingBatches = allBatches.filter((batch) => getWalletBatchStatus(batch) === "pending");
+    const wonBatches = allBatches.filter((batch) => ["won", "redeemed", "float"].includes(getWalletBatchStatus(batch)));
+    if (els.walletTotalTickets) els.walletTotalTickets.textContent = String(allBatches.length);
+    if (els.walletPendingTickets) els.walletPendingTickets.textContent = String(pendingBatches.length);
+    if (els.walletWonTickets) els.walletWonTickets.textContent = String(wonBatches.length);
+    if (els.walletSubtitle) els.walletSubtitle.textContent = `${allBatches.length} 张本地电子票 · ${pendingBatches.length} 张待核对`;
+
+    const batches = state.walletStatusFilter === "all"
+      ? allBatches
+      : allBatches.filter((batch) => getWalletBatchStatus(batch) === state.walletStatusFilter);
+    if (!batches.length) {
+      els.recordList.className = "wallet-ticket-list empty empty-cta";
+      els.recordList.innerHTML = `
+        <div>${allBatches.length ? "当前筛选下暂无票据" : "票夹还是空的，扫描实体彩票后会显示在这里"}</div>
+        <button class="mini-blue has-icon" type="button" data-wallet-add-empty>
+          <svg class="icn" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>添加彩票</span>
+        </button>
+      `;
+      els.recordList.querySelector("[data-wallet-add-empty]")?.addEventListener("click", () => openTicketAdd("intro"));
+      return;
+    }
+
+    els.recordList.className = "wallet-ticket-list";
+    els.recordList.innerHTML = batches.map((batch, index) => renderWalletTicket(batch, index)).join("");
+    els.recordList.querySelectorAll("[data-wallet-expand]").forEach((btn) => btn.addEventListener("click", () => {
+      const id = btn.dataset.walletExpand;
+      if (state.expandedWalletBatches.has(id)) state.expandedWalletBatches.delete(id);
+      else state.expandedWalletBatches.add(id);
+      renderWalletTickets();
+    }));
+    els.recordList.querySelectorAll("[data-delete-batch]").forEach((btn) => btn.addEventListener("click", () => deleteRecordsByBatch(btn.dataset.deleteBatch)));
+    els.recordList.querySelectorAll("[data-wallet-redeem]").forEach((btn) => btn.addEventListener("click", () => toggleBatchRedeemed(btn.dataset.walletRedeem)));
+  }
+
+  function renderWalletTicket(batch, index) {
+    const records = batch.records || [];
+    const first = records[0] || {};
+    const stats = summarizeRecords(records);
+    const gameKey = first.gameKey || "unknown";
+    const status = getWalletBatchStatus(batch);
+    const expanded = state.expandedWalletBatches.has(batch.batchId);
+    const visible = expanded ? records : records.slice(0, 3);
+    const issue = first.targetExpect || first.expect || "待定";
+    const openDate = first.targetOpenDate || first.openDate || "";
+    const prizeText = stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize);
+    const hasWinningRecord = records.some((record) => record.status === "won");
+    const allWinningRedeemed = hasWinningRecord && records.filter((record) => record.status === "won").every((record) => record.redeemedAt);
+    return `
+      <article class="wallet-ticket wallet-ticket-${gameKey}" style="--stagger-i:${index}">
+        <div class="wallet-ticket-top">
+          <div>
+            <div class="wallet-ticket-game">${GAME_CONFIGS[gameKey]?.label || gameKey}</div>
+            <div class="wallet-ticket-issue">第 ${issue} 期</div>
+          </div>
+          <span class="wallet-status is-${status}">${getWalletStatusLabel(status)}</span>
+        </div>
+        <div class="wallet-ticket-meta">
+          <span>购买 ${formatDateTime(batch.createdAt)}</span>
+          <span>${openDate ? `开奖 ${normalizeDate(openDate)}` : "开奖日期待确认"}</span>
+          <span>${records.length} 注 · ${first.multiple || 1} 倍</span>
+        </div>
+        <div class="wallet-ticket-lines">
+          ${visible.map((record, lineIndex) => `
+            <div class="wallet-ticket-line">
+              <span class="wallet-line-no">${String(lineIndex + 1).padStart(2, "0")}</span>
+              ${renderTicketBalls(record.gameKey, record.numbers, record.matched, FINAL_RECORD_STATUSES.has(record.status) && record.matched)}
+            </div>
+          `).join("")}
+        </div>
+        ${records.length > 3 ? `<button class="wallet-expand-btn" type="button" data-wallet-expand="${batch.batchId}">${expanded ? "收起号码" : `展开其余 ${records.length - 3} 注`}</button>` : ""}
+        <div class="wallet-ticket-summary">
+          <div><span>票面花费</span><strong>${formatCompactMoney(stats.totalCost)}</strong></div>
+          <div><span>中奖金额</span><strong>${prizeText}</strong></div>
+        </div>
+        <div class="wallet-ticket-actions">
+          ${hasWinningRecord ? `<button class="wallet-redeem-action${allWinningRedeemed ? " is-redeemed" : ""}" type="button" data-wallet-redeem="${batch.batchId}">${allWinningRedeemed ? "已兑奖" : "标记已兑奖"}</button>` : ""}
+          <button class="delete-btn has-icon" type="button" data-delete-batch="${batch.batchId}">${ICON.trash}<span>删除</span></button>
+        </div>
+        <div class="wallet-ticket-watermark">本地记录 · 非官方票据 · 不作为兑奖凭证</div>
+      </article>
+    `;
+  }
+
+  async function toggleBatchRedeemed(batchId) {
+    const records = state.records.filter((record) => (record.batchId || record.id) === batchId && record.status === "won");
+    if (!records.length) return;
+    const markRedeemed = !records.every((record) => record.redeemedAt);
+    const now = new Date().toISOString();
+    for (const record of records) {
+      await dbPut({ ...record, redeemedAt: markRedeemed ? now : "", updatedAt: now });
+    }
+    state.records = await dbGetAll();
+    renderRecords();
+    toast(markRedeemed ? "整张票已标记为已兑奖" : "已恢复为待兑奖");
   }
 
   function renderMyRecordsList() {
@@ -1629,12 +1917,12 @@
       container.className = "record-list empty empty-cta";
       container.innerHTML = `
         <div>当前筛选下暂无彩票记录</div>
-        <button class="mini-blue has-icon" type="button" data-empty-go-random>
+        <button class="mini-blue has-icon" type="button" data-empty-add-ticket>
           <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-          <span>先去试玩</span>
+          <span>添加彩票</span>
         </button>
       `;
-      container.querySelector("[data-empty-go-random]")?.addEventListener("click", () => switchView("random"));
+      container.querySelector("[data-empty-add-ticket]")?.addEventListener("click", () => openTicketAdd("intro"));
       return;
     }
     const batches = groupRecordsByBatch(records);
@@ -1686,13 +1974,13 @@
       container.className = "record-list empty empty-cta";
       container.innerHTML = `
         <div>${options.emptyText || "暂无保存记录"}</div>
-        <button class="mini-blue has-icon" type="button" data-empty-go-random>
+        <button class="mini-blue has-icon" type="button" data-empty-add-ticket>
           <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-          <span>先去试玩</span>
+          <span>添加彩票</span>
         </button>
       `;
-      const goBtn = container.querySelector("[data-empty-go-random]");
-      if (goBtn) goBtn.addEventListener("click", () => switchView("random"));
+      const goBtn = container.querySelector("[data-empty-add-ticket]");
+      if (goBtn) goBtn.addEventListener("click", () => openTicketAdd("intro"));
       return;
     }
     const groups = groupRecordsByGame(records);
@@ -1779,7 +2067,7 @@
       <article class="record-card random-ticket-${record.gameKey}">
         <div class="record-ticket-meta">
           <div class="record-ticket-line">
-            <span>${playText || "试玩"}</span>
+            <span>${playText || "普通"}</span>
             <span>成本 ${formatMoney(cost)}</span>
             <span>${record.multiple || 1}倍</span>
           </div>
@@ -1868,15 +2156,134 @@
   }
 
   function renderMineStats() {
-    const stats = getMineStats();
+    const stats = buildHomeMonthOverview();
     if (els.mineTotalCost) els.mineTotalCost.textContent = formatCompactMoney(stats.totalCost);
     if (els.minePrizeTotal) els.minePrizeTotal.textContent = stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize);
     if (els.mineWinRate) els.mineWinRate.textContent = `${stats.winRate}%`;
-    if (els.mineWonCount) els.mineWonCount.textContent = String(stats.wonCount);
+    if (els.mineWonCount) els.mineWonCount.textContent = String(stats.pendingBatches);
     if (els.mineRecordSummary) {
-      els.mineRecordSummary.textContent = `共 ${stats.totalRecords} 条 · 待开奖 ${stats.pendingCount} 条 · 已花 ${formatMoney(stats.totalCost)}`;
+      const all = getMineStats();
+      els.mineRecordSummary.textContent = `共 ${groupRecordsByBatch(state.records).length} 张票 · ${all.totalRecords} 注 · 已花 ${formatMoney(all.totalCost)}`;
     }
     renderProfitChart();
+    renderHomeMonthlyChart(stats);
+    renderHomeNotificationBadge();
+  }
+
+  function buildHomeMonthOverview() {
+    const cursor = new Date();
+    const monthKey = getMonthKey(cursor);
+    const records = state.records.filter((record) => getRecordProfitDate(record).startsWith(monthKey));
+    const stats = summarizeRecords(records);
+    const batches = groupRecordsByBatch(records);
+    const pendingBatches = batches.filter((batch) => getWalletBatchStatus(batch) === "pending").length;
+    const games = new Map();
+    records.forEach((record) => {
+      const gameKey = record.gameKey || "unknown";
+      if (!games.has(gameKey)) games.set(gameKey, { gameKey, cost: 0, count: 0 });
+      const game = games.get(gameKey);
+      game.cost += Number(record.price || 0) * Number(record.multiple || 1);
+      game.count += 1;
+    });
+    return {
+      ...stats,
+      records,
+      batches,
+      pendingBatches,
+      games: Array.from(games.values()).sort((a, b) => b.cost - a.cost)
+    };
+  }
+
+  function renderHomeDashboard() {
+    renderHero();
+    renderMineStats();
+    renderDraws();
+    renderDataStatus();
+  }
+
+  function renderHomeMonthlyChart(stats = buildHomeMonthOverview()) {
+    if (!els.homeMonthlyChart) return;
+    const games = stats.games.filter((game) => game.cost > 0);
+    if (els.homeMonthlySub) {
+      els.homeMonthlySub.textContent = stats.records.length
+        ? `${stats.batches.length} 张票 · ${stats.records.length} 注`
+        : "本月还没有彩票记录";
+    }
+    if (els.homeOverviewSub) {
+      els.homeOverviewSub.textContent = stats.records.length
+        ? `${stats.batches.length} 张电子票 · ${stats.pendingBatches} 张待核对`
+        : "扫描实体彩票后，这里会生成本月概览";
+    }
+    if (!games.length || !stats.totalCost) {
+      els.homeMonthlyChart.innerHTML = `<div class="home-monthly-empty">暂无统计数据</div>`;
+      return;
+    }
+    const circumference = 2 * Math.PI * 38;
+    let offset = 0;
+    const segments = games.map((game) => {
+      const share = game.cost / stats.totalCost;
+      const dash = share * circumference;
+      const node = `<circle class="monthly-donut-segment" cx="52" cy="52" r="38" stroke="${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"/>`;
+      offset += dash;
+      return node;
+    }).join("");
+    const legend = games.slice(0, 5).map((game) => `
+      <div class="home-monthly-legend-item">
+        <span class="monthly-legend-dot" style="background:${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}"></span>
+        <span>${GAME_CONFIGS[game.gameKey]?.label || game.gameKey}</span>
+        <strong>${Math.round((game.cost / stats.totalCost) * 100)}%</strong>
+      </div>
+    `).join("");
+    els.homeMonthlyChart.innerHTML = `
+      <div class="home-donut-wrap">
+        <div class="home-donut-figure">
+          <svg class="home-donut" viewBox="0 0 104 104" role="img" aria-label="本月各彩种花费占比"><circle class="monthly-donut-track" cx="52" cy="52" r="38"/>${segments}</svg>
+          <div class="home-donut-center"><strong>${formatCompactMoney(stats.totalCost)}</strong><span>本月花费</span></div>
+        </div>
+        <div class="home-monthly-legend">${legend}</div>
+      </div>
+    `;
+  }
+
+  function renderHomeNotificationBadge() {
+    if (!els.homeNotificationBadge) return;
+    const pending = groupRecordsByBatch(state.records).filter((batch) => getWalletBatchStatus(batch) === "pending").length;
+    const backupWarn = getBackupHealth().tone === "warn" ? 1 : 0;
+    const staleDraw = getPendingDrawUpdates().length ? 1 : 0;
+    const count = pending + backupWarn + staleDraw;
+    els.homeNotificationBadge.hidden = !count;
+    els.homeNotificationBadge.textContent = count > 9 ? "9+" : String(count);
+  }
+
+  function openNotificationSheet() {
+    if (!els.detailSheet || !els.detailSheetBody) return;
+    const pendingBatches = groupRecordsByBatch(state.records).filter((batch) => getWalletBatchStatus(batch) === "pending");
+    const backup = getBackupHealth();
+    const dataModel = getDataStatusModel();
+    els.detailSheetTitle.textContent = "提醒中心";
+    els.detailSheetSub.textContent = "票据、开奖数据与本地备份";
+    els.detailSheetBody.innerHTML = `
+      <div class="notification-list">
+        <button class="notification-item" type="button" data-notice-wallet>
+          <span class="notification-icon is-blue">票</span>
+          <span><strong>${pendingBatches.length ? `${pendingBatches.length} 张彩票等待核对` : "暂无待核对彩票"}</strong><small>${pendingBatches.length ? "开奖数据更新后会在打开应用时自动核对" : "票夹状态正常"}</small></span>
+        </button>
+        <div class="notification-item">
+          <span class="notification-icon is-${dataModel.tone === "ok" ? "green" : "orange"}">数</span>
+          <span><strong>${dataModel.summary}</strong><small>可在设置的数据状态中心查看详情</small></span>
+        </div>
+        <div class="notification-item">
+          <span class="notification-icon is-${backup.tone === "ok" ? "green" : "orange"}">备</span>
+          <span><strong>${backup.shortText}</strong><small>${backup.text}</small></span>
+        </div>
+      </div>
+    `;
+    els.detailSheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    els.detailSheetBody.querySelector("[data-notice-wallet]")?.addEventListener("click", () => {
+      closeDetailSheet();
+      switchView("check");
+    });
   }
 
   function openGameStatsSheet() {
@@ -1910,6 +2317,220 @@
     if (!els.detailSheet) return;
     els.detailSheet.hidden = true;
     document.body.classList.remove("sheet-open");
+  }
+
+  /* ===== 全彩种普通单式手动选号 ===== */
+
+  function bindManualToolEvents() {
+    els.manualClearBtn?.addEventListener("click", () => {
+      state.manualSelection = {};
+      renderManualPicker();
+    });
+    els.manualAddLineBtn?.addEventListener("click", () => {
+      const ticket = buildManualTicket();
+      if (!ticket) return;
+      state.manualTickets.push(ticket);
+      state.manualSelection = {};
+      renderManualTool();
+    });
+    els.manualMultipleMinusBtn?.addEventListener("click", () => {
+      state.manualMultiple = Math.max(1, state.manualMultiple - 1);
+      renderManualDraft();
+    });
+    els.manualMultiplePlusBtn?.addEventListener("click", () => {
+      state.manualMultiple = Math.min(99, state.manualMultiple + 1);
+      renderManualDraft();
+    });
+    els.manualSaveBtn?.addEventListener("click", async () => {
+      if (!state.manualTickets.length) return;
+      state.gameKey = state.manualGameKey;
+      state.playMode = state.manualPlayMode;
+      state.dltAddOn = state.manualGameKey === "dlt" && state.manualPlayMode === "add";
+      state.draftTickets = state.manualTickets.map((ticket) => ({ ...ticket }));
+      if (els.gameSelect) els.gameSelect.value = state.gameKey;
+      if (els.multipleInput) els.multipleInput.value = String(state.manualMultiple);
+      if (els.priceInput) els.priceInput.value = String(getCurrentTicketPrice());
+      const saved = await saveDraftRecords(false, "manual");
+      if (saved) {
+        state.manualTickets = [];
+        state.manualSelection = {};
+        state.manualMultiple = 1;
+        renderGameTabs();
+        syncPlayModeOptions();
+        syncDefaultPrice();
+        renderCountTabs();
+      }
+    });
+  }
+
+  function getManualModes(gameKey) {
+    if (gameKey === "dlt") return [{ key: "normal", label: "普通" }, { key: "add", label: "追加" }];
+    if (gameKey === "k8") return GAME_CONFIGS.k8.playModes;
+    if (gameKey === "fc3d" || gameKey === "pl3") return digitModes();
+    return [];
+  }
+
+  function resetManualDraft(nextGameKey = state.manualGameKey, nextMode = "") {
+    state.manualGameKey = nextGameKey;
+    const modes = getManualModes(nextGameKey);
+    state.manualPlayMode = nextMode || GAME_CONFIGS[nextGameKey]?.defaultPlayMode || modes[0]?.key || "";
+    state.manualSelection = {};
+    state.manualTickets = [];
+    state.manualMultiple = 1;
+  }
+
+  function renderManualTool() {
+    if (!els.manualGameTabs) return;
+    els.manualGameTabs.innerHTML = GAME_ORDER.map((key) => {
+      const active = key === state.manualGameKey;
+      return `<button class="manual-game-tab today-chip-${key}${active ? " is-active" : ""}" type="button" data-manual-game="${key}" aria-pressed="${active}">${GAME_CONFIGS[key].label}</button>`;
+    }).join("");
+    els.manualGameTabs.querySelectorAll("[data-manual-game]").forEach((btn) => btn.addEventListener("click", () => {
+      const key = btn.dataset.manualGame;
+      if (key === state.manualGameKey) return;
+      resetManualDraft(key);
+      renderManualTool();
+    }));
+
+    const modes = getManualModes(state.manualGameKey);
+    if (els.manualPlayModeField) els.manualPlayModeField.hidden = !modes.length;
+    if (els.manualPlayModeTabs) {
+      els.manualPlayModeTabs.dataset.accent = GAME_CONFIGS[state.manualGameKey]?.accent || "";
+      els.manualPlayModeTabs.innerHTML = modes.map((mode) => {
+        const active = mode.key === state.manualPlayMode;
+        return `<button class="segment-btn${active ? " segment-btn-active" : ""}" type="button" data-manual-mode="${mode.key}" aria-pressed="${active}">${mode.label}</button>`;
+      }).join("");
+      els.manualPlayModeTabs.querySelectorAll("[data-manual-mode]").forEach((btn) => btn.addEventListener("click", () => {
+        if (btn.dataset.manualMode === state.manualPlayMode) return;
+        state.manualPlayMode = btn.dataset.manualMode;
+        state.manualSelection = {};
+        state.manualTickets = [];
+        renderManualTool();
+      }));
+    }
+    renderManualPicker();
+    renderManualDraft();
+  }
+
+  function getManualSections() {
+    const gameKey = state.manualGameKey;
+    if (gameKey === "ssq") return [
+      { key: "red", label: "红球", helper: "选择 6 个", min: 1, max: 33, count: 6, tone: "red" },
+      { key: "blue", label: "蓝球", helper: "选择 1 个", min: 1, max: 16, count: 1, tone: "blue" }
+    ];
+    if (gameKey === "dlt") return [
+      { key: "front", label: "前区", helper: "选择 5 个", min: 1, max: 35, count: 5, tone: "blue" },
+      { key: "back", label: "后区", helper: "选择 2 个", min: 1, max: 12, count: 2, tone: "yellow" }
+    ];
+    if (gameKey === "k8") return [
+      { key: "nums", label: GAME_CONFIGS.k8.playModes.find((mode) => mode.key === state.manualPlayMode)?.label || "快乐8", helper: `选择 ${clampInt(state.manualPlayMode, 1, 10)} 个`, min: 1, max: 80, count: clampInt(state.manualPlayMode, 1, 10), tone: "k8orange" }
+    ];
+    if (gameKey === "qlc") return [
+      { key: "nums7", label: "基本号", helper: "选择 7 个", min: 1, max: 30, count: 7, tone: "yellow" }
+    ];
+    if (gameKey === "fc3d" || gameKey === "pl3") {
+      if (state.manualPlayMode === "group3") {
+        return [{ key: "nums3", label: "组三号码", helper: "选择 2 个数字，第一个作为重号", min: 0, max: 9, count: 2, tone: gameKey === "fc3d" ? "fc3d" : "plum" }];
+      }
+      if (state.manualPlayMode === "group6") {
+        return [{ key: "nums3", label: "组六号码", helper: "选择 3 个不同数字", min: 0, max: 9, count: 3, tone: gameKey === "fc3d" ? "fc3d" : "plum" }];
+      }
+      return ["百位", "十位", "个位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, count: 1, positional: true, tone: gameKey === "fc3d" ? "fc3d" : "plum" }));
+    }
+    if (gameKey === "pl5") {
+      return ["万位", "千位", "百位", "十位", "个位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, count: 1, positional: true, tone: "plum" }));
+    }
+    if (gameKey === "qxc") {
+      return [
+        ...["第一位", "第二位", "第三位", "第四位", "第五位", "第六位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, count: 1, positional: true, tone: "indigo" })),
+        { key: "tail", label: "特别号", helper: "选择 1 个（0–14）", min: 0, max: 14, count: 1, positional: true, tone: "amber" }
+      ];
+    }
+    return [];
+  }
+
+  function renderManualPicker() {
+    if (!els.manualPicker) return;
+    const sections = getManualSections();
+    const selectedCount = sections.reduce((sum, section) => sum + (state.manualSelection[section.key]?.length || 0), 0);
+    const requiredCount = sections.reduce((sum, section) => sum + section.count, 0);
+    if (els.manualPickerHint) els.manualPickerHint.textContent = `已选 ${selectedCount}/${requiredCount} · ${GAME_CONFIGS[state.manualGameKey]?.label || ""}`;
+    els.manualPicker.innerHTML = sections.map((section) => {
+      const selected = state.manualSelection[section.key] || [];
+      const balls = Array.from({ length: section.max - section.min + 1 }, (_, index) => section.min + index).map((number) => {
+        const active = selected.includes(number);
+        return `<button class="manual-ball is-${section.tone}${active ? " is-selected" : ""}" type="button" data-manual-section="${section.key}" data-manual-number="${number}" aria-pressed="${active}">${pad(number, section.max <= 14 && section.min === 0 ? 1 : 2)}</button>`;
+      }).join("");
+      return `<section class="manual-section"><div class="manual-section-head"><strong>${section.label}</strong><span>${section.helper}</span></div><div class="manual-ball-grid${section.positional ? " is-positional" : ""}">${balls}</div></section>`;
+    }).join("");
+    els.manualPicker.querySelectorAll("[data-manual-section]").forEach((btn) => btn.addEventListener("click", () => {
+      const section = sections.find((item) => item.key === btn.dataset.manualSection);
+      if (!section) return;
+      const number = Number(btn.dataset.manualNumber);
+      const values = (state.manualSelection[section.key] || []).slice();
+      const existing = values.indexOf(number);
+      if (existing >= 0 && !section.positional) values.splice(existing, 1);
+      else if (section.positional || section.count === 1) values.splice(0, values.length, number);
+      else if (values.length < section.count) values.push(number);
+      else {
+        toast(`${section.label}最多选择 ${section.count} 个`);
+        return;
+      }
+      state.manualSelection[section.key] = values;
+      renderManualPicker();
+    }));
+    if (els.manualAddLineBtn) els.manualAddLineBtn.disabled = !isManualSelectionComplete();
+  }
+
+  function isManualSelectionComplete() {
+    return getManualSections().every((section) => (state.manualSelection[section.key] || []).length === section.count);
+  }
+
+  function buildManualTicket() {
+    if (!isManualSelectionComplete()) return null;
+    const value = (key) => (state.manualSelection[key] || []).slice().sort((a, b) => a - b);
+    const ordered = (count) => Array.from({ length: count }, (_, index) => (state.manualSelection[`pos${index}`] || [])[0]);
+    if (state.manualGameKey === "ssq") return { red: value("red"), blue: value("blue") };
+    if (state.manualGameKey === "dlt") return { front: value("front"), back: value("back"), playMode: state.manualPlayMode, addOn: state.manualPlayMode === "add" };
+    if (state.manualGameKey === "k8") return { nums: value("nums"), playCount: clampInt(state.manualPlayMode, 1, 10), playMode: state.manualPlayMode };
+    if (state.manualGameKey === "qlc") return { nums7: value("nums7") };
+    if (state.manualGameKey === "fc3d" || state.manualGameKey === "pl3") {
+      if (state.manualPlayMode === "group3") {
+        const nums = state.manualSelection.nums3.slice();
+        return { nums3: [nums[0], nums[0], nums[1]], playMode: "group3" };
+      }
+      if (state.manualPlayMode === "group6") return { nums3: value("nums3"), playMode: "group6" };
+      return { nums3: ordered(3), playMode: "single" };
+    }
+    if (state.manualGameKey === "pl5") return { nums5: ordered(5) };
+    if (state.manualGameKey === "qxc") return { nums6: ordered(6), tail: (state.manualSelection.tail || [0])[0] };
+    return null;
+  }
+
+  function renderManualDraft() {
+    if (!els.manualDraftList) return;
+    const count = state.manualTickets.length;
+    const price = (GAME_CONFIGS[state.manualGameKey]?.price || 2) + (state.manualGameKey === "dlt" && state.manualPlayMode === "add" ? 1 : 0);
+    const total = count * state.manualMultiple * price;
+    if (els.manualMultipleText) els.manualMultipleText.textContent = `${state.manualMultiple}倍`;
+    if (els.manualDraftSummary) els.manualDraftSummary.textContent = count ? `${count} 注 · ${formatMoney(total)}` : "暂无号码";
+    if (!count) {
+      els.manualDraftList.className = "ticket-list empty-state";
+      els.manualDraftList.textContent = "请先完成一注号码";
+    } else {
+      els.manualDraftList.className = "ticket-list";
+      els.manualDraftList.innerHTML = state.manualTickets.map((ticket, index) => `
+        <article class="ticket-card random-ticket-${state.manualGameKey}">
+          <div class="ticket-head"><div class="ticket-head-left"><span class="ticket-no">第 ${index + 1} 注</span><span class="ticket-meta-inline">${GAME_CONFIGS[state.manualGameKey].label} · ${formatPlayMode(ticket.playMode || state.manualPlayMode) || "普通"}</span></div><button class="delete-btn" type="button" data-manual-delete="${index}">删除</button></div>
+          ${renderTicketBalls(state.manualGameKey, ticket)}
+        </article>
+      `).join("");
+      els.manualDraftList.querySelectorAll("[data-manual-delete]").forEach((btn) => btn.addEventListener("click", () => {
+        state.manualTickets.splice(Number(btn.dataset.manualDelete), 1);
+        renderManualDraft();
+      }));
+    }
+    if (els.manualSaveBtn) els.manualSaveBtn.disabled = !count;
   }
 
   /* ===== 本地 OCR 扫描彩票 ===== */
@@ -2291,6 +2912,7 @@
     closeTicketScan();
     await ensurePendingRecordDraws();
     await checkAllRecords(false);
+    switchView("check");
     toast(`已从彩票导入 ${records.length} 注`);
   }
 
@@ -2328,15 +2950,14 @@
     if (!series.days.length) {
       els.profitChartWrap.innerHTML = `
         <div class="profit-empty empty-cta" id="profitEmpty">
-          <div>暂无数据，先去试玩吧</div>
-          <button class="mini-blue has-icon" type="button" data-empty-go-random>
-            <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M3 21l8-8"/><path d="M16 21h5v-5"/><path d="M3 3l5 5"/></svg>
-            <span>去试玩</span>
+          <div>暂无完整开奖记录</div>
+          <button class="mini-blue has-icon" type="button" data-empty-add-ticket>
+            <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg>
+            <span>扫描彩票</span>
           </button>
         </div>
       `;
-      const goBtn = els.profitChartWrap.querySelector("[data-empty-go-random]");
-      if (goBtn) goBtn.addEventListener("click", () => switchView("random"));
+      els.profitChartWrap.querySelector("[data-empty-add-ticket]")?.addEventListener("click", openTicketScan);
       return;
     }
     els.profitChartWrap.innerHTML = buildProfitChartSvg(series);
@@ -2344,13 +2965,18 @@
   }
 
   function buildDailyProfitSeries(records, range = "all") {
-    const settled = (records || [])
+    let settled = (records || [])
       .filter((r) => r && (r.status === "won" || r.status === "lost") && r.createdAt)
       .slice()
       .sort((a, b) => {
         const dateCompare = getRecordProfitDate(a).localeCompare(getRecordProfitDate(b));
         return dateCompare || String(a.createdAt).localeCompare(String(b.createdAt));
       });
+
+    if (range === "month") {
+      const monthKey = getMonthKey(new Date());
+      settled = settled.filter((record) => getRecordProfitDate(record).startsWith(monthKey));
+    }
 
     const dayMap = new Map();
     settled.forEach((record) => {
@@ -2360,12 +2986,15 @@
     });
     const availableDates = Array.from(dayMap.keys()).sort();
     if (!availableDates.length) {
-      return { days: [], costTotal: 0, prizeTotal: 0, netTotal: 0, openingBalance: 0, closingBalance: 0, rangeLabel: range === "all" ? "全部" : `最近${range}天` };
+      return { days: [], costTotal: 0, prizeTotal: 0, netTotal: 0, openingBalance: 0, closingBalance: 0, rangeLabel: range === "all" ? "全部记录" : range === "month" ? "本月" : `最近${range}天` };
     }
 
     const endDate = availableDates[availableDates.length - 1];
     let startDate = availableDates[0];
-    if (range !== "all") {
+    if (range === "month") {
+      const now = new Date();
+      startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    } else if (range !== "all") {
       const date = new Date(`${endDate}T12:00:00`);
       date.setDate(date.getDate() - Math.max(0, Number(range) - 1));
       startDate = formatDate(date);
@@ -2431,7 +3060,7 @@
       netTotal: prizeTotal - costTotal,
       openingBalance,
       closingBalance: balance,
-      rangeLabel: range === "all" ? "全部记录" : `最近${range}天`
+      rangeLabel: range === "all" ? "全部记录" : range === "month" ? "本月" : `最近${range}天`
     };
   }
 
