@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="彩票夹">
-    <link rel="manifest" href="./manifest.webmanifest?v=3.3.0">
+    <link rel="manifest" href="./manifest.webmanifest?v=3.4.0">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <style>[hidden] { display: none !important; }</style>
     <script>
@@ -24,7 +24,7 @@
         if (themeColor) themeColor.setAttribute("content", theme === "dark" ? "#0b0f1c" : "#f7f7f7");
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=3.3.0">
+    <link rel="stylesheet" href="./styles.css?v=3.4.0">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%A4%B9%3C/text%3E%3C/svg%3E">
   </head>
   <body>
@@ -45,8 +45,8 @@
               <div class="profit-head">
                 <div class="profit-head-left">
                   <div class="profit-title">累计盈亏</div>
-                  <div class="profit-sub" id="profitSub">全部记录</div>
                 </div>
+                <div class="profit-net-value is-neutral" id="profitNetValue">0元</div>
               </div>
               <div class="profit-chart-wrap" id="profitChartWrap">
                 <div class="profit-empty" id="profitEmpty">暂无完整数据</div>
@@ -102,24 +102,26 @@
 
       <section class="view-section" data-view-panel="check" hidden>
         <div class="wallet-page">
-          <header class="page-action-row wallet-header">
-            <span class="sr-only" id="walletSubtitle">本地记录 · 自动核对</span>
-            <div class="wallet-header-actions">
-              <button class="round-action-btn" id="scanTicketBtn" type="button" aria-label="直接扫描彩票">
-                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
-              </button>
-              <button class="round-action-btn wallet-more-btn" id="walletMoreBtn" type="button" aria-label="查看全部彩票记录"><span aria-hidden="true">•••</span></button>
-            </div>
-          </header>
+          <div class="wallet-sticky-shell">
+            <header class="page-action-row wallet-header">
+              <span class="sr-only" id="walletSubtitle">本地记录 · 自动核对</span>
+              <div class="wallet-header-actions">
+                <button class="round-action-btn" id="scanTicketBtn" type="button" aria-label="直接扫描彩票">
+                  <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
+                </button>
+                <button class="round-action-btn wallet-more-btn" id="walletMoreBtn" type="button" aria-label="查看全部彩票记录"><span aria-hidden="true">•••</span></button>
+              </div>
+            </header>
 
-          <div class="wallet-filter-row">
-            <div class="wallet-filter-chips" id="walletFilterChips" role="group" aria-label="筛选票据状态"></div>
-            <button class="wallet-recheck-btn" id="checkRecordsBtn" type="button">
-              <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
-              <span>重新核对</span>
-            </button>
+            <div class="wallet-filter-row">
+              <div class="wallet-filter-chips" id="walletFilterChips" role="group" aria-label="筛选票据状态"></div>
+              <button class="wallet-recheck-btn" id="checkRecordsBtn" type="button">
+                <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M9 12l2 2 4-4"/></svg>
+                <span>重新核对</span>
+              </button>
+            </div>
+            <div class="wallet-filter-summary" id="walletFilterSummary">全部 · 暂无记录</div>
           </div>
-          <div class="wallet-filter-summary" id="walletFilterSummary">全部 · 暂无记录</div>
           <div id="recordList" class="wallet-ticket-list empty" aria-live="polite">暂无彩票记录</div>
           <button class="wallet-floating-add" id="addTicketBtn" type="button" aria-label="添加彩票"><span aria-hidden="true">＋</span></button>
         </div>
@@ -258,7 +260,7 @@
 
       <section class="view-section" data-view-panel="monthly" hidden>
         <div class="monthly-page">
-          <div class="history-head monthly-head">
+          <div class="history-head monthly-head sticky-secondary-head">
             <div class="history-title-wrap"><div class="history-title">统计</div><div class="history-sub" id="monthlySummary">按开奖日期汇总本地记录</div></div>
             <button class="mini-blue has-icon" id="monthlyBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
           </div>
@@ -435,9 +437,9 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./rules.js?v=3.3.0"></script>
-    <script src="./ocr.js?v=3.3.0"></script>
-    <script src="./pwa.js?v=3.3.0"></script>
-    <script src="./app.js?v=3.3.0"></script>
+    <script src="./rules.js?v=3.4.0"></script>
+    <script src="./ocr.js?v=3.4.0"></script>
+    <script src="./pwa.js?v=3.4.0"></script>
+    <script src="./app.js?v=3.4.0"></script>
   </body>
 </html>

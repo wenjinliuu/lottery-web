@@ -4702,3 +4702,442 @@ body { width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .wallet-winning-sparkles i { animation: none; opacity: .55; }
 }
+
+/* ==========================================================================
+   v3.4 — 粘性玻璃栏、统计交互与电子票精修
+   ========================================================================== */
+
+/* 首页收益：去掉范围说明小字，恢复醒目的期间盈亏，并扩大绘图区。 */
+.home-profit-card .profit-head {
+  align-items: center;
+  min-height: 34px;
+}
+.home-profit-card .profit-head-left { display: flex; align-items: center; }
+.home-profit-card .profit-net-value {
+  margin-left: auto;
+  font-size: clamp(25px, 7.4vw, 34px);
+  font-weight: 950;
+  letter-spacing: -.045em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.profit-net-value.is-neutral { color: var(--muted-strong); }
+.home-profit-card .profit-chart-wrap {
+  width: calc(100% + 10px);
+  margin-right: -5px;
+  margin-left: -5px;
+}
+.profit-extreme-label { stroke-width: 4px; }
+
+/* 苹果式粘性状态栏：内容保持清晰，毛玻璃在下沿逐步淡出。 */
+.home-header,
+.wallet-sticky-shell,
+.sticky-secondary-head {
+  position: sticky;
+  top: max(0px, var(--safe-top));
+  z-index: 28;
+  isolation: isolate;
+}
+.home-header::before,
+.wallet-sticky-shell::before,
+.sticky-secondary-head::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -12px -18px -24px;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--page) 96%, transparent) 0%,
+      color-mix(in srgb, var(--page) 86%, transparent) 56%,
+      transparent 100%
+    );
+  opacity: .38;
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%);
+  pointer-events: none;
+  transition: opacity .22s ease, backdrop-filter .22s ease;
+}
+.home-header.is-scrolled::before,
+.wallet-sticky-shell.is-scrolled::before,
+.sticky-secondary-head.is-scrolled::before {
+  opacity: 1;
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+}
+.home-header { margin-bottom: -8px; }
+.wallet-sticky-shell {
+  display: grid;
+  gap: 6px;
+  margin: -2px -2px 0;
+  padding: 2px 2px 7px;
+}
+.sticky-secondary-head {
+  min-height: 50px;
+  margin: -2px -2px 0;
+  padding: 4px 2px 9px;
+}
+
+/* 最新开奖轨道彻底透明；无一等奖时号码在卡片内容区垂直居中。 */
+.home-draw-carousel,
+.home-draw-carousel::before,
+.home-draw-carousel::after {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.home-draw-carousel > .draw-card {
+  display: flex;
+  min-height: 132px !important;
+  flex-direction: column;
+  background-clip: padding-box;
+}
+.home-draw-carousel > .draw-card::before,
+.home-draw-carousel > .draw-card::after { display: none !important; }
+.home-draw-carousel .draw-card.no-first-prize .draw-number-row {
+  flex: 1 1 auto;
+  align-content: center;
+  align-items: center;
+  margin-top: 0;
+}
+.home-draw-carousel .draw-card.no-first-prize .draw-number-row .balls {
+  align-content: center;
+}
+
+/* 票夹筛选固定单行：四个筛选加重新核对在所有手机宽度下完整显示。 */
+.wallet-filter-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+  overflow: visible;
+  padding: 0;
+}
+.wallet-filter-row .wallet-filter-chips { display: contents; }
+.wallet-filter-row .wallet-filter-btn,
+.wallet-filter-row .wallet-recheck-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 33px;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+  font-size: 8.5px;
+}
+.wallet-filter-row .wallet-recheck-btn .icn {
+  width: 11px;
+  height: 11px;
+}
+.wallet-filter-btn.is-active {
+  background: linear-gradient(180deg, #4d9cff, #2563eb);
+  box-shadow: none;
+}
+.wallet-filter-badge {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  font-size: 7px;
+}
+.wallet-filter-summary { margin: 0 3px; }
+
+/* 电子票头部：Logo、期号/时间/票面信息与状态删除形成紧凑三列。 */
+.wallet-ticket {
+  overflow: hidden;
+  padding: 14px 13px 11px;
+  border-right-style: solid;
+  border-left-style: solid;
+}
+.wallet-ticket::before,
+.wallet-ticket::after {
+  top: 7px;
+  bottom: 7px;
+  z-index: 4;
+  width: 9px;
+  height: auto;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% 7px, var(--page) 0 3.2px, transparent 3.6px)
+    center top / 9px 14px repeat-y;
+  box-shadow: none;
+  transform: none;
+}
+.wallet-ticket::before { left: -4px; }
+.wallet-ticket::after { right: -4px; }
+.wallet-ticket-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: start;
+}
+.wallet-ticket-identity {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+.wallet-game-badge {
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  padding: 4px;
+  border: 0;
+  cursor: pointer;
+  font-size: 10.5px;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.wallet-game-badge:active { transform: scale(.94); }
+.wallet-ticket-info { min-width: 0; }
+.wallet-ticket-issue { font-size: 12px; }
+.wallet-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 7px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  font-size: 7.5px;
+  line-height: 1.45;
+}
+.wallet-ticket-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+}
+.wallet-ticket-tags > span {
+  padding: 3px 6px;
+  border-radius: 99px;
+  color: var(--muted-strong);
+  background: rgba(100,116,139,.08);
+  font-size: 7.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.wallet-ticket-tags .wallet-play-badge {
+  color: #1d4ed8;
+  background: rgba(59,130,246,.12);
+}
+.wallet-ticket-head-right {
+  min-width: 56px;
+  justify-items: end;
+  gap: 7px;
+}
+.wallet-ticket-head-right .wallet-status {
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wallet-ticket-head-right .wallet-status.is-won,
+.wallet-ticket-head-right .wallet-status.is-float {
+  color: #047857;
+  background: linear-gradient(180deg, rgba(167,243,208,.55), rgba(16,185,129,.12));
+  font-size: 11px;
+}
+.wallet-ticket-delete {
+  min-height: 25px;
+  padding: 0 5px;
+  font-size: 7.5px;
+}
+.wallet-ticket-delete .icn { width: 11px; height: 11px; }
+
+/* 点击彩种圆标后，在第一注上方展开当期开奖号码。 */
+.wallet-draw-panel {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 8px 9px;
+  border-top: 1px dashed rgba(var(--wallet-rgb),.23);
+  border-bottom: 1px dashed rgba(var(--wallet-rgb),.23);
+  border-radius: 10px;
+  background: rgba(var(--wallet-rgb),.045);
+  animation: wallet-draw-reveal .2s ease-out both;
+}
+.wallet-draw-label {
+  color: var(--muted);
+  font-size: 7.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.wallet-draw-panel .balls {
+  justify-content: center;
+  gap: 4px;
+}
+.wallet-draw-panel .ball {
+  width: 23px;
+  height: 23px;
+  min-width: 23px;
+  max-width: 23px;
+  flex: 0 0 23px;
+  aspect-ratio: 1;
+  padding: 0;
+  font-size: 8px;
+}
+@keyframes wallet-draw-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 号码始终正圆、整行居中、等距排列；命中态取消发白外环。 */
+.wallet-ticket-line {
+  grid-template-columns: 21px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+}
+.wallet-ticket-line .balls,
+.wallet-ticket-lines-k8 .wallet-ticket-line .balls {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(5px, 1.7vw, 9px);
+  overflow: visible;
+}
+.wallet-ticket-line .ball {
+  inline-size: 27px;
+  block-size: 27px;
+  min-inline-size: 27px;
+  max-inline-size: 27px;
+  min-block-size: 27px;
+  max-block-size: 27px;
+  flex: 0 0 27px;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+  padding: 0;
+  border-radius: 50%;
+}
+.wallet-ticket .ball.hit { transform: scale(1.04); }
+.wallet-ticket .ball.hit.ball-red { box-shadow: 0 4px 10px rgba(var(--c-red),.38); }
+.wallet-ticket .ball.hit.ball-blue { box-shadow: 0 4px 10px rgba(var(--c-blue),.38); }
+.wallet-ticket .ball.hit.ball-yellow { box-shadow: 0 4px 10px rgba(var(--c-yellow),.38); }
+.wallet-ticket .ball.hit.ball-k8orange { box-shadow: 0 4px 10px rgba(var(--c-orange),.38); }
+.wallet-ticket .ball.hit.ball-fc3d { box-shadow: 0 4px 10px rgba(var(--c-fc3d),.38); }
+.wallet-ticket .ball.hit.ball-plum { box-shadow: 0 4px 10px rgba(var(--c-plum),.38); }
+.wallet-ticket .ball.hit.ball-indigo { box-shadow: 0 4px 10px rgba(var(--c-indigo),.38); }
+.wallet-ticket .ball.hit.ball-amber { box-shadow: 0 4px 10px rgba(var(--c-amber),.38); }
+
+/* 中奖电子票以多彩礼花循环庆祝，粒子层不阻挡票据操作。 */
+.wallet-winning-sparkles { z-index: 1; }
+.wallet-winning-sparkles i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow:
+    0 -14px #fbbf24,
+    10px -10px #fb7185,
+    14px 0 #60a5fa,
+    10px 10px #34d399,
+    0 14px #a78bfa,
+    -10px 10px #f97316,
+    -14px 0 #22d3ee,
+    -10px -10px #fde047;
+  animation: wallet-firework 2.8s ease-out infinite;
+}
+.wallet-winning-sparkles i:nth-child(1) { top: 19%; left: 70%; animation-delay: 0s; }
+.wallet-winning-sparkles i:nth-child(2) { top: 43%; left: 91%; animation-delay: -.75s; }
+.wallet-winning-sparkles i:nth-child(3) { top: 74%; left: 12%; animation-delay: -1.45s; }
+.wallet-winning-sparkles i:nth-child(4) { top: 88%; left: 76%; animation-delay: -2.05s; }
+.wallet-winning-sparkles i:nth-child(5) { top: 54%; left: 48%; animation-delay: -2.5s; }
+@keyframes wallet-firework {
+  0% { opacity: 0; transform: scale(.08); }
+  12% { opacity: .95; }
+  38% { opacity: .86; transform: scale(1); }
+  58%, 100% { opacity: 0; transform: scale(1.25); }
+}
+
+/* 全年柱图：更高、更紧凑；选中月份使用预留边框，不挤占相邻柱。 */
+.monthly-chart-card { padding: 11px 12px 10px; }
+.month-stack-chart {
+  gap: 2px;
+  height: 184px;
+  margin-top: 3px;
+}
+.month-stack-item {
+  grid-template-rows: 15px 146px 16px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 1px;
+  border: 0;
+  background: transparent;
+}
+.month-stack-total { font-size: 6.5px; }
+.month-stack-track {
+  height: 146px;
+  border: 2px solid transparent;
+  border-radius: 6px 6px 3px 3px;
+  box-sizing: border-box;
+}
+.month-stack-item.is-active .month-stack-track {
+  border-color: #f59e0b;
+  outline: 0;
+  box-shadow: 0 0 0 1px rgba(245,158,11,.14);
+}
+.month-stack-item:active .month-stack-track { transform: scaleY(.98); transform-origin: bottom; }
+.month-game-detail-list { display: grid; gap: 8px; }
+.month-game-detail {
+  display: grid;
+  grid-template-columns: 8px minmax(72px,1fr) repeat(3, minmax(48px,.7fr));
+  align-items: center;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 15px;
+  background: var(--glass-tint-soft);
+}
+.month-game-detail-dot {
+  width: 7px;
+  height: 34px;
+  border-radius: 99px;
+  background: var(--detail-color);
+}
+.month-game-detail > div { min-width: 0; }
+.month-game-detail span,
+.month-game-detail small,
+.month-game-detail strong { display: block; }
+.month-game-detail small,
+.month-game-detail > div > span { color: var(--muted); font-size: 7px; font-weight: 800; }
+.month-game-detail strong {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.month-game-detail strong.is-positive { color: #059669; }
+.month-game-detail strong.is-negative { color: #dc2626; }
+
+@media (max-width: 390px) {
+  .wallet-filter-row .wallet-filter-btn,
+  .wallet-filter-row .wallet-recheck-btn { padding: 0 2px; font-size: 8px; }
+  .wallet-game-badge { width: 47px; height: 47px; min-width: 47px; }
+  .wallet-ticket-line .balls,
+  .wallet-ticket-lines-k8 .wallet-ticket-line .balls { gap: 5px; }
+  .wallet-ticket-line .ball {
+    inline-size: clamp(24px, 7vw, 27px);
+    block-size: clamp(24px, 7vw, 27px);
+    min-inline-size: clamp(24px, 7vw, 27px);
+    max-inline-size: clamp(24px, 7vw, 27px);
+    min-block-size: clamp(24px, 7vw, 27px);
+    max-block-size: clamp(24px, 7vw, 27px);
+    flex-basis: clamp(24px, 7vw, 27px);
+  }
+  .month-game-detail { grid-template-columns: 7px minmax(64px,1fr) repeat(3, minmax(42px,.65fr)); gap: 5px; padding: 9px 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-header::before,
+  .wallet-sticky-shell::before,
+  .sticky-secondary-head::before { transition: none; }
+  .wallet-winning-sparkles i { animation: none; opacity: .42; transform: scale(.72); }
+  .wallet-draw-panel { animation: none; }
+}

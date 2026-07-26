@@ -10,7 +10,7 @@
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
-  const APP_VERSION = "3.3.0";
+  const APP_VERSION = "3.4.0";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -48,6 +48,7 @@
     profitRange: "all",
     walletStatusFilter: "all",
     expandedWalletBatches: new Set(),
+    expandedWalletDraws: new Set(),
     drawCarouselIndex: 0,
     ticketAddStep: "intro",
     manualGameKey: "ssq",
@@ -383,6 +384,7 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && state.activeView === "home") scheduleDrawCarouselAuto(1600);
     });
+    window.addEventListener("scroll", syncStickyChrome, { passive: true });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && els.detailSheet && !els.detailSheet.hidden) closeDetailSheet();
       if (event.key === "Escape" && els.ticketAdd && !els.ticketAdd.hidden) closeTicketAdd();
@@ -424,6 +426,15 @@
     }
     bindManualToolEvents();
     renderAutoCheckPreference();
+    syncStickyChrome();
+  }
+
+  function syncStickyChrome() {
+    const scrolling = document.scrollingElement || document.documentElement;
+    const scrolled = Number(scrolling?.scrollTop || window.scrollY || 0) > 8;
+    document.querySelectorAll(".home-header,.wallet-sticky-shell,.sticky-secondary-head").forEach((node) => {
+      node.classList.toggle("is-scrolled", scrolled);
+    });
   }
 
   function syncPlayModeOptions() {
@@ -1655,13 +1666,14 @@
     if (!draw) {
       return `<article class="draw-card draw-card-${gameKey}${expanded ? " is-expanded-list" : ""}" data-draw-slide="${gameKey}" style="--stagger-i:${index}"><div class="draw-top"><div class="draw-title-line"><div class="draw-title">${config.label}</div>${todayTag}</div><span class="draw-meta-tag">暂无数据</span></div><div class="draw-card-empty">等待开奖仓库更新</div></article>`;
     }
+    const firstPrize = renderFirstPrize(draw);
     return `
-      <article class="draw-card draw-card-${gameKey}${expanded ? " is-expanded-list" : ""}" data-draw-slide="${gameKey}" style="--stagger-i:${index}">
+      <article class="draw-card draw-card-${gameKey}${firstPrize ? " has-first-prize" : " no-first-prize"}${expanded ? " is-expanded-list" : ""}" data-draw-slide="${gameKey}" style="--stagger-i:${index}">
         <div class="draw-top">
           <div class="draw-title-line"><div class="draw-title">${config.label}</div>${todayTag}</div>
           <span class="draw-meta-tag">${draw.expect || "未知期"} · ${draw.openDate || draw.time || "未知日期"}</span>
         </div>
-        ${renderFirstPrize(draw)}
+        ${firstPrize}
         <div class="draw-number-row">
           ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode), { compactK8: !expanded })}
           <button class="draw-action-btn" type="button" data-history-game="${gameKey}" aria-label="查看${config.label}往期">${ICON.chevronRight}</button>
@@ -1883,28 +1895,43 @@
     const prizeText = stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize);
     const isWinning = status === "won" || status === "float";
     const isDltAddOn = gameKey === "dlt" && records.some((record) => record.addOn || record.playMode === "add");
+    const draw = findDrawForRecord(first);
+    const drawExpanded = state.expandedWalletDraws.has(batch.batchId);
+    const statusText = status === "won"
+      ? prizeText
+      : status === "float"
+        ? "奖金待定"
+        : getWalletStatusLabel(status);
     return `
       <article class="wallet-ticket wallet-ticket-${gameKey}${isWinning ? " is-winning" : ""}" style="--stagger-i:${index}">
-        ${isWinning ? `<div class="wallet-winning-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>` : ""}
+        ${isWinning ? `<div class="wallet-winning-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>` : ""}
         <div class="wallet-ticket-top">
           <div class="wallet-ticket-identity">
-            <div class="wallet-game-badge">${GAME_CONFIGS[gameKey]?.label || gameKey}</div>
-            <div class="wallet-ticket-issue">第 ${issue} 期</div>
-            ${isDltAddOn ? `<span class="wallet-play-badge">追加</span>` : ""}
-          </div>
-          <div class="wallet-ticket-head-right">
-            <span class="wallet-status is-${status}">${getWalletStatusLabel(status)}</span>
-            <div class="wallet-ticket-money">
-              <span>花费 ${formatCompactMoney(stats.totalCost)}</span>
-              ${isWinning ? `<strong>${stats.floatCount ? "奖金待定" : `中奖 ${prizeText}`}</strong>` : ""}
+            <button class="wallet-game-badge" type="button" data-wallet-draw="${batch.batchId}" aria-expanded="${drawExpanded}" aria-label="${draw ? `${drawExpanded ? "收起" : "查看"}第${issue}期开奖号` : `第${issue}期开奖号码尚未更新`}">${GAME_CONFIGS[gameKey]?.label || gameKey}</button>
+            <div class="wallet-ticket-info">
+              <div class="wallet-ticket-issue">第 ${issue} 期</div>
+              <div class="wallet-ticket-meta">
+                <span>购买 ${formatDateTime(batch.createdAt)}</span>
+                <span>${openDate ? `开奖 ${normalizeDate(openDate)}` : "开奖日期待确认"}</span>
+              </div>
+              <div class="wallet-ticket-tags">
+                <span>${records.length} 注 · ${first.multiple || 1} 倍</span>
+                <span>花费 ${formatCompactMoney(stats.totalCost)}</span>
+                ${isDltAddOn ? `<span class="wallet-play-badge">追加</span>` : ""}
+              </div>
             </div>
           </div>
+          <div class="wallet-ticket-head-right">
+            <span class="wallet-status is-${status}">${statusText}</span>
+            <button class="delete-btn wallet-ticket-delete has-icon" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本张电子票">${ICON.trash}<span>删除</span></button>
+          </div>
         </div>
-        <div class="wallet-ticket-meta">
-          <span>购买 ${formatDateTime(batch.createdAt)}</span>
-          <span>${openDate ? `开奖 ${normalizeDate(openDate)}` : "开奖日期待确认"}</span>
-          <span>${records.length} 注 · ${first.multiple || 1} 倍</span>
-        </div>
+        ${drawExpanded && draw ? `
+          <div class="wallet-draw-panel">
+            <span class="wallet-draw-label">开奖号码</span>
+            ${renderDrawBalls(gameKey, draw.drawValues || parseOpenCodeToDrawValues(gameKey, draw.openCode))}
+          </div>
+        ` : ""}
         <div class="wallet-ticket-lines${gameKey === "k8" ? " wallet-ticket-lines-k8" : ""}">
           ${visible.map((record, lineIndex) => `
             <div class="wallet-ticket-line">
@@ -1914,9 +1941,6 @@
           `).join("")}
         </div>
         ${records.length > 3 ? `<button class="wallet-expand-btn" type="button" data-wallet-expand="${batch.batchId}">${expanded ? "收起号码" : `展开其余 ${records.length - 3} 注`}</button>` : ""}
-        <div class="wallet-ticket-actions">
-          <button class="delete-btn has-icon" type="button" data-delete-batch="${batch.batchId}">${ICON.trash}<span>删除</span></button>
-        </div>
         <div class="wallet-ticket-watermark">本地记录 · 非官方票据 · 请以实体票与官方开奖为准</div>
       </article>
     `;
@@ -1927,6 +1951,18 @@
       const id = btn.dataset.walletExpand;
       if (state.expandedWalletBatches.has(id)) state.expandedWalletBatches.delete(id);
       else state.expandedWalletBatches.add(id);
+      rerender();
+    }));
+    container?.querySelectorAll("[data-wallet-draw]").forEach((btn) => btn.addEventListener("click", () => {
+      const id = btn.dataset.walletDraw;
+      const batch = groupRecordsByBatch(state.records).find((item) => item.batchId === id);
+      const draw = batch?.records?.length ? findDrawForRecord(batch.records[0]) : null;
+      if (!draw) {
+        toast("本期尚未开奖或开奖号码尚未更新");
+        return;
+      }
+      if (state.expandedWalletDraws.has(id)) state.expandedWalletDraws.delete(id);
+      else state.expandedWalletDraws.add(id);
       rerender();
     }));
     container?.querySelectorAll("[data-delete-batch]").forEach((btn) => btn.addEventListener("click", () => deleteRecordsByBatch(btn.dataset.deleteBatch)));
@@ -3050,10 +3086,10 @@
   function renderProfitChart() {
     if (!els.profitChartWrap) return;
     const series = buildDailyProfitSeries(state.records, state.profitRange);
-    if (els.profitSub) {
-      els.profitSub.textContent = series.days.length
-        ? series.rangeLabel
-        : "尚无完整数据";
+    if (els.profitNetValue) {
+      const value = series.netTotal || 0;
+      els.profitNetValue.textContent = `${value > 0 ? "+" : ""}${formatCompactMoney(value)}`;
+      els.profitNetValue.className = `profit-net-value ${value > 0 ? "is-positive" : value < 0 ? "is-negative" : "is-neutral"}`;
     }
     if (!series.days.length) {
       els.profitChartWrap.innerHTML = `
@@ -3161,8 +3197,26 @@
     });
     const costTotal = days.reduce((sum, day) => sum + day.cost, 0);
     const prizeTotal = days.reduce((sum, day) => sum + day.prize, 0);
+    const chartDays = range === "all" && days.length
+      ? [{
+          date: formatDate(new Date(days[0].t - 86400000)),
+          t: days[0].t - 86400000,
+          open: 0,
+          close: 0,
+          high: 0,
+          low: 0,
+          cost: 0,
+          prize: 0,
+          net: 0,
+          count: 0,
+          wonCount: 0,
+          winRate: 0,
+          games: [],
+          isBaseline: true
+        }, ...days]
+      : days;
     return {
-      days,
+      days: chartDays,
       costTotal,
       prizeTotal,
       netTotal: prizeTotal - costTotal,
@@ -3264,8 +3318,11 @@
       const value = days[index].close;
       const x = xOf(index);
       const pointY = yOf(value);
-      const above = kind === "max" || pointY > padT + innerH * 0.56;
-      const labelY = Math.max(10, Math.min(H - padB - 4, pointY + (above ? -8 : 14)));
+      const preferAbove = kind === "max";
+      const canPlaceAbove = pointY - 16 >= 10;
+      const canPlaceBelow = pointY + 19 <= H - padB - 2;
+      const placeAbove = preferAbove ? canPlaceAbove : !canPlaceBelow && canPlaceAbove;
+      const labelY = pointY + (placeAbove ? -13 : 18);
       const tone = value > 0 ? "is-positive" : value < 0 ? "is-negative" : "is-neutral";
       const amount = `${value > 0 ? "+" : ""}${formatChartTick(value)}元`;
       const anchor = x < 34 ? "start" : x > W - 34 ? "end" : "middle";
@@ -3496,10 +3553,39 @@
         return `<span class="month-stack-segment" style="height:${height.toFixed(2)}%;background:${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}" title="${GAME_CONFIGS[game.gameKey]?.label || game.gameKey} ${formatMoney(game.cost)}"></span>`;
       }).join("");
       const active = String(index + 1) === String(selectedMonth);
-      return `<div class="month-stack-item${active ? " is-active" : ""}" aria-label="${year}年${index + 1}月，花费${formatMoney(month.totalCost)}，中奖${formatMoney(month.totalPrize)}"><div class="month-stack-total">${month.totalCost ? formatChartTick(month.totalCost) : ""}</div><div class="month-stack-track">${segments}</div><div class="month-stack-label">${index + 1}</div></div>`;
+      return `<button class="month-stack-item${active ? " is-active" : ""}" type="button" data-month-stack="${index + 1}" aria-label="${year}年${index + 1}月，花费${formatMoney(month.totalCost)}，中奖${formatMoney(month.totalPrize)}，点击查看各彩种明细"><span class="month-stack-total">${month.totalCost ? formatChartTick(month.totalCost) : ""}</span><span class="month-stack-track">${segments}</span><span class="month-stack-label">${index + 1}</span></button>`;
     }).join("");
     const legend = yearGames.map((game) => `<span><i style="background:${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}"></i>${GAME_CONFIGS[game.gameKey]?.label || game.gameKey}</span>`).join("");
     els.monthlyCompareChart.innerHTML = `<div class="month-stack-chart">${bars}</div><div class="month-stack-legend">${legend}</div>`;
+    els.monthlyCompareChart.querySelectorAll("[data-month-stack]").forEach((button) => {
+      button.addEventListener("click", () => openMonthStackDetails(year, button.dataset.monthStack));
+    });
+  }
+
+  function openMonthStackDetails(year, month) {
+    if (!els.detailSheet || !els.detailSheetBody) return;
+    const stats = buildPeriodStats(year, String(month));
+    els.detailSheet.classList.remove("is-fullscreen");
+    els.detailSheetTitle.textContent = `${year}年${month}月`;
+    els.detailSheetSub.textContent = `花费 ${formatMoney(stats.totalCost)} · 中奖 ${formatMoney(stats.totalPrize)} · 盈亏 ${stats.net > 0 ? "+" : ""}${formatMoney(stats.net)}`;
+    els.detailSheetBody.innerHTML = stats.games.length
+      ? `<div class="month-game-detail-list">${stats.games.map((game) => {
+          const net = game.prize - game.cost;
+          return `
+            <article class="month-game-detail" style="--detail-color:${GAME_CHART_COLORS[game.gameKey] || "#94a3b8"}">
+              <span class="month-game-detail-dot"></span>
+              <div><strong>${GAME_CONFIGS[game.gameKey]?.label || game.gameKey}</strong><small>${game.count} 注</small></div>
+              <div><span>花费</span><strong>${formatCompactMoney(game.cost)}</strong></div>
+              <div><span>中奖</span><strong>${formatCompactMoney(game.prize)}</strong></div>
+              <div><span>盈亏</span><strong class="${net > 0 ? "is-positive" : net < 0 ? "is-negative" : ""}">${net > 0 ? "+" : ""}${formatCompactMoney(net)}</strong></div>
+            </article>
+          `;
+        }).join("")}</div>`
+      : `<div class="empty-state">这个月暂无已核对记录</div>`;
+    els.detailSheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    els.detailSheetBody.scrollTop = 0;
+    window.setTimeout(() => els.detailSheetCloseBtn?.focus(), 20);
   }
 
   function formatChartTick(value) {
