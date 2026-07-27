@@ -5639,8 +5639,8 @@ body { width: 100%; }
 }
 
 /*
- * v3.5.1 电子票据视觉回调：
- * 不再裁成尖锐多边形，改用圆润半圆票孔；票面直接沿用最新开奖卡片的淡色玻璃渐变。
+ * v3.5.2 电子票据边缘：
+ * 保留淡色玻璃票面，将规则票孔替换成不等幅、带轻微弧度的自然撕纸边。
  */
 .wallet-ticket {
   --ticket-edge-color: rgba(var(--wallet-rgb), .26);
@@ -5665,26 +5665,38 @@ body { width: 100%; }
   content: "";
   position: absolute;
   z-index: 6;
-  top: 12px !important;
-  bottom: 12px !important;
+  top: 14px !important;
+  bottom: 14px !important;
   inset-inline: auto !important;
-  width: 12px !important;
+  width: 14px !important;
   height: auto !important;
   border: 0 !important;
   border-radius: 0 !important;
   clip-path: none !important;
-  background:
-    radial-gradient(circle at 50% 10px,
-      var(--page) 0 4.15px,
-      var(--ticket-edge-color) 4.25px 4.95px,
-      transparent 5.05px)
-    center top / 12px 20px repeat-y !important;
+  background: var(--page) !important;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='134' viewBox='0 0 14 134'%3E%3Cpath fill='white' d='M0 0H7.1C9.3 4.2 5.4 8.9 7.8 13.8C10.1 18.7 5.7 23.2 7 28.8C8.5 34.1 4.5 39.4 6.6 45.2C8.7 51.3 5 56.8 8.3 62.2C11 67.1 6 73.4 7.9 79.1C10.2 84.8 5.3 91 7.2 97.8C9.1 104.1 4.4 110.4 6.8 117.3C9 123.1 5.8 128.8 7.6 134H0Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 14px 134px;
+  -webkit-mask-position: left top;
+  -webkit-mask-repeat: repeat-y;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='134' viewBox='0 0 14 134'%3E%3Cpath fill='white' d='M0 0H7.1C9.3 4.2 5.4 8.9 7.8 13.8C10.1 18.7 5.7 23.2 7 28.8C8.5 34.1 4.5 39.4 6.6 45.2C8.7 51.3 5 56.8 8.3 62.2C11 67.1 6 73.4 7.9 79.1C10.2 84.8 5.3 91 7.2 97.8C9.1 104.1 4.4 110.4 6.8 117.3C9 123.1 5.8 128.8 7.6 134H0Z'/%3E%3C/svg%3E");
+  mask-size: 14px 134px;
+  mask-position: left top;
+  mask-repeat: repeat-y;
   box-shadow: none !important;
-  transform: none !important;
   pointer-events: none;
 }
-.wallet-ticket::before { left: -6px !important; right: auto !important; }
-.wallet-ticket::after { right: -6px !important; left: auto !important; }
+.wallet-ticket::before {
+  left: -1px !important;
+  right: auto !important;
+  filter: drop-shadow(1px 0 0 var(--ticket-edge-color));
+  transform: none !important;
+}
+.wallet-ticket::after {
+  right: -1px !important;
+  left: auto !important;
+  filter: drop-shadow(1px 0 0 var(--ticket-edge-color));
+  transform: scaleX(-1) !important;
+}
 .wallet-ticket > * { position: relative; z-index: 2; }
 .wallet-ticket.is-winning {
   --ticket-edge-color: rgba(16,185,129,.58);
