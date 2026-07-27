@@ -5379,28 +5379,79 @@ body { width: 100%; }
   top: -8px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 10px;
-  padding: 8px 0 9px;
+  padding: 9px 0 10px;
   background: linear-gradient(180deg, var(--page) 72%, transparent);
 }
 .entry-mode-tabs[hidden] { display: none; }
 .entry-mode-tab {
+  --mode-rgb: 37, 99, 235;
   min-width: 0;
-  min-height: 38px;
-  padding: 0 5px;
+  min-height: 66px;
+  padding: 8px 3px 7px;
   border: 1px solid var(--glass-stroke);
-  border-radius: 14px;
+  border-radius: 18px;
   color: var(--muted-strong);
-  background: var(--glass-tint-soft);
-  font-size: 10px;
+  background:
+    radial-gradient(circle at 78% 12%, rgba(var(--mode-rgb),.10), transparent 52%),
+    rgba(255,255,255,.48);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.70);
+  font-size: 9px;
   font-weight: 900;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
 }
+.entry-mode-tab.mode-random { --mode-rgb: 124, 58, 237; }
+.entry-mode-tab.mode-manual { --mode-rgb: 37, 99, 235; }
+.entry-mode-tab.mode-compound { --mode-rgb: 13, 148, 136; }
+.entry-mode-tab.mode-banker { --mode-rgb: 236, 72, 153; }
+.entry-mode-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 4px;
+  place-items: center;
+  border-radius: 11px;
+  color: rgb(var(--mode-rgb));
+  background: rgba(var(--mode-rgb),.10);
+  box-shadow: inset 0 0 0 1px rgba(var(--mode-rgb),.08);
+}
+.entry-mode-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.entry-mode-label { display: block; white-space: nowrap; }
 .entry-mode-tab.is-active {
+  color: rgb(var(--mode-rgb));
+  border-color: rgba(var(--mode-rgb),.30);
+  background:
+    radial-gradient(circle at 78% 12%, rgba(var(--mode-rgb),.18), transparent 54%),
+    linear-gradient(160deg, rgba(255,255,255,.80), rgba(var(--mode-rgb),.105));
+  box-shadow:
+    0 8px 17px rgba(var(--mode-rgb),.13),
+    inset 0 1px 0 rgba(255,255,255,.82);
+  transform: translateY(-2px);
+}
+.entry-mode-tab.is-active .entry-mode-icon {
   color: #fff;
-  border-color: transparent;
-  background: linear-gradient(180deg, #5ea8ff, #2563eb);
-  box-shadow: 0 7px 16px rgba(37,99,235,.20);
+  background: rgb(var(--mode-rgb));
+  box-shadow: 0 5px 11px rgba(var(--mode-rgb),.22);
+}
+[data-theme="dark"] .entry-mode-tab {
+  background:
+    radial-gradient(circle at 78% 12%, rgba(var(--mode-rgb),.15), transparent 52%),
+    rgba(255,255,255,.035);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055);
+}
+[data-theme="dark"] .entry-mode-tab.is-active {
+  background:
+    radial-gradient(circle at 78% 12%, rgba(var(--mode-rgb),.23), transparent 55%),
+    rgba(var(--mode-rgb),.08);
 }
 .entry-target-card { margin-bottom: 10px; }
 .entry-target-head,
@@ -5457,6 +5508,109 @@ body { width: 100%; }
   padding: 0 12px;
   line-height: 1.2;
 }
+
+/* 录入区统一成淡色玻璃卡，避免高饱和按钮和突兀的灰色块。 */
+#manualToolView,
+#randomToolView { --workspace-rgb: 37, 99, 235; }
+#manualToolView .card,
+#randomToolView .card,
+.entry-target-card {
+  border-color: rgba(148,163,184,.15);
+  background:
+    radial-gradient(circle at 96% 0, rgba(var(--workspace-rgb),.055), transparent 38%),
+    rgba(255,255,255,.52);
+  box-shadow:
+    0 7px 19px rgba(36,48,80,.055),
+    inset 0 1px 0 rgba(255,255,255,.74);
+}
+[data-theme="dark"] #manualToolView .card,
+[data-theme="dark"] #randomToolView .card,
+[data-theme="dark"] .entry-target-card {
+  background:
+    radial-gradient(circle at 96% 0, rgba(var(--workspace-rgb),.10), transparent 40%),
+    rgba(255,255,255,.035);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055);
+}
+.manual-game-tabs { gap: 8px; }
+.manual-game-tab {
+  --manual-accent: 37, 99, 235;
+  min-height: 40px;
+  border-color: rgba(var(--manual-accent),.12);
+  border-radius: 15px;
+  color: var(--muted-strong);
+  background: rgba(var(--manual-accent),.045);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.58);
+}
+.manual-game-tab.today-chip-ssq { --manual-accent: var(--c-red); }
+.manual-game-tab.today-chip-dlt { --manual-accent: var(--c-blue); }
+.manual-game-tab.today-chip-k8 { --manual-accent: var(--c-orange); }
+.manual-game-tab.today-chip-fc3d { --manual-accent: var(--c-fc3d); }
+.manual-game-tab.today-chip-pl3,
+.manual-game-tab.today-chip-pl5 { --manual-accent: var(--c-plum); }
+.manual-game-tab.today-chip-qlc { --manual-accent: var(--c-yellow); }
+.manual-game-tab.today-chip-qxc { --manual-accent: var(--c-indigo); }
+.manual-game-tab.is-active {
+  color: rgb(var(--manual-accent));
+  border-color: rgba(var(--manual-accent),.30);
+  background:
+    radial-gradient(circle at 80% 10%, rgba(var(--manual-accent),.18), transparent 56%),
+    rgba(var(--manual-accent),.09);
+  box-shadow: 0 6px 14px rgba(var(--manual-accent),.12), inset 0 1px 0 rgba(255,255,255,.68);
+}
+.manual-play-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 7px;
+}
+.manual-play-tabs .segment-btn {
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 6px;
+  border: 1px solid rgba(37,99,235,.10);
+  border-radius: 13px;
+  background: rgba(37,99,235,.045);
+  font-size: 9px;
+  line-height: 1.25;
+}
+.manual-play-tabs .segment-btn-active {
+  color: #2563eb;
+  border-color: rgba(37,99,235,.25);
+  background: rgba(37,99,235,.11);
+  box-shadow: 0 5px 12px rgba(37,99,235,.10);
+}
+.manual-picker-card { padding-bottom: 13px; }
+.manual-picker-actions .mini-blue,
+.manual-picker-actions .mini-clear {
+  border: 1px solid rgba(37,99,235,.12);
+  border-radius: 12px;
+  background: rgba(37,99,235,.06);
+  box-shadow: none;
+}
+.manual-picker-actions .mini-clear {
+  color: var(--muted-strong);
+  border-color: rgba(100,116,139,.12);
+  background: rgba(100,116,139,.055);
+}
+.manual-add-line-btn {
+  border: 1px solid rgba(37,99,235,.18);
+  border-radius: 15px;
+  color: #2563eb;
+  background:
+    radial-gradient(circle at 85% 0, rgba(59,130,246,.14), transparent 55%),
+    rgba(37,99,235,.075);
+  box-shadow: 0 7px 15px rgba(37,99,235,.09), inset 0 1px 0 rgba(255,255,255,.65);
+}
+.manual-add-line-btn:disabled {
+  color: var(--muted);
+  border-color: rgba(148,163,184,.12);
+  background: rgba(148,163,184,.05);
+  box-shadow: none;
+}
+.manual-draft-card .manual-save-btn {
+  border-radius: 16px;
+  background: linear-gradient(135deg, #438df4, #2563eb);
+  box-shadow: 0 9px 20px rgba(37,99,235,.18);
+}
 .wallet-entry-badge {
   color: #2563eb !important;
   background: rgba(37,99,235,.09) !important;
@@ -5485,100 +5639,125 @@ body { width: 100%; }
 }
 
 /*
- * 电子票据最终轮廓：父层只承担一圈随锯齿走向的彩色边缘，
- * ::before 是唯一纸面，::after 只负责玻璃高光。旧矩形边框与半圆缺口全部失效。
+ * v3.5.1 电子票据视觉回调：
+ * 不再裁成尖锐多边形，改用圆润半圆票孔；票面直接沿用最新开奖卡片的淡色玻璃渐变。
  */
 .wallet-ticket {
-  --ticket-edge-color: rgba(var(--wallet-rgb), .48);
-  --ticket-cut: polygon(
-    2% 0, 98% 0,
-    100% 2%, 98.25% 4%, 100% 6%, 98.25% 8%, 100% 10%, 98.25% 12%,
-    100% 14%, 98.25% 16%, 100% 18%, 98.25% 20%, 100% 22%, 98.25% 24%,
-    100% 26%, 98.25% 28%, 100% 30%, 98.25% 32%, 100% 34%, 98.25% 36%,
-    100% 38%, 98.25% 40%, 100% 42%, 98.25% 44%, 100% 46%, 98.25% 48%,
-    100% 50%, 98.25% 52%, 100% 54%, 98.25% 56%, 100% 58%, 98.25% 60%,
-    100% 62%, 98.25% 64%, 100% 66%, 98.25% 68%, 100% 70%, 98.25% 72%,
-    100% 74%, 98.25% 76%, 100% 78%, 98.25% 80%, 100% 82%, 98.25% 84%,
-    100% 86%, 98.25% 88%, 100% 90%, 98.25% 92%, 100% 94%, 98.25% 96%,
-    100% 98%, 98% 100%, 2% 100%,
-    0 98%, 1.75% 96%, 0 94%, 1.75% 92%, 0 90%, 1.75% 88%,
-    0 86%, 1.75% 84%, 0 82%, 1.75% 80%, 0 78%, 1.75% 76%,
-    0 74%, 1.75% 72%, 0 70%, 1.75% 68%, 0 66%, 1.75% 64%,
-    0 62%, 1.75% 60%, 0 58%, 1.75% 56%, 0 54%, 1.75% 52%,
-    0 50%, 1.75% 48%, 0 46%, 1.75% 44%, 0 42%, 1.75% 40%,
-    0 38%, 1.75% 36%, 0 34%, 1.75% 32%, 0 30%, 1.75% 28%,
-    0 26%, 1.75% 24%, 0 22%, 1.75% 20%, 0 18%, 1.75% 16%,
-    0 14%, 1.75% 12%, 0 10%, 1.75% 8%, 0 6%, 1.75% 4%, 0 2%
-  );
+  --ticket-edge-color: rgba(var(--wallet-rgb), .26);
   isolation: isolate;
-  overflow: hidden !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  clip-path: var(--ticket-cut);
-  background: var(--ticket-edge-color) !important;
-  box-shadow: none !important;
-  filter: drop-shadow(0 10px 18px rgba(28,40,80,.10));
-}
-.wallet-ticket::before {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  inset: 1.25px !important;
-  width: auto !important;
-  height: auto !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  clip-path: var(--ticket-cut);
+  overflow: visible !important;
+  border: 1px solid var(--ticket-edge-color) !important;
+  border-radius: 24px !important;
+  clip-path: none !important;
   background:
-    radial-gradient(circle at 94% 2%, rgba(var(--wallet-rgb),.13), transparent 34%),
-    linear-gradient(145deg, rgba(255,255,255,.91), rgba(247,250,255,.77) 58%, rgba(var(--wallet-rgb),.055)) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.78) !important;
-  transform: none !important;
-  pointer-events: none;
+    radial-gradient(62% 58% at 84% 8%, rgba(var(--wallet-rgb), .17), transparent 67%),
+    radial-gradient(76% 86% at 2% 100%, rgba(var(--wallet-rgb), .075), transparent 72%),
+    linear-gradient(135deg, rgba(255,255,255,.82) 0%, rgba(255,255,255,.58) 48%, rgba(var(--wallet-rgb),.065) 100%) !important;
+  box-shadow:
+    0 11px 26px rgba(34,48,84,.085),
+    inset 0 1px 0 rgba(255,255,255,.82) !important;
+  filter: none !important;
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
 }
+.wallet-ticket::before,
 .wallet-ticket::after {
   content: "";
   position: absolute;
-  z-index: 1;
-  inset: 1.25px !important;
-  width: auto !important;
+  z-index: 6;
+  top: 12px !important;
+  bottom: 12px !important;
+  inset-inline: auto !important;
+  width: 12px !important;
   height: auto !important;
   border: 0 !important;
   border-radius: 0 !important;
-  clip-path: var(--ticket-cut);
-  background: linear-gradient(118deg, rgba(255,255,255,.18), transparent 34%, rgba(255,255,255,.08) 70%, transparent) !important;
+  clip-path: none !important;
+  background:
+    radial-gradient(circle at 50% 10px,
+      var(--page) 0 4.15px,
+      var(--ticket-edge-color) 4.25px 4.95px,
+      transparent 5.05px)
+    center top / 12px 20px repeat-y !important;
   box-shadow: none !important;
   transform: none !important;
   pointer-events: none;
 }
+.wallet-ticket::before { left: -6px !important; right: auto !important; }
+.wallet-ticket::after { right: -6px !important; left: auto !important; }
 .wallet-ticket > * { position: relative; z-index: 2; }
 .wallet-ticket.is-winning {
-  --ticket-edge-color: #10b981;
-  filter: drop-shadow(0 11px 21px rgba(16,185,129,.18));
-}
-.wallet-ticket.is-winning::before {
+  --ticket-edge-color: rgba(16,185,129,.58);
   background:
-    radial-gradient(circle at 94% 2%, rgba(250,204,21,.14), transparent 32%),
-    radial-gradient(circle at 5% 96%, rgba(16,185,129,.10), transparent 30%),
-    linear-gradient(145deg, rgba(255,255,255,.92), rgba(248,252,249,.80) 58%, rgba(16,185,129,.06)) !important;
+    radial-gradient(54% 52% at 88% 5%, rgba(250,204,21,.20), transparent 66%),
+    radial-gradient(68% 82% at 2% 100%, rgba(16,185,129,.11), transparent 72%),
+    linear-gradient(135deg, rgba(255,255,255,.84) 0%, rgba(255,255,255,.60) 50%, rgba(var(--wallet-rgb),.055) 100%) !important;
+  box-shadow:
+    0 13px 30px rgba(16,185,129,.14),
+    inset 0 1px 0 rgba(255,255,255,.86) !important;
 }
 [data-theme="dark"] .wallet-ticket {
-  filter: drop-shadow(0 11px 21px rgba(0,0,0,.27));
-}
-[data-theme="dark"] .wallet-ticket::before {
   background:
-    radial-gradient(circle at 94% 2%, rgba(var(--wallet-rgb),.15), transparent 35%),
-    linear-gradient(145deg, rgba(26,32,48,.98), rgba(13,18,31,.97) 64%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.065) !important;
+    radial-gradient(62% 58% at 84% 8%, rgba(var(--wallet-rgb),.23), transparent 67%),
+    radial-gradient(76% 86% at 2% 100%, rgba(var(--wallet-rgb),.10), transparent 72%),
+    linear-gradient(135deg, rgba(27,34,52,.96), rgba(15,20,34,.93) 55%, rgba(var(--wallet-rgb),.09)) !important;
+  box-shadow:
+    0 13px 30px rgba(0,0,0,.25),
+    inset 0 1px 0 rgba(255,255,255,.07) !important;
 }
 [data-theme="dark"] .wallet-ticket.is-winning {
-  filter: drop-shadow(0 11px 22px rgba(16,185,129,.16));
-}
-[data-theme="dark"] .wallet-ticket.is-winning::before {
   background:
-    radial-gradient(circle at 94% 2%, rgba(250,204,21,.14), transparent 32%),
-    radial-gradient(circle at 5% 96%, rgba(16,185,129,.11), transparent 30%),
-    linear-gradient(145deg, rgba(22,31,40,.99), rgba(13,18,31,.97) 62%) !important;
+    radial-gradient(54% 52% at 88% 5%, rgba(250,204,21,.17), transparent 66%),
+    radial-gradient(68% 82% at 2% 100%, rgba(16,185,129,.13), transparent 72%),
+    linear-gradient(135deg, rgba(26,34,47,.97), rgba(14,19,32,.95) 58%, rgba(var(--wallet-rgb),.08)) !important;
+}
+
+/* 礼花始终位于纸面之上；降动画模式也保留静态彩色礼花，不再整层消失。 */
+.wallet-ticket .wallet-winning-sparkles {
+  position: absolute;
+  z-index: 5 !important;
+  inset: 2px;
+  overflow: hidden;
+  border-radius: 22px;
+  opacity: 1 !important;
+  pointer-events: none;
+}
+.wallet-ticket .wallet-winning-sparkles i {
+  position: absolute;
+  display: block !important;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  opacity: 0;
+  background: #fbbf24;
+  box-shadow:
+    0 -13px #fbbf24,
+    9px -9px #fb7185,
+    13px 0 #60a5fa,
+    9px 9px #34d399,
+    0 13px #a78bfa,
+    -9px 9px #f97316,
+    -13px 0 #22d3ee,
+    -9px -9px #fde047;
+  animation: wallet-firework-soft 3s ease-out infinite !important;
+}
+.wallet-ticket .wallet-winning-sparkles i:nth-child(1) { top: 18%; left: 72%; animation-delay: 0s !important; }
+.wallet-ticket .wallet-winning-sparkles i:nth-child(2) { top: 42%; left: 91%; animation-delay: -.7s !important; }
+.wallet-ticket .wallet-winning-sparkles i:nth-child(3) { top: 74%; left: 12%; animation-delay: -1.35s !important; }
+.wallet-ticket .wallet-winning-sparkles i:nth-child(4) { top: 86%; left: 76%; animation-delay: -2s !important; }
+.wallet-ticket .wallet-winning-sparkles i:nth-child(5) { top: 55%; left: 50%; animation-delay: -2.45s !important; }
+@keyframes wallet-firework-soft {
+  0%, 5% { opacity: 0; transform: scale(.1); }
+  16% { opacity: .92; }
+  38% { opacity: .82; transform: scale(.86); }
+  58%, 100% { opacity: 0; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wallet-ticket .wallet-winning-sparkles i {
+    animation: none !important;
+    opacity: .58 !important;
+    transform: scale(.62);
+  }
 }
 
 @media (max-width: 390px) {

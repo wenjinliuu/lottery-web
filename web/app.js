@@ -11,7 +11,7 @@
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
   const SYSTEM_GAMES = new Set(["ssq", "dlt"]);
   const MAX_SYSTEM_COMBINATIONS = 2000;
-  const APP_VERSION = "3.5.0";
+  const APP_VERSION = "3.5.1";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -253,14 +253,30 @@
   function renderEntryModeTabs() {
     if (!els.entryModeTabs) return;
     const modes = [
-      { key: "random", label: "随机" },
-      { key: "manual", label: "手动" },
-      { key: "compound", label: "复式" },
-      { key: "banker", label: "胆拖" }
+      {
+        key: "random",
+        label: "随机",
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M21 3l-8 8M3 21l8-8M16 21h5v-5M3 3l5 5"/></svg>'
+      },
+      {
+        key: "manual",
+        label: "手动",
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20h4L20 10l-4-4L6 16v4zM14.5 7.5l4 4"/><path d="M4 20h7"/></svg>'
+      },
+      {
+        key: "compound",
+        label: "复式",
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3.5"/><circle cx="16" cy="8" r="3.5"/><circle cx="8" cy="16" r="3.5"/><circle cx="16" cy="16" r="3.5"/></svg>'
+      },
+      {
+        key: "banker",
+        label: "胆拖",
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg>'
+      }
     ];
     els.entryModeTabs.innerHTML = modes.map((mode) => {
       const active = mode.key === state.ticketAddStep;
-      return `<button class="entry-mode-tab${active ? " is-active" : ""}" type="button" data-entry-mode="${mode.key}" aria-pressed="${active}">${mode.label}</button>`;
+      return `<button class="entry-mode-tab mode-${mode.key}${active ? " is-active" : ""}" type="button" data-entry-mode="${mode.key}" aria-pressed="${active}"><span class="entry-mode-icon">${mode.icon}</span><span class="entry-mode-label">${mode.label}</span></button>`;
     }).join("");
     els.entryModeTabs.querySelectorAll("[data-entry-mode]").forEach((button) => {
       button.addEventListener("click", () => {
