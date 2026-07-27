@@ -2,15 +2,16 @@
   "use strict";
 
   const GAME_ROWS = [
-    ["ssq", "dlt"],
-    ["k8", "fc3d", "pl3"],
-    ["qlc", "qxc", "pl5"]
+    ["ssq", "dlt", "k8", "fc3d"],
+    ["pl3", "qlc", "qxc", "pl5"]
   ];
   const GAME_ORDER = GAME_ROWS.flat();
   const COUNT_GAMES = new Set(["ssq", "dlt", "pl5", "qxc", "qlc"]);
   const COUNT_OPTIONS = [1, 5, 10];
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
-  const APP_VERSION = "3.4.3";
+  const SYSTEM_GAMES = new Set(["ssq", "dlt"]);
+  const MAX_SYSTEM_COMBINATIONS = 2000;
+  const APP_VERSION = "3.5.0";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -45,13 +46,18 @@
     loadedHistoryGames: new Set(),
     historyLoadingGames: new Set(),
     recordFilterGame: "all",
+    recordFilterStatus: "all",
+    myRecordsReturnView: "check",
     profitRange: "all",
     walletStatusFilter: "all",
     expandedWalletBatches: new Set(),
     drawCarouselIndex: 0,
     ticketAddStep: "intro",
+    manualEntryMode: "manual",
     manualGameKey: "ssq",
     manualPlayMode: "",
+    manualSystemType: "",
+    manualAddOn: false,
     manualSelection: {},
     manualTickets: [],
     manualMultiple: 1,
@@ -83,7 +89,7 @@
     await loadAllGameHistories();
     await loadRecords();
     await reconcileInferredRecords(false);
-    /* 首页开奖轮播固定从双色球开始；选号工具的彩种状态与开奖浏览互不干扰。 */
+    /* 首页轮播首位由双色球/大乐透当日开奖安排决定。 */
     state.drawCarouselIndex = 0;
     renderTodayRecommend();
     randomizeTickets();
@@ -106,6 +112,7 @@
       "themeToggleBtn", "themeToggleSub",
       "profitCard", "profitChartWrap", "profitEmpty", "profitNetValue", "profitSub", "profitRangeTabs",
       "myRecordsBackBtn", "myRecordsSummary", "recordFilterChips", "recordFilterSummary",
+      "recordStatusFilterChips",
       "wonRecordsBackBtn", "wonRecordsSummary", "wonRecordList", "mineWonRecordsBtn",
       "detailSheet", "detailSheetBackdrop", "detailSheetCloseBtn", "detailSheetTitle", "detailSheetSub", "detailSheetBody",
       "scanTicketBtn", "ticketScan", "ticketScanBackdrop", "ticketScanCloseBtn", "ticketScanTitle", "ticketScanSub", "ticketScanBody", "ticketScanOverlay", "ticketScanInput",
@@ -118,9 +125,9 @@
       "homeNotificationBtn", "homeNotificationBadge", "homeOverviewSub", "homeOverviewMoreBtn", "homeScanTicketBtn", "latestDrawMoreBtn", "drawCarouselDots", "homeMonthlyChart", "homeMonthlySub",
       "walletSubtitle", "walletFilterChips", "walletFilterSummary", "addTicketBtn", "walletMoreBtn",
       "autoCheckToggleBtn", "autoCheckToggleSub",
-      "ticketAdd", "ticketAddBackdrop", "ticketAddBackBtn", "ticketAddCloseBtn", "ticketAddTitle", "ticketAddSub", "ticketAddIntro", "randomToolView", "manualToolView",
+      "ticketAdd", "ticketAddBackdrop", "ticketAddBackBtn", "ticketAddCloseBtn", "ticketAddTitle", "ticketAddSub", "ticketAddIntro", "entryModeTabs", "entryTargetCard", "entryTargetHint", "entryTargetResetBtn", "entryIssueInput", "entryDateInput", "randomToolView", "manualToolView",
       "addScanTicketBtn", "addAlbumTicketBtn", "openRandomToolBtn", "openManualToolBtn", "openManualPickToolBtn", "dataStatusEntryBtn",
-      "manualGameTabs", "manualPlayModeField", "manualPlayModeTabs", "manualPickerHint", "manualPicker", "manualClearBtn", "manualAddLineBtn",
+      "manualGameTabs", "manualPlayModeField", "manualModeTitle", "manualPlayModeTabs", "manualAddOnBtn", "manualPickerHint", "manualPicker", "manualRandomBtn", "manualClearBtn", "manualAddLineBtn",
       "manualDraftSummary", "manualDraftList", "manualMultipleMinusBtn", "manualMultiplePlusBtn", "manualMultipleText", "manualSaveBtn"
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
@@ -202,31 +209,66 @@
   function closeTicketAdd() {
     if (!els.ticketAdd) return;
     els.ticketAdd.hidden = true;
+    els.ticketAdd.classList.remove("is-tool-mode");
     document.body.classList.remove("ticket-add-open");
     state.ticketAddStep = "intro";
   }
 
   function showTicketAddStep(step = "intro") {
-    state.ticketAddStep = ["random", "manual"].includes(step) ? step : "intro";
+    const allowed = ["random", "manual", "compound", "banker"];
+    const previousMode = state.ticketAddStep;
+    state.ticketAddStep = allowed.includes(step) ? step : "intro";
+    if (["manual", "compound", "banker"].includes(state.ticketAddStep)) {
+      state.manualEntryMode = state.ticketAddStep;
+      const nextGame = state.manualEntryMode !== "manual" && !SYSTEM_GAMES.has(state.manualGameKey) ? "ssq" : state.manualGameKey;
+      if (previousMode !== state.ticketAddStep) resetManualDraft(nextGame);
+    }
     const intro = state.ticketAddStep === "intro";
+    const random = state.ticketAddStep === "random";
     if (els.ticketAddIntro) els.ticketAddIntro.hidden = !intro;
-    if (els.randomToolView) els.randomToolView.hidden = state.ticketAddStep !== "random";
-    if (els.manualToolView) els.manualToolView.hidden = state.ticketAddStep !== "manual";
+    if (els.randomToolView) els.randomToolView.hidden = !random;
+    if (els.manualToolView) els.manualToolView.hidden = intro || random;
+    if (els.entryModeTabs) els.entryModeTabs.hidden = intro;
+    if (els.entryTargetCard) els.entryTargetCard.hidden = intro;
+    els.ticketAdd?.classList.toggle("is-tool-mode", !intro);
     if (els.ticketAddBackBtn) els.ticketAddBackBtn.hidden = intro;
-    if (els.ticketAddTitle) els.ticketAddTitle.textContent = intro ? "添加到票夹" : state.ticketAddStep === "random" ? "随机选号" : "手动录入号码";
+    if (els.ticketAddTitle) els.ticketAddTitle.textContent = intro ? "添加到票夹" : "手动录入号码";
     if (els.ticketAddSub) {
       els.ticketAddSub.textContent = intro
         ? "记录已经在线下正规渠道购买的彩票"
-        : state.ticketAddStep === "random"
-          ? "生成号码后，请确认已在线下完成购买再加入票夹"
-          : "选择一张普通单式票的号码并加入票夹";
+        : "随机、普通、复式与胆拖统一整理，确认线下购买后再加入票夹";
     }
-    if (state.ticketAddStep === "random") {
+    if (!intro) {
+      renderEntryModeTabs();
+      syncEntryTargetForGame(true);
+    }
+    if (random) {
       renderDraftHead();
       renderDraft();
     }
-    if (state.ticketAddStep === "manual") renderManualTool();
+    if (!intro && !random) renderManualTool();
     els.ticketAdd?.querySelector(".ticket-add-scroll")?.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  function renderEntryModeTabs() {
+    if (!els.entryModeTabs) return;
+    const modes = [
+      { key: "random", label: "随机" },
+      { key: "manual", label: "手动" },
+      { key: "compound", label: "复式" },
+      { key: "banker", label: "胆拖" }
+    ];
+    els.entryModeTabs.innerHTML = modes.map((mode) => {
+      const active = mode.key === state.ticketAddStep;
+      return `<button class="entry-mode-tab${active ? " is-active" : ""}" type="button" data-entry-mode="${mode.key}" aria-pressed="${active}">${mode.label}</button>`;
+    }).join("");
+    els.entryModeTabs.querySelectorAll("[data-entry-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const mode = button.dataset.entryMode;
+        if (!mode || mode === state.ticketAddStep) return;
+        showTicketAddStep(mode);
+      });
+    });
   }
 
   /* ===== iOS 26 Liquid Glass — View Transitions (with reduce-motion fallback) ===== */
@@ -280,6 +322,7 @@
       renderCountTabs();
       state.draftTickets = [];
       renderAll();
+      if (state.ticketAddStep === "random") syncEntryTargetForGame(true);
     });
     els.playModeSelect.addEventListener("change", () => {
       state.playMode = els.playModeSelect.value;
@@ -333,7 +376,8 @@
     if (els.latestDrawMoreBtn) els.latestDrawMoreBtn.addEventListener("click", openLatestDrawsSheet);
     if (els.walletMoreBtn) els.walletMoreBtn.addEventListener("click", () => {
       state.recordFilterGame = "all";
-      openMyRecordsView();
+      state.recordFilterStatus = "all";
+      openMyRecordsView("check");
     });
     if (els.dataStatusEntryBtn) els.dataStatusEntryBtn.addEventListener("click", openDataStatusSheet);
     if (els.homeNotificationBtn) els.homeNotificationBtn.addEventListener("click", openNotificationSheet);
@@ -341,8 +385,8 @@
     if (els.ticketScanCloseBtn) els.ticketScanCloseBtn.addEventListener("click", closeTicketScan);
     if (els.ticketScanInput) els.ticketScanInput.addEventListener("change", handleTicketScanFile);
     if (els.historyBackBtn) els.historyBackBtn.addEventListener("click", () => switchView("check"));
-    if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView());
-    if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView("mine"));
+    if (els.mineRecordToggleBtn) els.mineRecordToggleBtn.addEventListener("click", () => openMyRecordsView("mine"));
+    if (els.myRecordsBackBtn) els.myRecordsBackBtn.addEventListener("click", () => switchView(state.myRecordsReturnView || "check"));
     if (els.wonRecordsBackBtn) els.wonRecordsBackBtn.addEventListener("click", () => switchView("home"));
     if (els.mineWonRecordsBtn) els.mineWonRecordsBtn.addEventListener("click", () => {
       state.walletStatusFilter = "pending";
@@ -363,6 +407,8 @@
     });
     if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.addEventListener("click", refreshDataStatus);
     if (els.pwaInstallBtn) els.pwaInstallBtn.addEventListener("click", installPwa);
+    if (els.entryTargetResetBtn) els.entryTargetResetBtn.addEventListener("click", () => syncEntryTargetForGame(true));
+    [els.entryIssueInput, els.entryDateInput].forEach((input) => input?.addEventListener("input", renderEntryTargetHint));
     if (els.autoCheckToggleBtn) {
       els.autoCheckToggleBtn.addEventListener("click", () => {
         const enabled = !getAutoCheckEnabled();
@@ -483,6 +529,7 @@
         renderCountTabs();
         state.draftTickets = [];
         renderAll();
+        if (state.ticketAddStep === "random") syncEntryTargetForGame(true);
       });
     });
   }
@@ -793,6 +840,19 @@
       pl5: [0, 1, 2, 3, 4, 5, 6], k8: [0, 1, 2, 3, 4, 5, 6]
     };
     return GAME_ORDER.filter((g) => (FALLBACK[g] || []).includes(wd));
+  }
+
+  function getDrawCarouselOrder() {
+    const todayGames = getTodayOpenGames();
+    const weekday = getChinaNowParts().weekday;
+    let primary = todayGames.includes("dlt") ? "dlt" : todayGames.includes("ssq") ? "ssq" : "";
+    /* 周五双色球、大乐透均不开，延续周四双色球作为首张；其余异常日按最近开奖安排兜底。 */
+    if (!primary) {
+      const recentPrimaryByWeekday = ["ssq", "dlt", "ssq", "dlt", "ssq", "ssq", "dlt"];
+      primary = recentPrimaryByWeekday[weekday] || "ssq";
+    }
+    const secondary = primary === "ssq" ? "dlt" : "ssq";
+    return [primary, secondary].concat(GAME_ORDER.filter((gameKey) => gameKey !== primary && gameKey !== secondary));
   }
 
   function renderTodayRecommend() {
@@ -1165,7 +1225,7 @@
     const multiple = clampInt(els.multipleInput.value, 1, 99);
     const price = Math.max(0, Number(getCurrentTicketPrice() || els.priceInput.value || 0));
     const batchId = `batch_${compactDate(now)}_${randomId()}`;
-    const targetDraw = getNextDrawTarget(state.gameKey);
+    const targetDraw = getEntryTargetDraw(state.gameKey);
     if (!targetDraw.available) {
       toast(targetDraw.message);
       return false;
@@ -1202,6 +1262,8 @@
         originalTargetExpect: targetDraw.status === "inferred" ? targetDraw.expect : "",
         originalTargetOpenDate: targetDraw.status === "inferred" ? targetDraw.openDate : "",
         numbers: ticket,
+        entryKind: ticket._entryKind || (source === "random" ? "random" : "manual"),
+        entryLabel: ticket._entryLabel || (source === "random" ? "随机" : "普通"),
         price,
         multiple,
         status: "pending",
@@ -1644,7 +1706,7 @@
 
   function renderDraws() {
     if (!els.latestDraws) return;
-    const visibleGames = GAME_ORDER.filter((gameKey) => DEFAULT_VISIBLE_DRAWS.has(gameKey));
+    const visibleGames = getDrawCarouselOrder().filter((gameKey) => DEFAULT_VISIBLE_DRAWS.has(gameKey));
     const latestCards = visibleGames.map((gameKey, idx) => renderLatestDrawCard(gameKey, idx)).join("");
     els.latestDraws.innerHTML = latestCards;
     els.latestDraws.querySelectorAll("[data-history-game]").forEach((btn) => {
@@ -1658,7 +1720,8 @@
       renderDraws.scrollTimer = window.setTimeout(syncDrawCarouselIndex, 70);
     };
     window.requestAnimationFrame(() => {
-      const activeGame = GAME_ORDER[state.drawCarouselIndex] || GAME_ORDER[0];
+      const order = getDrawCarouselOrder();
+      const activeGame = order[state.drawCarouselIndex] || order[0];
       scrollDrawCarouselToGame(activeGame, { behavior: "auto", manual: false });
     });
     scheduleDrawCarouselAuto();
@@ -1691,7 +1754,7 @@
 
   function renderDrawCarouselDots() {
     if (!els.drawCarouselDots) return;
-    els.drawCarouselDots.innerHTML = GAME_ORDER.map((gameKey, index) => `
+    els.drawCarouselDots.innerHTML = getDrawCarouselOrder().map((gameKey, index) => `
       <button class="draw-carousel-dot${index === state.drawCarouselIndex ? " is-active" : ""}" type="button" data-draw-dot="${gameKey}" aria-label="查看${GAME_CONFIGS[gameKey]?.label || gameKey}" aria-pressed="${index === state.drawCarouselIndex}"></button>
     `).join("");
     els.drawCarouselDots.querySelectorAll("[data-draw-dot]").forEach((btn) => btn.addEventListener("click", () => scrollDrawCarouselToGame(btn.dataset.drawDot, { manual: true })));
@@ -1720,7 +1783,7 @@
     if (!els.latestDraws) return;
     const card = els.latestDraws.querySelector(`[data-draw-slide="${gameKey}"]`);
     if (!card) return;
-    state.drawCarouselIndex = Math.max(0, GAME_ORDER.indexOf(gameKey));
+    state.drawCarouselIndex = Math.max(0, getDrawCarouselOrder().indexOf(gameKey));
     const trackRect = els.latestDraws.getBoundingClientRect();
     const cardRect = card.getBoundingClientRect();
     const targetLeft = els.latestDraws.scrollLeft + cardRect.left - trackRect.left;
@@ -1746,8 +1809,9 @@
         scheduleDrawCarouselAuto(Math.max(1200, pauseLeft + 300));
         return;
       }
-      const nextIndex = (state.drawCarouselIndex + 1) % GAME_ORDER.length;
-      scrollDrawCarouselToGame(GAME_ORDER[nextIndex], { manual: false });
+      const order = getDrawCarouselOrder();
+      const nextIndex = (state.drawCarouselIndex + 1) % order.length;
+      scrollDrawCarouselToGame(order[nextIndex], { manual: false });
       scheduleDrawCarouselAuto();
     }, Math.max(800, delay));
   }
@@ -1885,7 +1949,8 @@
     bindWalletTicketActions(els.recordList, renderWalletTickets);
     els.recordList.querySelector("[data-wallet-all]")?.addEventListener("click", () => {
       state.recordFilterGame = "all";
-      openMyRecordsView();
+      state.recordFilterStatus = "all";
+      openMyRecordsView("check");
     });
   }
 
@@ -1923,6 +1988,7 @@
               <div class="wallet-ticket-tags">
                 <span>${records.length} 注 · ${first.multiple || 1} 倍</span>
                 <span>花费 ${formatCompactMoney(stats.totalCost)}</span>
+                ${first.entryLabel && !["普通", "随机"].includes(first.entryLabel) ? `<span class="wallet-entry-badge">${first.entryLabel}</span>` : ""}
                 ${isDltAddOn ? `<span class="wallet-play-badge">追加</span>` : ""}
               </div>
             </div>
@@ -1964,14 +2030,16 @@
 
   function renderMyRecordsList() {
     renderRecordFilters();
-    const filteredRecords = state.recordFilterGame === "all"
+    const gameRecords = state.recordFilterGame === "all"
       ? state.records
       : state.records.filter((record) => record.gameKey === state.recordFilterGame);
+    const batches = groupRecordsByBatch(gameRecords)
+      .filter((batch) => walletBatchMatchesFilter(batch, state.recordFilterStatus));
+    const filteredRecords = batches.flatMap((batch) => batch.records || []);
     if (els.mineRecordList) {
-      const batches = groupRecordsByBatch(filteredRecords);
       if (!batches.length) {
         els.mineRecordList.className = "wallet-ticket-list empty empty-cta";
-        els.mineRecordList.innerHTML = `<div>当前筛选下暂无彩票记录</div><button class="mini-blue has-icon" type="button" data-empty-add-ticket><svg class="icn" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>添加彩票</span></button>`;
+        els.mineRecordList.innerHTML = `<div>当前筛选下暂无票夹记录</div><button class="mini-blue has-icon" type="button" data-empty-add-ticket><svg class="icn" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>添加彩票</span></button>`;
         els.mineRecordList.querySelector("[data-empty-add-ticket]")?.addEventListener("click", () => openTicketAdd("intro"));
       } else {
         els.mineRecordList.className = "wallet-ticket-list";
@@ -1981,14 +2049,15 @@
     }
     if (els.myRecordsSummary) {
       const label = state.recordFilterGame === "all" ? "全部彩种" : (GAME_CONFIGS[state.recordFilterGame]?.label || state.recordFilterGame);
-      els.myRecordsSummary.textContent = `${label} · ${groupRecordsByBatch(filteredRecords).length} 次记录`;
+      const statusLabel = { all: "全部状态", pending: "待核对", won: "已中奖", lost: "未中奖" }[state.recordFilterStatus] || "全部状态";
+      els.myRecordsSummary.textContent = `${label} · ${statusLabel} · ${batches.length} 张票`;
     }
     if (els.recordFilterSummary) {
       const stats = summarizeRecords(filteredRecords);
-      const batchCount = groupRecordsByBatch(filteredRecords).length;
       const label = state.recordFilterGame === "all" ? "全部彩种" : (GAME_CONFIGS[state.recordFilterGame]?.label || state.recordFilterGame);
+      const statusLabel = { all: "全部状态", pending: "待核对", won: "已中奖", lost: "未中奖" }[state.recordFilterStatus] || "全部状态";
       const prize = stats.floatCount ? "待定" : formatCompactMoney(stats.totalPrize);
-      els.recordFilterSummary.textContent = `${label} · ${batchCount} 次记录 · ${filteredRecords.length} 注 · 花费 ${formatCompactMoney(stats.totalCost)} · 中奖 ${prize} · 中奖率 ${stats.winRate}%`;
+      els.recordFilterSummary.textContent = `${label} · ${statusLabel} · ${batches.length} 张票 · ${filteredRecords.length} 注 · 花费 ${formatCompactMoney(stats.totalCost)} · 中奖 ${prize} · 中奖率 ${stats.winRate}%`;
     }
   }
 
@@ -2002,6 +2071,23 @@
     els.recordFilterChips.querySelectorAll("[data-record-filter]").forEach((btn) => {
       btn.addEventListener("click", () => {
         state.recordFilterGame = btn.dataset.recordFilter || "all";
+        renderMyRecordsList();
+      });
+    });
+    if (!els.recordStatusFilterChips) return;
+    const statusOptions = [
+      { key: "all", label: "全部状态" },
+      { key: "pending", label: "待核对" },
+      { key: "won", label: "已中奖" },
+      { key: "lost", label: "未中奖" }
+    ];
+    els.recordStatusFilterChips.innerHTML = statusOptions.map((option) => {
+      const active = option.key === state.recordFilterStatus;
+      return `<button class="record-status-filter-btn${active ? " is-active" : ""}" type="button" data-record-status-filter="${option.key}" aria-pressed="${active}">${option.label}</button>`;
+    }).join("");
+    els.recordStatusFilterChips.querySelectorAll("[data-record-status-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.recordFilterStatus = button.dataset.recordStatusFilter || "all";
         renderMyRecordsList();
       });
     });
@@ -2046,7 +2132,8 @@
     }
   }
 
-  function openMyRecordsView() {
+  function openMyRecordsView(returnView = state.activeView) {
+    state.myRecordsReturnView = ["check", "mine"].includes(returnView) ? returnView : "check";
     renderMyRecordsList();
     switchView("myRecords");
     requestAnimationFrame(() => {
@@ -2469,10 +2556,23 @@
       state.manualSelection = {};
       renderManualPicker();
     });
+    els.manualRandomBtn?.addEventListener("click", () => {
+      randomizeManualSelection();
+      renderManualPicker();
+    });
+    els.manualAddOnBtn?.addEventListener("click", () => {
+      state.manualAddOn = !state.manualAddOn;
+      state.manualTickets = [];
+      renderManualTool();
+    });
     els.manualAddLineBtn?.addEventListener("click", () => {
-      const ticket = buildManualTicket();
-      if (!ticket) return;
-      state.manualTickets.push(ticket);
+      const tickets = buildManualTickets();
+      if (!tickets.length) return;
+      if (tickets.length > MAX_SYSTEM_COMBINATIONS) {
+        toast(`组合数量超过 ${MAX_SYSTEM_COMBINATIONS} 注，请减少选号`);
+        return;
+      }
+      state.manualTickets.push(...tickets);
       state.manualSelection = {};
       renderManualTool();
     });
@@ -2487,13 +2587,13 @@
     els.manualSaveBtn?.addEventListener("click", async () => {
       if (!state.manualTickets.length) return;
       state.gameKey = state.manualGameKey;
-      state.playMode = state.manualPlayMode;
-      state.dltAddOn = state.manualGameKey === "dlt" && state.manualPlayMode === "add";
+      state.playMode = state.manualGameKey === "dlt" && state.manualAddOn ? "add" : state.manualPlayMode;
+      state.dltAddOn = state.manualGameKey === "dlt" && state.manualAddOn;
       state.draftTickets = state.manualTickets.map((ticket) => ({ ...ticket }));
       if (els.gameSelect) els.gameSelect.value = state.gameKey;
       if (els.multipleInput) els.multipleInput.value = String(state.manualMultiple);
       if (els.priceInput) els.priceInput.value = String(getCurrentTicketPrice());
-      const saved = await saveDraftRecords(false, "manual");
+      const saved = await saveDraftRecords(false, `manual-${state.manualEntryMode}`);
       if (saved) {
         state.manualTickets = [];
         state.manualSelection = {};
@@ -2507,7 +2607,31 @@
   }
 
   function getManualModes(gameKey) {
-    if (gameKey === "dlt") return [{ key: "normal", label: "普通" }, { key: "add", label: "追加" }];
+    if (state.manualEntryMode === "compound") {
+      return gameKey === "ssq"
+        ? [
+            { key: "red_compound", label: "红球复式" },
+            { key: "blue_compound", label: "蓝球复式" },
+            { key: "full_compound", label: "红蓝全复式" }
+          ]
+        : [
+            { key: "front_compound", label: "前区复式" },
+            { key: "back_compound", label: "后区复式" },
+            { key: "full_compound", label: "前后全复式" }
+          ];
+    }
+    if (state.manualEntryMode === "banker") {
+      return gameKey === "ssq"
+        ? [
+            { key: "red_banker_single_blue", label: "红球胆拖＋单蓝" },
+            { key: "red_banker_multi_blue", label: "红球胆拖＋多蓝" }
+          ]
+        : [
+            { key: "front_banker", label: "前区胆拖" },
+            { key: "back_banker", label: "后区胆拖" },
+            { key: "double_banker", label: "前后双区胆拖" }
+          ];
+    }
     if (gameKey === "k8") return GAME_CONFIGS.k8.playModes;
     if (gameKey === "fc3d" || gameKey === "pl3") return digitModes();
     return [];
@@ -2517,6 +2641,8 @@
     state.manualGameKey = nextGameKey;
     const modes = getManualModes(nextGameKey);
     state.manualPlayMode = nextMode || GAME_CONFIGS[nextGameKey]?.defaultPlayMode || modes[0]?.key || "";
+    state.manualSystemType = state.manualEntryMode === "manual" ? "" : (nextMode || modes[0]?.key || "");
+    state.manualAddOn = false;
     state.manualSelection = {};
     state.manualTickets = [];
     state.manualMultiple = 1;
@@ -2524,7 +2650,13 @@
 
   function renderManualTool() {
     if (!els.manualGameTabs) return;
-    els.manualGameTabs.innerHTML = GAME_ORDER.map((key) => {
+    const gameOptions = state.manualEntryMode === "manual" ? GAME_ORDER : GAME_ORDER.filter((key) => SYSTEM_GAMES.has(key));
+    const modes = getManualModes(state.manualGameKey);
+    if (state.manualEntryMode !== "manual" && !modes.some((mode) => mode.key === state.manualSystemType)) {
+      state.manualSystemType = modes[0]?.key || "";
+      state.manualSelection = {};
+    }
+    els.manualGameTabs.innerHTML = gameOptions.map((key) => {
       const active = key === state.manualGameKey;
       return `<button class="manual-game-tab today-chip-${key}${active ? " is-active" : ""}" type="button" data-manual-game="${key}" aria-pressed="${active}">${GAME_CONFIGS[key].label}</button>`;
     }).join("");
@@ -2532,20 +2664,30 @@
       const key = btn.dataset.manualGame;
       if (key === state.manualGameKey) return;
       resetManualDraft(key);
+      syncEntryTargetForGame(true);
       renderManualTool();
     }));
 
-    const modes = getManualModes(state.manualGameKey);
-    if (els.manualPlayModeField) els.manualPlayModeField.hidden = !modes.length;
+    const showAddOn = state.manualGameKey === "dlt";
+    if (els.manualPlayModeField) els.manualPlayModeField.hidden = !modes.length && !showAddOn;
+    if (els.manualModeTitle) els.manualModeTitle.textContent = state.manualEntryMode === "manual" ? "玩法" : "组合类型";
+    if (els.manualAddOnBtn) {
+      els.manualAddOnBtn.hidden = !showAddOn;
+      els.manualAddOnBtn.classList.toggle("is-on", state.manualAddOn);
+      els.manualAddOnBtn.setAttribute("aria-pressed", String(state.manualAddOn));
+    }
     if (els.manualPlayModeTabs) {
       els.manualPlayModeTabs.dataset.accent = GAME_CONFIGS[state.manualGameKey]?.accent || "";
       els.manualPlayModeTabs.innerHTML = modes.map((mode) => {
-        const active = mode.key === state.manualPlayMode;
+        const activeKey = state.manualEntryMode === "manual" ? state.manualPlayMode : state.manualSystemType;
+        const active = mode.key === activeKey;
         return `<button class="segment-btn${active ? " segment-btn-active" : ""}" type="button" data-manual-mode="${mode.key}" aria-pressed="${active}">${mode.label}</button>`;
       }).join("");
       els.manualPlayModeTabs.querySelectorAll("[data-manual-mode]").forEach((btn) => btn.addEventListener("click", () => {
-        if (btn.dataset.manualMode === state.manualPlayMode) return;
-        state.manualPlayMode = btn.dataset.manualMode;
+        const current = state.manualEntryMode === "manual" ? state.manualPlayMode : state.manualSystemType;
+        if (btn.dataset.manualMode === current) return;
+        if (state.manualEntryMode === "manual") state.manualPlayMode = btn.dataset.manualMode;
+        else state.manualSystemType = btn.dataset.manualMode;
         state.manualSelection = {};
         state.manualTickets = [];
         renderManualTool();
@@ -2557,36 +2699,87 @@
 
   function getManualSections() {
     const gameKey = state.manualGameKey;
+    const type = state.manualSystemType;
+    if (state.manualEntryMode === "compound" && gameKey === "ssq") {
+      const redMin = type === "blue_compound" ? 6 : 7;
+      const redMax = type === "blue_compound" ? 6 : 20;
+      const blueMin = type === "red_compound" ? 1 : 2;
+      const blueMax = type === "red_compound" ? 1 : 16;
+      return [
+        { key: "red", label: "红球", helper: `${redMin === redMax ? `选择 ${redMin}` : `至少 ${redMin}`} 个`, min: 1, max: 33, minCount: redMin, maxCount: redMax, tone: "red" },
+        { key: "blue", label: "蓝球", helper: `${blueMin === blueMax ? `选择 ${blueMin}` : `至少 ${blueMin}`} 个`, min: 1, max: 16, minCount: blueMin, maxCount: blueMax, tone: "blue" }
+      ];
+    }
+    if (state.manualEntryMode === "compound" && gameKey === "dlt") {
+      const frontMin = type === "back_compound" ? 5 : 6;
+      const frontMax = type === "back_compound" ? 5 : 20;
+      const backMin = type === "front_compound" ? 2 : 3;
+      const backMax = type === "front_compound" ? 2 : 12;
+      return [
+        { key: "front", label: "前区", helper: `${frontMin === frontMax ? `选择 ${frontMin}` : `至少 ${frontMin}`} 个`, min: 1, max: 35, minCount: frontMin, maxCount: frontMax, tone: "blue" },
+        { key: "back", label: "后区", helper: `${backMin === backMax ? `选择 ${backMin}` : `至少 ${backMin}`} 个`, min: 1, max: 12, minCount: backMin, maxCount: backMax, tone: "yellow" }
+      ];
+    }
+    if (state.manualEntryMode === "banker" && gameKey === "ssq") {
+      const multiBlue = type === "red_banker_multi_blue";
+      return [
+        { key: "redDan", label: "红球胆码", helper: "选择 1–5 个", min: 1, max: 33, minCount: 1, maxCount: 5, tone: "red", exclusiveGroup: "ssq-red" },
+        { key: "redTuo", label: "红球拖码", helper: "胆码＋拖码至少 7 个", min: 1, max: 33, minCount: 2, maxCount: 28, tone: "red", exclusiveGroup: "ssq-red" },
+        { key: "blue", label: "蓝球", helper: multiBlue ? "至少选择 2 个" : "选择 1 个", min: 1, max: 16, minCount: multiBlue ? 2 : 1, maxCount: multiBlue ? 16 : 1, tone: "blue" }
+      ];
+    }
+    if (state.manualEntryMode === "banker" && gameKey === "dlt") {
+      if (type === "front_banker") {
+        return [
+          { key: "frontDan", label: "前区胆码", helper: "选择 1–4 个", min: 1, max: 35, minCount: 1, maxCount: 4, tone: "blue", exclusiveGroup: "dlt-front" },
+          { key: "frontTuo", label: "前区拖码", helper: "胆码＋拖码至少 6 个", min: 1, max: 35, minCount: 2, maxCount: 31, tone: "blue", exclusiveGroup: "dlt-front" },
+          { key: "back", label: "后区", helper: "选择 2 个", min: 1, max: 12, minCount: 2, maxCount: 2, tone: "yellow" }
+        ];
+      }
+      if (type === "back_banker") {
+        return [
+          { key: "front", label: "前区", helper: "选择 5 个", min: 1, max: 35, minCount: 5, maxCount: 5, tone: "blue" },
+          { key: "backDan", label: "后区胆码", helper: "选择 1 个", min: 1, max: 12, minCount: 1, maxCount: 1, tone: "yellow", exclusiveGroup: "dlt-back" },
+          { key: "backTuo", label: "后区拖码", helper: "至少选择 2 个", min: 1, max: 12, minCount: 2, maxCount: 11, tone: "yellow", exclusiveGroup: "dlt-back" }
+        ];
+      }
+      return [
+        { key: "frontDan", label: "前区胆码", helper: "选择 1–4 个", min: 1, max: 35, minCount: 1, maxCount: 4, tone: "blue", exclusiveGroup: "dlt-front" },
+        { key: "frontTuo", label: "前区拖码", helper: "胆码＋拖码至少 6 个", min: 1, max: 35, minCount: 2, maxCount: 31, tone: "blue", exclusiveGroup: "dlt-front" },
+        { key: "backDan", label: "后区胆码", helper: "选择 1 个", min: 1, max: 12, minCount: 1, maxCount: 1, tone: "yellow", exclusiveGroup: "dlt-back" },
+        { key: "backTuo", label: "后区拖码", helper: "至少选择 2 个", min: 1, max: 12, minCount: 2, maxCount: 11, tone: "yellow", exclusiveGroup: "dlt-back" }
+      ];
+    }
     if (gameKey === "ssq") return [
-      { key: "red", label: "红球", helper: "选择 6 个", min: 1, max: 33, count: 6, tone: "red" },
-      { key: "blue", label: "蓝球", helper: "选择 1 个", min: 1, max: 16, count: 1, tone: "blue" }
+      { key: "red", label: "红球", helper: "选择 6 个", min: 1, max: 33, minCount: 6, maxCount: 6, tone: "red" },
+      { key: "blue", label: "蓝球", helper: "选择 1 个", min: 1, max: 16, minCount: 1, maxCount: 1, tone: "blue" }
     ];
     if (gameKey === "dlt") return [
-      { key: "front", label: "前区", helper: "选择 5 个", min: 1, max: 35, count: 5, tone: "blue" },
-      { key: "back", label: "后区", helper: "选择 2 个", min: 1, max: 12, count: 2, tone: "yellow" }
+      { key: "front", label: "前区", helper: "选择 5 个", min: 1, max: 35, minCount: 5, maxCount: 5, tone: "blue" },
+      { key: "back", label: "后区", helper: "选择 2 个", min: 1, max: 12, minCount: 2, maxCount: 2, tone: "yellow" }
     ];
     if (gameKey === "k8") return [
-      { key: "nums", label: GAME_CONFIGS.k8.playModes.find((mode) => mode.key === state.manualPlayMode)?.label || "快乐8", helper: `选择 ${clampInt(state.manualPlayMode, 1, 10)} 个`, min: 1, max: 80, count: clampInt(state.manualPlayMode, 1, 10), tone: "k8orange" }
+      { key: "nums", label: GAME_CONFIGS.k8.playModes.find((mode) => mode.key === state.manualPlayMode)?.label || "快乐8", helper: `选择 ${clampInt(state.manualPlayMode, 1, 10)} 个`, min: 1, max: 80, minCount: clampInt(state.manualPlayMode, 1, 10), maxCount: clampInt(state.manualPlayMode, 1, 10), tone: "k8orange" }
     ];
     if (gameKey === "qlc") return [
-      { key: "nums7", label: "基本号", helper: "选择 7 个", min: 1, max: 30, count: 7, tone: "yellow" }
+      { key: "nums7", label: "基本号", helper: "选择 7 个", min: 1, max: 30, minCount: 7, maxCount: 7, tone: "yellow" }
     ];
     if (gameKey === "fc3d" || gameKey === "pl3") {
       if (state.manualPlayMode === "group3") {
-        return [{ key: "nums3", label: "组三号码", helper: "选择 2 个数字，第一个作为重号", min: 0, max: 9, count: 2, tone: gameKey === "fc3d" ? "fc3d" : "plum" }];
+        return [{ key: "nums3", label: "组三号码", helper: "选择 2 个数字，第一个作为重号", min: 0, max: 9, minCount: 2, maxCount: 2, tone: gameKey === "fc3d" ? "fc3d" : "plum" }];
       }
       if (state.manualPlayMode === "group6") {
-        return [{ key: "nums3", label: "组六号码", helper: "选择 3 个不同数字", min: 0, max: 9, count: 3, tone: gameKey === "fc3d" ? "fc3d" : "plum" }];
+        return [{ key: "nums3", label: "组六号码", helper: "选择 3 个不同数字", min: 0, max: 9, minCount: 3, maxCount: 3, tone: gameKey === "fc3d" ? "fc3d" : "plum" }];
       }
-      return ["百位", "十位", "个位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, count: 1, positional: true, tone: gameKey === "fc3d" ? "fc3d" : "plum" }));
+      return ["百位", "十位", "个位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, minCount: 1, maxCount: 1, positional: true, tone: gameKey === "fc3d" ? "fc3d" : "plum" }));
     }
     if (gameKey === "pl5") {
-      return ["万位", "千位", "百位", "十位", "个位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, count: 1, positional: true, tone: "plum" }));
+      return ["万位", "千位", "百位", "十位", "个位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, minCount: 1, maxCount: 1, positional: true, tone: "plum" }));
     }
     if (gameKey === "qxc") {
       return [
-        ...["第一位", "第二位", "第三位", "第四位", "第五位", "第六位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, count: 1, positional: true, tone: "indigo" })),
-        { key: "tail", label: "特别号", helper: "选择 1 个（0–14）", min: 0, max: 14, count: 1, positional: true, tone: "amber" }
+        ...["第一位", "第二位", "第三位", "第四位", "第五位", "第六位"].map((label, index) => ({ key: `pos${index}`, label, helper: "选择 1 个", min: 0, max: 9, minCount: 1, maxCount: 1, positional: true, tone: "indigo" })),
+        { key: "tail", label: "特别号", helper: "选择 1 个（0–14）", min: 0, max: 14, minCount: 1, maxCount: 1, positional: true, tone: "amber" }
       ];
     }
     return [];
@@ -2596,8 +2789,12 @@
     if (!els.manualPicker) return;
     const sections = getManualSections();
     const selectedCount = sections.reduce((sum, section) => sum + (state.manualSelection[section.key]?.length || 0), 0);
-    const requiredCount = sections.reduce((sum, section) => sum + section.count, 0);
-    if (els.manualPickerHint) els.manualPickerHint.textContent = `已选 ${selectedCount}/${requiredCount} · ${GAME_CONFIGS[state.manualGameKey]?.label || ""}`;
+    const requiredCount = sections.reduce((sum, section) => sum + section.minCount, 0);
+    const builtCount = isManualSelectionComplete() ? buildManualTickets().length : 0;
+    if (els.manualPickerHint) {
+      const resultHint = state.manualEntryMode === "manual" ? "" : ` · 可生成 ${builtCount} 注`;
+      els.manualPickerHint.textContent = `已选 ${selectedCount} 个（至少 ${requiredCount} 个）· ${GAME_CONFIGS[state.manualGameKey]?.label || ""}${resultHint}`;
+    }
     els.manualPicker.innerHTML = sections.map((section) => {
       const selected = state.manualSelection[section.key] || [];
       const balls = Array.from({ length: section.max - section.min + 1 }, (_, index) => section.min + index).map((number) => {
@@ -2613,47 +2810,198 @@
       const values = (state.manualSelection[section.key] || []).slice();
       const existing = values.indexOf(number);
       if (existing >= 0 && !section.positional) values.splice(existing, 1);
-      else if (section.positional || section.count === 1) values.splice(0, values.length, number);
-      else if (values.length < section.count) values.push(number);
+      else if (section.positional || section.maxCount === 1) values.splice(0, values.length, number);
+      else if (values.length < section.maxCount) values.push(number);
       else {
-        toast(`${section.label}最多选择 ${section.count} 个`);
+        toast(`${section.label}最多选择 ${section.maxCount} 个`);
         return;
+      }
+      if (existing < 0 && section.exclusiveGroup) {
+        sections
+          .filter((item) => item.exclusiveGroup === section.exclusiveGroup && item.key !== section.key)
+          .forEach((item) => {
+            state.manualSelection[item.key] = (state.manualSelection[item.key] || []).filter((value) => value !== number);
+          });
       }
       state.manualSelection[section.key] = values;
       renderManualPicker();
     }));
-    if (els.manualAddLineBtn) els.manualAddLineBtn.disabled = !isManualSelectionComplete();
+    if (els.manualAddLineBtn) {
+      const tooMany = builtCount > MAX_SYSTEM_COMBINATIONS;
+      els.manualAddLineBtn.disabled = !isManualSelectionComplete() || tooMany;
+      els.manualAddLineBtn.textContent = state.manualEntryMode === "manual"
+        ? "＋ 加入这一注"
+        : (tooMany ? `组合超过 ${MAX_SYSTEM_COMBINATIONS} 注` : `生成并加入 ${builtCount} 注组合`);
+    }
   }
 
   function isManualSelectionComplete() {
-    return getManualSections().every((section) => (state.manualSelection[section.key] || []).length === section.count);
+    const sections = getManualSections();
+    const basicComplete = sections.every((section) => {
+      const length = (state.manualSelection[section.key] || []).length;
+      return length >= section.minCount && length <= section.maxCount;
+    });
+    if (!basicComplete) return false;
+    if (state.manualEntryMode !== "banker") return true;
+    const count = (key) => (state.manualSelection[key] || []).length;
+    if (state.manualGameKey === "ssq") return count("redDan") + count("redTuo") >= 7;
+    if (state.manualGameKey === "dlt") {
+      const frontOkay = !state.manualSelection.frontDan || count("frontDan") + count("frontTuo") >= 6;
+      const backOkay = !state.manualSelection.backDan || count("backDan") + count("backTuo") >= 3;
+      return frontOkay && backOkay;
+    }
+    return true;
   }
 
-  function buildManualTicket() {
-    if (!isManualSelectionComplete()) return null;
+  function randomizeManualSelection() {
+    const shuffleNumbers = (values) => {
+      for (let index = values.length - 1; index > 0; index -= 1) {
+        const swapIndex = randomInt(0, index);
+        [values[index], values[swapIndex]] = [values[swapIndex], values[index]];
+      }
+      return values;
+    };
+    const sections = getManualSections();
+    state.manualSelection = {};
+    sections.forEach((section) => {
+      const excluded = new Set();
+      if (section.exclusiveGroup) {
+        sections
+          .filter((item) => item.exclusiveGroup === section.exclusiveGroup && item.key !== section.key)
+          .forEach((item) => (state.manualSelection[item.key] || []).forEach((value) => excluded.add(value)));
+      }
+      const pool = Array.from({ length: section.max - section.min + 1 }, (_, index) => section.min + index)
+        .filter((value) => !excluded.has(value));
+      shuffleNumbers(pool);
+      state.manualSelection[section.key] = pool.slice(0, section.minCount).sort((a, b) => a - b);
+    });
+    if (state.manualEntryMode === "banker") {
+      if (state.manualGameKey === "ssq") {
+        const needed = Math.max(0, 7 - (state.manualSelection.redDan?.length || 0) - (state.manualSelection.redTuo?.length || 0));
+        const used = new Set([...(state.manualSelection.redDan || []), ...(state.manualSelection.redTuo || [])]);
+        const pool = Array.from({ length: 33 }, (_, index) => index + 1).filter((value) => !used.has(value));
+        shuffleNumbers(pool);
+        state.manualSelection.redTuo = (state.manualSelection.redTuo || []).concat(pool.slice(0, needed)).sort((a, b) => a - b);
+      } else {
+        const ensureZone = (danKey, tuoKey, max, minimum) => {
+          if (!state.manualSelection[danKey]) return;
+          const needed = Math.max(0, minimum - state.manualSelection[danKey].length - state.manualSelection[tuoKey].length);
+          const used = new Set([...state.manualSelection[danKey], ...state.manualSelection[tuoKey]]);
+          const pool = Array.from({ length: max }, (_, index) => index + 1).filter((value) => !used.has(value));
+          shuffleNumbers(pool);
+          state.manualSelection[tuoKey] = state.manualSelection[tuoKey].concat(pool.slice(0, needed)).sort((a, b) => a - b);
+        };
+        ensureZone("frontDan", "frontTuo", 35, 6);
+        ensureZone("backDan", "backTuo", 12, 3);
+      }
+    }
+  }
+
+  function chooseCombinations(values, count) {
+    if (count === 0) return [[]];
+    if (values.length < count) return [];
+    const result = [];
+    const walk = (start, picked) => {
+      if (picked.length === count) {
+        result.push(picked.slice());
+        return;
+      }
+      for (let index = start; index <= values.length - (count - picked.length); index += 1) {
+        picked.push(values[index]);
+        walk(index + 1, picked);
+        picked.pop();
+        if (result.length > MAX_SYSTEM_COMBINATIONS) return;
+      }
+    };
+    walk(0, []);
+    return result;
+  }
+
+  function getManualSystemLabel() {
+    return getManualModes(state.manualGameKey).find((mode) => mode.key === state.manualSystemType)?.label
+      || (state.manualEntryMode === "compound" ? "复式" : state.manualEntryMode === "banker" ? "胆拖" : "普通");
+  }
+
+  function crossProductTickets(leftSets, rightSets, factory) {
+    const tickets = [];
+    for (const left of leftSets) {
+      for (const right of rightSets) {
+        tickets.push(factory(left, right));
+        if (tickets.length > MAX_SYSTEM_COMBINATIONS) return tickets;
+      }
+    }
+    return tickets;
+  }
+
+  function buildManualTickets() {
+    if (!isManualSelectionComplete()) return [];
     const value = (key) => (state.manualSelection[key] || []).slice().sort((a, b) => a - b);
     const ordered = (count) => Array.from({ length: count }, (_, index) => (state.manualSelection[`pos${index}`] || [])[0]);
-    if (state.manualGameKey === "ssq") return { red: value("red"), blue: value("blue") };
-    if (state.manualGameKey === "dlt") return { front: value("front"), back: value("back"), playMode: state.manualPlayMode, addOn: state.manualPlayMode === "add" };
-    if (state.manualGameKey === "k8") return { nums: value("nums"), playCount: clampInt(state.manualPlayMode, 1, 10), playMode: state.manualPlayMode };
-    if (state.manualGameKey === "qlc") return { nums7: value("nums7") };
+    const decorate = (ticket, label = "普通") => ({
+      ...ticket,
+      _entryKind: state.manualEntryMode,
+      _entryLabel: label
+    });
+    if (state.manualEntryMode === "compound") {
+      const label = getManualSystemLabel();
+      if (state.manualGameKey === "ssq") {
+        const reds = chooseCombinations(value("red"), 6);
+        const blues = value("blue");
+        return crossProductTickets(reds, blues, (red, blue) => decorate({ red, blue: [blue] }, label));
+      }
+      const fronts = chooseCombinations(value("front"), 5);
+      const backs = chooseCombinations(value("back"), 2);
+      return crossProductTickets(fronts, backs, (front, back) => decorate({
+        front,
+        back,
+        playMode: state.manualAddOn ? "add" : "normal",
+        addOn: state.manualAddOn
+      }, label));
+    }
+    if (state.manualEntryMode === "banker") {
+      const label = getManualSystemLabel();
+      if (state.manualGameKey === "ssq") {
+        const redDan = value("redDan");
+        const redSets = chooseCombinations(value("redTuo"), 6 - redDan.length)
+          .map((tuo) => redDan.concat(tuo).sort((a, b) => a - b));
+        return crossProductTickets(redSets, value("blue"), (red, blue) => decorate({ red, blue: [blue] }, label));
+      }
+      const frontSets = state.manualSystemType === "back_banker"
+        ? [value("front")]
+        : chooseCombinations(value("frontTuo"), 5 - value("frontDan").length)
+          .map((tuo) => value("frontDan").concat(tuo).sort((a, b) => a - b));
+      const backSets = state.manualSystemType === "front_banker"
+        ? [value("back")]
+        : chooseCombinations(value("backTuo"), 2 - value("backDan").length)
+          .map((tuo) => value("backDan").concat(tuo).sort((a, b) => a - b));
+      return crossProductTickets(frontSets, backSets, (front, back) => decorate({
+        front,
+        back,
+        playMode: state.manualAddOn ? "add" : "normal",
+        addOn: state.manualAddOn
+      }, label));
+    }
+    if (state.manualGameKey === "ssq") return [decorate({ red: value("red"), blue: value("blue") })];
+    if (state.manualGameKey === "dlt") return [decorate({ front: value("front"), back: value("back"), playMode: state.manualAddOn ? "add" : "normal", addOn: state.manualAddOn })];
+    if (state.manualGameKey === "k8") return [decorate({ nums: value("nums"), playCount: clampInt(state.manualPlayMode, 1, 10), playMode: state.manualPlayMode })];
+    if (state.manualGameKey === "qlc") return [decorate({ nums7: value("nums7") })];
     if (state.manualGameKey === "fc3d" || state.manualGameKey === "pl3") {
       if (state.manualPlayMode === "group3") {
         const nums = state.manualSelection.nums3.slice();
-        return { nums3: [nums[0], nums[0], nums[1]], playMode: "group3" };
+        return [decorate({ nums3: [nums[0], nums[0], nums[1]], playMode: "group3" }, "组三")];
       }
-      if (state.manualPlayMode === "group6") return { nums3: value("nums3"), playMode: "group6" };
-      return { nums3: ordered(3), playMode: "single" };
+      if (state.manualPlayMode === "group6") return [decorate({ nums3: value("nums3"), playMode: "group6" }, "组六")];
+      return [decorate({ nums3: ordered(3), playMode: "single" })];
     }
-    if (state.manualGameKey === "pl5") return { nums5: ordered(5) };
-    if (state.manualGameKey === "qxc") return { nums6: ordered(6), tail: (state.manualSelection.tail || [0])[0] };
-    return null;
+    if (state.manualGameKey === "pl5") return [decorate({ nums5: ordered(5) })];
+    if (state.manualGameKey === "qxc") return [decorate({ nums6: ordered(6), tail: (state.manualSelection.tail || [0])[0] })];
+    return [];
   }
 
   function renderManualDraft() {
     if (!els.manualDraftList) return;
     const count = state.manualTickets.length;
-    const price = (GAME_CONFIGS[state.manualGameKey]?.price || 2) + (state.manualGameKey === "dlt" && state.manualPlayMode === "add" ? 1 : 0);
+    const price = (GAME_CONFIGS[state.manualGameKey]?.price || 2) + (state.manualGameKey === "dlt" && state.manualAddOn ? 1 : 0);
     const total = count * state.manualMultiple * price;
     if (els.manualMultipleText) els.manualMultipleText.textContent = `${state.manualMultiple}倍`;
     if (els.manualDraftSummary) els.manualDraftSummary.textContent = count ? `${count} 注 · ${formatMoney(total)}` : "暂无号码";
@@ -2664,7 +3012,7 @@
       els.manualDraftList.className = "ticket-list";
       els.manualDraftList.innerHTML = state.manualTickets.map((ticket, index) => `
         <article class="ticket-card random-ticket-${state.manualGameKey}">
-          <div class="ticket-head"><div class="ticket-head-left"><span class="ticket-no">第 ${index + 1} 注</span><span class="ticket-meta-inline">${GAME_CONFIGS[state.manualGameKey].label} · ${formatPlayMode(ticket.playMode || state.manualPlayMode) || "普通"}</span></div><button class="delete-btn" type="button" data-manual-delete="${index}">删除</button></div>
+          <div class="ticket-head"><div class="ticket-head-left"><span class="ticket-no">第 ${index + 1} 注</span><span class="ticket-meta-inline">${GAME_CONFIGS[state.manualGameKey].label} · ${ticket._entryLabel || formatPlayMode(ticket.playMode || state.manualPlayMode) || "普通"}</span></div><button class="delete-btn" type="button" data-manual-delete="${index}">删除</button></div>
           ${renderTicketBalls(state.manualGameKey, ticket)}
         </article>
       `).join("");
@@ -3725,6 +4073,80 @@
     return {
       ...metadata,
       available: true,
+      message: ""
+    };
+  }
+
+  function getEntryGameKey() {
+    return state.ticketAddStep === "random" ? state.gameKey : state.manualGameKey;
+  }
+
+  function syncEntryTargetForGame(force = false) {
+    if (!els.entryIssueInput || !els.entryDateInput || state.ticketAddStep === "intro") return;
+    const gameKey = getEntryGameKey();
+    const metadata = getNextDrawMetadata(gameKey);
+    const expect = String(metadata?.expect || "");
+    const openDate = normalizeDate(metadata?.openDate || metadata?.openTime || "");
+    const currentAutoGame = els.entryTargetCard?.dataset.autoGame || "";
+    if (force || currentAutoGame !== gameKey || (!els.entryIssueInput.value && !els.entryDateInput.value)) {
+      els.entryIssueInput.value = expect;
+      els.entryDateInput.value = openDate;
+    }
+    if (els.entryTargetCard) {
+      els.entryTargetCard.dataset.autoGame = gameKey;
+      els.entryTargetCard.dataset.autoExpect = expect;
+      els.entryTargetCard.dataset.autoDate = openDate;
+    }
+    renderEntryTargetHint();
+  }
+
+  function renderEntryTargetHint() {
+    if (!els.entryTargetHint) return;
+    const gameKey = getEntryGameKey();
+    const expect = String(els.entryIssueInput?.value || "").trim();
+    const date = normalizeDate(els.entryDateInput?.value || "");
+    const autoExpect = String(els.entryTargetCard?.dataset.autoExpect || "");
+    const autoDate = normalizeDate(els.entryTargetCard?.dataset.autoDate || "");
+    const isManual = Boolean(expect || date) && (expect !== autoExpect || date !== autoDate);
+    els.entryTargetHint.textContent = !expect || !date
+      ? "请补全期号和开奖日期后再保存"
+      : `${isManual ? "已手动调整" : "开奖仓库自动带入"} · ${GAME_CONFIGS[gameKey]?.label || gameKey}`;
+    els.entryTargetHint.dataset.tone = !expect || !date ? "warn" : isManual ? "manual" : "auto";
+  }
+
+  function getEntryTargetDraw(gameKey) {
+    const expect = String(els.entryIssueInput?.value || "").trim();
+    const openDate = normalizeDate(els.entryDateInput?.value || "");
+    const autoExpect = String(els.entryTargetCard?.dataset.autoExpect || "");
+    const autoDate = normalizeDate(els.entryTargetCard?.dataset.autoDate || "");
+    if (!expect || !openDate) {
+      return { available: false, status: "unavailable", message: "请填写开奖期号和开奖日期" };
+    }
+    if (expect === autoExpect && openDate === autoDate) {
+      const target = getNextDrawTarget(gameKey);
+      if (target.available) return target;
+      const metadata = getNextDrawMetadata(gameKey);
+      if (!metadata) return target;
+      return {
+        ...metadata,
+        expect,
+        openDate,
+        available: true,
+        message: ""
+      };
+    }
+    return {
+      available: true,
+      expect,
+      openDate,
+      openTime: `${openDate}T21:15:00+08:00`,
+      buyEndTime: `${openDate}T20:00:00+08:00`,
+      status: "manual",
+      source: "manual_entry",
+      confirmed: false,
+      basisIssue: "",
+      resolutionReason: "user_selected_target",
+      sourceDrawId: "",
       message: ""
     };
   }

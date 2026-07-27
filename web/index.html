@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="彩票夹">
-    <link rel="manifest" href="./manifest.webmanifest?v=3.4.3">
+    <link rel="manifest" href="./manifest.webmanifest?v=3.5.0">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <style>[hidden] { display: none !important; }</style>
     <script>
@@ -24,7 +24,7 @@
         if (themeColor) themeColor.setAttribute("content", theme === "dark" ? "#0b0f1c" : "#f7f7f7");
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=3.4.3">
+    <link rel="stylesheet" href="./styles.css?v=3.5.0">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' fill='white' font-family='Arial,sans-serif'%3E%E5%A4%B9%3C/text%3E%3C/svg%3E">
   </head>
   <body>
@@ -109,7 +109,7 @@
                 <button class="round-action-btn" id="scanTicketBtn" type="button" aria-label="直接扫描彩票">
                   <svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
                 </button>
-                <button class="round-action-btn wallet-more-btn" id="walletMoreBtn" type="button" aria-label="查看全部彩票记录"><span aria-hidden="true">•••</span></button>
+                <button class="round-action-btn wallet-more-btn" id="walletMoreBtn" type="button" aria-label="查看所有票夹记录"><span aria-hidden="true">•••</span></button>
               </div>
             </header>
 
@@ -187,7 +187,7 @@
             <div class="mine-menu-item">
               <span class="setting-icon is-blue"><svg class="icn" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
               <div class="mine-menu-copy">
-                <div class="mine-menu-title">完整彩票记录</div>
+                <div class="mine-menu-title">所有票夹记录</div>
                 <div class="mine-menu-sub" id="mineRecordSummary">共 0 条记录</div>
               </div>
               <button class="mini-blue has-icon" id="mineRecordToggleBtn" type="button">
@@ -237,11 +237,12 @@
       <section class="view-section" data-view-panel="myRecords" hidden>
         <div class="history-page">
           <div class="history-head">
-            <div class="history-title-wrap"><div class="history-title">完整彩票记录</div><div class="history-sub" id="myRecordsSummary">共 0 条</div></div>
+            <div class="history-title-wrap"><div class="history-title">所有票夹记录</div><div class="history-sub" id="myRecordsSummary">共 0 条</div></div>
             <button class="mini-blue has-icon" id="myRecordsBackBtn" type="button"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>返回</span></button>
           </div>
           <section class="record-filter-panel" aria-label="按彩种筛选彩票记录">
             <div class="record-filter-chips" id="recordFilterChips"></div>
+            <div class="record-status-filter-chips" id="recordStatusFilterChips" role="group" aria-label="按核对状态筛选票夹记录"></div>
             <div class="record-filter-summary" id="recordFilterSummary">全部彩种 · 暂无记录</div>
           </section>
           <section class="all-wallet-records"><div id="mineRecordList" class="wallet-ticket-list empty" aria-live="polite">暂无保存记录</div></section>
@@ -323,30 +324,23 @@
             </button>
             <button class="add-option" id="openManualToolBtn" type="button">
               <span class="add-option-icon"><svg class="icn" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg></span>
-              <span><strong>手动录入号码</strong><small>支持全部八个彩种的普通号码</small></span>
+              <span><strong>手动录入号码</strong><small>随机、手动、复式与胆拖统一录入</small></span>
               <svg class="icn" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
             </button>
-            <div class="number-tools-label"><strong>选号工具</strong><span>仅用于生成或整理号码，不代表购买</span></div>
-            <div class="add-tool-grid">
-              <button class="add-tool-tile" id="openRandomToolBtn" type="button">
-                <span class="add-tool-icon is-purple"><svg class="icn" viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-8 8M3 21l8-8M16 21h5v-5M3 3l5 5"/></svg></span>
-                <strong>随机选号</strong>
-              </button>
-              <button class="add-tool-tile" id="openManualPickToolBtn" type="button">
-                <span class="add-tool-icon is-blue"><svg class="icn" viewBox="0 0 24 24"><path d="M7 11V7a2 2 0 0 1 4 0v4-6a2 2 0 0 1 4 0v6-4a2 2 0 0 1 4 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5.2-3L4 13.5A2 2 0 0 1 7 11z"/></svg></span>
-                <strong>手动选号</strong>
-              </button>
-              <span class="add-tool-tile is-disabled">
-                <span class="add-tool-icon is-indigo"><svg class="icn" viewBox="0 0 24 24"><path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z"/></svg></span>
-                <strong>复式</strong><em>后续支持</em>
-              </span>
-              <span class="add-tool-tile is-disabled">
-                <span class="add-tool-icon is-pink"><svg class="icn" viewBox="0 0 24 24"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg></span>
-                <strong>胆拖</strong><em>后续支持</em>
-              </span>
-            </div>
             <div class="add-responsible-note">请通过当地合法、正规线下彩票销售渠道购买，请勿参与网络售彩、代购或非法投注平台。</div>
           </div>
+
+          <nav class="entry-mode-tabs" id="entryModeTabs" aria-label="录入方式" hidden></nav>
+          <section class="card entry-target-card" id="entryTargetCard" hidden>
+            <div class="entry-target-head">
+              <div><div class="section-title section-title-no-margin">绑定开奖期次</div><div class="entry-target-hint" id="entryTargetHint">自动读取开奖仓库的下一期信息</div></div>
+              <button class="mini-blue" id="entryTargetResetBtn" type="button">恢复自动</button>
+            </div>
+            <div class="entry-target-fields">
+              <label><span>期号</span><input id="entryIssueInput" type="text" inputmode="numeric" placeholder="自动获取"></label>
+              <label><span>开奖日期</span><input id="entryDateInput" type="date"></label>
+            </div>
+          </section>
 
           <div class="ticket-tool-view" id="randomToolView" hidden>
             <div class="custom-random-panel">
@@ -397,13 +391,19 @@
               <div class="manual-game-tabs" id="manualGameTabs"></div>
             </section>
             <section class="card manual-card" id="manualPlayModeField">
-              <div class="section-title">玩法</div>
+              <div class="manual-mode-head">
+                <div class="section-title section-title-no-margin" id="manualModeTitle">玩法</div>
+                <button class="dlt-addon-btn" id="manualAddOnBtn" type="button" aria-pressed="false" hidden>追加</button>
+              </div>
               <div class="segment-row manual-play-tabs" id="manualPlayModeTabs"></div>
             </section>
             <section class="card manual-picker-card">
               <div class="manual-picker-head">
                 <div><div class="section-title section-title-no-margin">手动选择号码</div><div class="manual-picker-sub" id="manualPickerHint">按规则选择一注号码</div></div>
-                <button class="mini-clear" id="manualClearBtn" type="button">清空</button>
+                <div class="manual-picker-actions">
+                  <button class="mini-blue" id="manualRandomBtn" type="button">随机一组</button>
+                  <button class="mini-clear" id="manualClearBtn" type="button">清空</button>
+                </div>
               </div>
               <div class="manual-picker" id="manualPicker"></div>
               <button class="manual-add-line-btn" id="manualAddLineBtn" type="button" disabled>＋ 加入这一注</button>
@@ -437,9 +437,9 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./rules.js?v=3.4.3"></script>
-    <script src="./ocr.js?v=3.4.3"></script>
-    <script src="./pwa.js?v=3.4.3"></script>
-    <script src="./app.js?v=3.4.3"></script>
+    <script src="./rules.js?v=3.5.0"></script>
+    <script src="./ocr.js?v=3.5.0"></script>
+    <script src="./pwa.js?v=3.5.0"></script>
+    <script src="./app.js?v=3.5.0"></script>
   </body>
 </html>

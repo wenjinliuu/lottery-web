@@ -5351,3 +5351,238 @@ body { width: 100%; }
   border-color: rgba(245, 158, 11, .48);
   box-shadow: 0 0 0 1px rgba(245, 158, 11, .07);
 }
+
+/* v3.5：手动录入统一工作台。进入选号后使用全屏，四种模式共享期次与日期。 */
+.ticket-add.is-tool-mode {
+  align-items: stretch;
+}
+.ticket-add.is-tool-mode .ticket-add-panel {
+  width: min(100%, 720px);
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-top: max(8px, env(safe-area-inset-top));
+  border-width: 0 1px;
+  border-radius: 0;
+}
+.ticket-add.is-tool-mode .sheet-handle { display: none; }
+.ticket-add.is-tool-mode .ticket-add-head {
+  flex: 0 0 auto;
+  min-height: 58px;
+}
+.ticket-add.is-tool-mode .ticket-add-scroll {
+  flex: 1 1 auto;
+  padding-bottom: calc(16px + var(--safe-bottom));
+}
+.entry-mode-tabs {
+  position: sticky;
+  z-index: 8;
+  top: -8px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 8px 0 9px;
+  background: linear-gradient(180deg, var(--page) 72%, transparent);
+}
+.entry-mode-tabs[hidden] { display: none; }
+.entry-mode-tab {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 5px;
+  border: 1px solid var(--glass-stroke);
+  border-radius: 14px;
+  color: var(--muted-strong);
+  background: var(--glass-tint-soft);
+  font-size: 10px;
+  font-weight: 900;
+}
+.entry-mode-tab.is-active {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(180deg, #5ea8ff, #2563eb);
+  box-shadow: 0 7px 16px rgba(37,99,235,.20);
+}
+.entry-target-card { margin-bottom: 10px; }
+.entry-target-head,
+.manual-mode-head,
+.manual-picker-actions {
+  display: flex;
+  align-items: center;
+}
+.entry-target-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+.entry-target-head > div { min-width: 0; }
+.entry-target-hint {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entry-target-hint[data-tone="warn"] { color: #d97706; }
+.entry-target-hint[data-tone="manual"] { color: #2563eb; }
+.entry-target-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 9px;
+  margin-top: 11px;
+}
+.entry-target-fields label { display: grid; gap: 5px; min-width: 0; }
+.entry-target-fields span { color: var(--muted); font-size: 9px; font-weight: 800; }
+.entry-target-fields input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--glass-stroke);
+  border-radius: 13px;
+  color: var(--ink);
+  background: var(--glass-tint-soft);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 850;
+}
+.manual-mode-head { justify-content: space-between; gap: 10px; }
+.manual-picker-actions { justify-content: flex-end; gap: 6px; }
+.manual-picker-actions button { min-height: 32px; padding-inline: 10px; }
+.manual-ball-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.manual-ball-grid.is-positional { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.manual-ball { width: 100%; max-width: 40px; justify-self: center; }
+.manual-add-line-btn {
+  min-height: 43px;
+  padding: 0 12px;
+  line-height: 1.2;
+}
+.wallet-entry-badge {
+  color: #2563eb !important;
+  background: rgba(37,99,235,.09) !important;
+}
+.record-status-filter-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+.record-status-filter-btn {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 4px;
+  border: 1px solid var(--glass-stroke);
+  border-radius: 12px;
+  color: var(--muted-strong);
+  background: var(--glass-tint-soft);
+  font-size: 9px;
+  font-weight: 850;
+}
+.record-status-filter-btn.is-active {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(180deg, #5ea8ff, #2563eb);
+}
+
+/*
+ * 电子票据最终轮廓：父层只承担一圈随锯齿走向的彩色边缘，
+ * ::before 是唯一纸面，::after 只负责玻璃高光。旧矩形边框与半圆缺口全部失效。
+ */
+.wallet-ticket {
+  --ticket-edge-color: rgba(var(--wallet-rgb), .48);
+  --ticket-cut: polygon(
+    2% 0, 98% 0,
+    100% 2%, 98.25% 4%, 100% 6%, 98.25% 8%, 100% 10%, 98.25% 12%,
+    100% 14%, 98.25% 16%, 100% 18%, 98.25% 20%, 100% 22%, 98.25% 24%,
+    100% 26%, 98.25% 28%, 100% 30%, 98.25% 32%, 100% 34%, 98.25% 36%,
+    100% 38%, 98.25% 40%, 100% 42%, 98.25% 44%, 100% 46%, 98.25% 48%,
+    100% 50%, 98.25% 52%, 100% 54%, 98.25% 56%, 100% 58%, 98.25% 60%,
+    100% 62%, 98.25% 64%, 100% 66%, 98.25% 68%, 100% 70%, 98.25% 72%,
+    100% 74%, 98.25% 76%, 100% 78%, 98.25% 80%, 100% 82%, 98.25% 84%,
+    100% 86%, 98.25% 88%, 100% 90%, 98.25% 92%, 100% 94%, 98.25% 96%,
+    100% 98%, 98% 100%, 2% 100%,
+    0 98%, 1.75% 96%, 0 94%, 1.75% 92%, 0 90%, 1.75% 88%,
+    0 86%, 1.75% 84%, 0 82%, 1.75% 80%, 0 78%, 1.75% 76%,
+    0 74%, 1.75% 72%, 0 70%, 1.75% 68%, 0 66%, 1.75% 64%,
+    0 62%, 1.75% 60%, 0 58%, 1.75% 56%, 0 54%, 1.75% 52%,
+    0 50%, 1.75% 48%, 0 46%, 1.75% 44%, 0 42%, 1.75% 40%,
+    0 38%, 1.75% 36%, 0 34%, 1.75% 32%, 0 30%, 1.75% 28%,
+    0 26%, 1.75% 24%, 0 22%, 1.75% 20%, 0 18%, 1.75% 16%,
+    0 14%, 1.75% 12%, 0 10%, 1.75% 8%, 0 6%, 1.75% 4%, 0 2%
+  );
+  isolation: isolate;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  clip-path: var(--ticket-cut);
+  background: var(--ticket-edge-color) !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 10px 18px rgba(28,40,80,.10));
+}
+.wallet-ticket::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 1.25px !important;
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  clip-path: var(--ticket-cut);
+  background:
+    radial-gradient(circle at 94% 2%, rgba(var(--wallet-rgb),.13), transparent 34%),
+    linear-gradient(145deg, rgba(255,255,255,.91), rgba(247,250,255,.77) 58%, rgba(var(--wallet-rgb),.055)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.78) !important;
+  transform: none !important;
+  pointer-events: none;
+}
+.wallet-ticket::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 1.25px !important;
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  clip-path: var(--ticket-cut);
+  background: linear-gradient(118deg, rgba(255,255,255,.18), transparent 34%, rgba(255,255,255,.08) 70%, transparent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  pointer-events: none;
+}
+.wallet-ticket > * { position: relative; z-index: 2; }
+.wallet-ticket.is-winning {
+  --ticket-edge-color: #10b981;
+  filter: drop-shadow(0 11px 21px rgba(16,185,129,.18));
+}
+.wallet-ticket.is-winning::before {
+  background:
+    radial-gradient(circle at 94% 2%, rgba(250,204,21,.14), transparent 32%),
+    radial-gradient(circle at 5% 96%, rgba(16,185,129,.10), transparent 30%),
+    linear-gradient(145deg, rgba(255,255,255,.92), rgba(248,252,249,.80) 58%, rgba(16,185,129,.06)) !important;
+}
+[data-theme="dark"] .wallet-ticket {
+  filter: drop-shadow(0 11px 21px rgba(0,0,0,.27));
+}
+[data-theme="dark"] .wallet-ticket::before {
+  background:
+    radial-gradient(circle at 94% 2%, rgba(var(--wallet-rgb),.15), transparent 35%),
+    linear-gradient(145deg, rgba(26,32,48,.98), rgba(13,18,31,.97) 64%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.065) !important;
+}
+[data-theme="dark"] .wallet-ticket.is-winning {
+  filter: drop-shadow(0 11px 22px rgba(16,185,129,.16));
+}
+[data-theme="dark"] .wallet-ticket.is-winning::before {
+  background:
+    radial-gradient(circle at 94% 2%, rgba(250,204,21,.14), transparent 32%),
+    radial-gradient(circle at 5% 96%, rgba(16,185,129,.11), transparent 30%),
+    linear-gradient(145deg, rgba(22,31,40,.99), rgba(13,18,31,.97) 62%) !important;
+}
+
+@media (max-width: 390px) {
+  .manual-ball-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .manual-ball-grid.is-positional { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  .entry-target-fields { grid-template-columns: 1fr; }
+}
