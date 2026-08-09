@@ -5639,40 +5639,44 @@ body { width: 100%; }
 }
 
 /*
- * v3.5.3 电子票据轮廓：
- * 票体自身使用左右两条不同的长周期曲线遮罩，形成柔和、不等幅的自然撕边。
- * 顶部与底部保持平直方角，不再用圆角矩形叠加侧边缺口。
+ * v3.5.4 电子票据视觉：
+ * 以近白票纸为主体，只保留极浅彩种染色；左右使用两条不同的小幅密波遮罩。
+ * 顶部与底部保持平直，不叠加圆角卡片，也不使用大面积彩色光雾。
  */
 .wallet-ticket {
-  --ticket-edge-color: rgba(var(--wallet-rgb), .26);
+  --ticket-edge-color: rgba(var(--wallet-rgb), .15);
   isolation: isolate;
   overflow: hidden !important;
+  padding: 16px 18px 13px !important;
   border: 0 !important;
   border-radius: 0 !important;
   clip-path: none !important;
   background:
-    radial-gradient(62% 58% at 84% 8%, rgba(var(--wallet-rgb), .17), transparent 67%),
-    radial-gradient(76% 86% at 2% 100%, rgba(var(--wallet-rgb), .075), transparent 72%),
-    linear-gradient(135deg, rgba(255,255,255,.82) 0%, rgba(255,255,255,.58) 48%, rgba(var(--wallet-rgb),.065) 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.88), inset 0 -1px 0 rgba(var(--wallet-rgb),.10) !important;
+    linear-gradient(145deg,
+      rgba(var(--wallet-rgb), .048) 0%,
+      rgba(255,255,255,.92) 42%,
+      rgba(255,255,255,.88) 68%,
+      rgba(var(--wallet-rgb),.024) 100%),
+    rgba(255,255,255,.91) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 rgba(var(--wallet-rgb),.055) !important;
   filter:
-    drop-shadow(0 0 .65px var(--ticket-edge-color))
-    drop-shadow(0 10px 16px rgba(34,48,84,.10)) !important;
-  backdrop-filter: blur(18px) saturate(1.12);
-  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+    drop-shadow(0 0 .35px var(--ticket-edge-color))
+    drop-shadow(0 7px 13px rgba(34,48,84,.065)) !important;
+  backdrop-filter: blur(10px) saturate(1.02);
+  -webkit-backdrop-filter: blur(10px) saturate(1.02);
   -webkit-mask-image:
     linear-gradient(#fff 0 0),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='260' viewBox='0 0 20 260'%3E%3Cpath fill='white' d='M9.2 0C11.4 4.2 6.3 8.9 8 13.6C9.9 18.6 5.5 23.7 7.4 28.8C9.8 34.4 5.9 40.2 8.6 45.8C11.2 51.1 6.4 56.8 8 62.3C9.9 68.4 5.1 74.5 7 80.8C8.8 86.4 5.8 92.3 8.9 97.8C11.1 102.1 7.2 108.4 8.1 114.2C9.2 120.6 4.9 126.2 7.5 132.1C10.3 138.2 6.1 144.3 8.6 150C10.8 155.1 5.7 161.2 7.8 167.4C9.8 173.2 6.6 178.5 8.9 184.6C11 190.3 5.6 196.2 7.2 202.4C8.7 208.1 5 214.5 7.9 220.2C10.4 225.1 6.7 231.7 8.5 237.3C10.2 243 6.5 249.6 9.2 260H20V0Z'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='247' viewBox='0 0 20 247'%3E%3Cpath fill='white' d='M0 0H10.1C7.1 5.1 11.7 10.2 9.2 15.4C6.6 21 11.1 26.2 8.6 31.8C6.4 37 10.4 42.8 8 48.7C5.8 54.6 10.8 60.2 9 66.1C7 72.4 11.5 78.1 8.5 83.9C5.9 88.8 10.1 95 8.8 100.8C7.3 107.1 11.7 113.2 9.2 119.1C6.5 125.1 10.6 130.7 8.1 136.3C5.5 142.2 10.7 148.4 8.6 154.4C6.6 160.2 11.2 166.2 9 172.2C6.7 178.5 10.1 184.3 8 190.2C5.7 196.1 10.9 202.2 8.8 208.4C6.8 214.1 11.4 220 9.1 226.3C7.1 232.1 11.7 238.2 10.1 247H0Z'/%3E%3C/svg%3E");
-  -webkit-mask-size: calc(100% - 28px) 100%, 20px 260px, 20px 247px;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='210' viewBox='0 0 14 210'%3E%3Cpath fill='white' d='M6.8 0C8.2 3.3 4.8 6.8 6.3 10.4C7.9 14.3 4.7 18.2 6.1 22.3C7.7 26.6 5 30.6 6.7 34.8C8.1 38.5 4.6 42.8 6.2 47C7.9 51.2 5.1 55.5 6.8 59.7C8.3 63.7 4.9 67.8 6.1 72.2C7.6 76.6 4.7 80.8 6.4 85C8.1 89.4 5 93.5 6.6 97.9C8 102 4.8 106.5 6.2 110.8C7.8 115.2 4.7 119.4 6.5 123.9C8.2 128 5 132.1 6.7 136.4C8 140.5 4.6 144.8 6.1 149.1C7.7 153.5 4.9 157.7 6.6 162C8.1 166.1 4.8 170.4 6.3 174.9C7.8 179.1 5 183.4 6.8 187.6C8.2 191.6 4.8 196 6.2 200.2C7.6 204 5.4 207.4 6.8 210H14V0Z'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='197' viewBox='0 0 14 197'%3E%3Cpath fill='white' d='M0 0H7.1C5.3 3.4 8.4 6.8 6.8 10.3C5.2 14 8 17.7 6.5 21.4C4.9 25.4 8.1 29.1 6.7 33C5.1 36.9 8.4 40.7 6.8 44.8C5.2 48.8 7.9 52.7 6.4 56.8C4.8 60.7 8.2 64.7 6.7 68.8C5.2 72.8 8.5 76.8 6.9 81C5.3 84.9 8 89 6.5 93.1C4.9 97.2 8.2 101.1 6.8 105.3C5.2 109.4 8.4 113.4 6.9 117.6C5.4 121.7 8 125.7 6.4 129.9C4.9 134 8.3 138.1 6.8 142.3C5.1 146.3 8.2 150.4 6.6 154.6C5 158.8 8.4 162.8 6.9 167C5.3 171.2 8.1 175.2 6.5 179.4C4.9 183.3 8.2 187.4 6.8 191.3C5.6 194 7.6 195.8 7.1 197H0Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: calc(100% - 20px) 100%, 14px 210px, 14px 197px;
   -webkit-mask-position: center, left top, right top;
   -webkit-mask-repeat: no-repeat, repeat-y, repeat-y;
   -webkit-mask-composite: source-over;
   mask-image:
     linear-gradient(#fff 0 0),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='260' viewBox='0 0 20 260'%3E%3Cpath fill='white' d='M9.2 0C11.4 4.2 6.3 8.9 8 13.6C9.9 18.6 5.5 23.7 7.4 28.8C9.8 34.4 5.9 40.2 8.6 45.8C11.2 51.1 6.4 56.8 8 62.3C9.9 68.4 5.1 74.5 7 80.8C8.8 86.4 5.8 92.3 8.9 97.8C11.1 102.1 7.2 108.4 8.1 114.2C9.2 120.6 4.9 126.2 7.5 132.1C10.3 138.2 6.1 144.3 8.6 150C10.8 155.1 5.7 161.2 7.8 167.4C9.8 173.2 6.6 178.5 8.9 184.6C11 190.3 5.6 196.2 7.2 202.4C8.7 208.1 5 214.5 7.9 220.2C10.4 225.1 6.7 231.7 8.5 237.3C10.2 243 6.5 249.6 9.2 260H20V0Z'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='247' viewBox='0 0 20 247'%3E%3Cpath fill='white' d='M0 0H10.1C7.1 5.1 11.7 10.2 9.2 15.4C6.6 21 11.1 26.2 8.6 31.8C6.4 37 10.4 42.8 8 48.7C5.8 54.6 10.8 60.2 9 66.1C7 72.4 11.5 78.1 8.5 83.9C5.9 88.8 10.1 95 8.8 100.8C7.3 107.1 11.7 113.2 9.2 119.1C6.5 125.1 10.6 130.7 8.1 136.3C5.5 142.2 10.7 148.4 8.6 154.4C6.6 160.2 11.2 166.2 9 172.2C6.7 178.5 10.1 184.3 8 190.2C5.7 196.1 10.9 202.2 8.8 208.4C6.8 214.1 11.4 220 9.1 226.3C7.1 232.1 11.7 238.2 10.1 247H0Z'/%3E%3C/svg%3E");
-  mask-size: calc(100% - 28px) 100%, 20px 260px, 20px 247px;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='210' viewBox='0 0 14 210'%3E%3Cpath fill='white' d='M6.8 0C8.2 3.3 4.8 6.8 6.3 10.4C7.9 14.3 4.7 18.2 6.1 22.3C7.7 26.6 5 30.6 6.7 34.8C8.1 38.5 4.6 42.8 6.2 47C7.9 51.2 5.1 55.5 6.8 59.7C8.3 63.7 4.9 67.8 6.1 72.2C7.6 76.6 4.7 80.8 6.4 85C8.1 89.4 5 93.5 6.6 97.9C8 102 4.8 106.5 6.2 110.8C7.8 115.2 4.7 119.4 6.5 123.9C8.2 128 5 132.1 6.7 136.4C8 140.5 4.6 144.8 6.1 149.1C7.7 153.5 4.9 157.7 6.6 162C8.1 166.1 4.8 170.4 6.3 174.9C7.8 179.1 5 183.4 6.8 187.6C8.2 191.6 4.8 196 6.2 200.2C7.6 204 5.4 207.4 6.8 210H14V0Z'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='197' viewBox='0 0 14 197'%3E%3Cpath fill='white' d='M0 0H7.1C5.3 3.4 8.4 6.8 6.8 10.3C5.2 14 8 17.7 6.5 21.4C4.9 25.4 8.1 29.1 6.7 33C5.1 36.9 8.4 40.7 6.8 44.8C5.2 48.8 7.9 52.7 6.4 56.8C4.8 60.7 8.2 64.7 6.7 68.8C5.2 72.8 8.5 76.8 6.9 81C5.3 84.9 8 89 6.5 93.1C4.9 97.2 8.2 101.1 6.8 105.3C5.2 109.4 8.4 113.4 6.9 117.6C5.4 121.7 8 125.7 6.4 129.9C4.9 134 8.3 138.1 6.8 142.3C5.1 146.3 8.2 150.4 6.6 154.6C5 158.8 8.4 162.8 6.9 167C5.3 171.2 8.1 175.2 6.5 179.4C4.9 183.3 8.2 187.4 6.8 191.3C5.6 194 7.6 195.8 7.1 197H0Z'/%3E%3C/svg%3E");
+  mask-size: calc(100% - 20px) 100%, 14px 210px, 14px 197px;
   mask-position: center, left top, right top;
   mask-repeat: no-repeat, repeat-y, repeat-y;
   mask-composite: add;
@@ -5683,30 +5687,81 @@ body { width: 100%; }
   display: none !important;
 }
 .wallet-ticket > * { position: relative; z-index: 2; }
+.wallet-ticket-top { gap: 9px; }
+.wallet-ticket-identity {
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+}
+.wallet-game-badge {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  font-size: 10.5px;
+  box-shadow: 0 7px 16px rgba(var(--wallet-rgb),.14);
+}
+.wallet-ticket-issue { font-size: 13px; line-height: 1.18; }
+.wallet-ticket-meta { gap: 2px 8px; margin-top: 4px; color: var(--muted-strong); }
+.wallet-ticket-tags { gap: 4px; margin-top: 5px; }
+.wallet-ticket-tags > span {
+  padding: 2px 6px;
+  background: rgba(100,116,139,.055);
+  font-size: 7.5px;
+}
+.wallet-ticket-head-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.wallet-ticket-head-right .wallet-status {
+  max-width: 74px;
+  padding: 5px 8px;
+  background: rgba(100,116,139,.075);
+  box-shadow: none;
+}
+.wallet-ticket-head-right .wallet-status.is-pending {
+  color: #b45309;
+  background: rgba(245,158,11,.10);
+}
+.wallet-ticket-delete {
+  display: inline-flex;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(239,68,68,.20);
+  border-radius: 50%;
+  color: #ef4444;
+  background: rgba(255,255,255,.48);
+  box-shadow: none;
+}
+.wallet-ticket-delete .icn { width: 14px; height: 14px; }
 .wallet-ticket.is-winning {
-  --ticket-edge-color: rgba(16,185,129,.58);
+  --ticket-edge-color: rgba(16,185,129,.32);
   background:
-    radial-gradient(54% 52% at 88% 5%, rgba(250,204,21,.20), transparent 66%),
-    radial-gradient(68% 82% at 2% 100%, rgba(16,185,129,.11), transparent 72%),
-    linear-gradient(135deg, rgba(255,255,255,.84) 0%, rgba(255,255,255,.60) 50%, rgba(var(--wallet-rgb),.055) 100%) !important;
-  box-shadow:
-    0 13px 30px rgba(16,185,129,.14),
-    inset 0 1px 0 rgba(255,255,255,.86) !important;
+    linear-gradient(145deg, rgba(16,185,129,.045), rgba(255,255,255,.93) 48%, rgba(250,204,21,.035)),
+    rgba(255,255,255,.91) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92) !important;
 }
 [data-theme="dark"] .wallet-ticket {
   background:
-    radial-gradient(62% 58% at 84% 8%, rgba(var(--wallet-rgb),.23), transparent 67%),
-    radial-gradient(76% 86% at 2% 100%, rgba(var(--wallet-rgb),.10), transparent 72%),
-    linear-gradient(135deg, rgba(27,34,52,.96), rgba(15,20,34,.93) 55%, rgba(var(--wallet-rgb),.09)) !important;
-  box-shadow:
-    0 13px 30px rgba(0,0,0,.25),
-    inset 0 1px 0 rgba(255,255,255,.07) !important;
+    linear-gradient(145deg, rgba(var(--wallet-rgb),.095), rgba(20,26,42,.97) 46%, rgba(13,18,31,.97)),
+    #111827 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055) !important;
 }
 [data-theme="dark"] .wallet-ticket.is-winning {
   background:
-    radial-gradient(54% 52% at 88% 5%, rgba(250,204,21,.17), transparent 66%),
-    radial-gradient(68% 82% at 2% 100%, rgba(16,185,129,.13), transparent 72%),
-    linear-gradient(135deg, rgba(26,34,47,.97), rgba(14,19,32,.95) 58%, rgba(var(--wallet-rgb),.08)) !important;
+    linear-gradient(145deg, rgba(16,185,129,.10), rgba(20,27,40,.97) 48%, rgba(250,204,21,.04)),
+    #111827 !important;
+}
+[data-theme="dark"] .wallet-ticket-delete {
+  color: #f87171;
+  border-color: rgba(248,113,113,.27);
+  background: rgba(15,23,42,.46);
 }
 
 /* 礼花始终位于纸面之上；降动画模式也保留静态彩色礼花，不再整层消失。 */
@@ -5722,21 +5777,22 @@ body { width: 100%; }
 
 /* 开奖号码条采用与彩种一致的轻柔实线票面，避免虚线和撕边同时争夺注意力。 */
 .wallet-ticket .wallet-draw-panel {
-  border: 1px solid rgba(var(--wallet-rgb),.18);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.28), transparent),
-    rgba(var(--wallet-rgb),.055);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.52);
+  margin-top: 10px;
+  padding: 8px 3px;
+  border: 1px solid rgba(var(--wallet-rgb),.125);
+  background: rgba(var(--wallet-rgb),.025);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.44);
 }
 .wallet-ticket .wallet-draw-panel.is-pending {
-  border-color: rgba(100,116,139,.13);
-  background: rgba(100,116,139,.035);
+  border-color: rgba(100,116,139,.105);
+  background: rgba(100,116,139,.022);
 }
 [data-theme="dark"] .wallet-ticket .wallet-draw-panel {
   border-color: rgba(var(--wallet-rgb),.24);
   background: rgba(var(--wallet-rgb),.075);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
 }
+.wallet-ticket-lines { padding: 12px 0 10px; }
 .wallet-ticket .wallet-winning-sparkles i {
   position: absolute;
   display: block !important;

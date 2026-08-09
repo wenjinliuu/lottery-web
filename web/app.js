@@ -11,7 +11,7 @@
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
   const SYSTEM_GAMES = new Set(["ssq", "dlt"]);
   const MAX_SYSTEM_COMBINATIONS = 2000;
-  const APP_VERSION = "3.5.3";
+  const APP_VERSION = "3.5.4";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
@@ -2002,7 +2002,8 @@
                 <span>${openDate ? `开奖 ${normalizeDate(openDate)}` : "开奖日期待确认"}</span>
               </div>
               <div class="wallet-ticket-tags">
-                <span>${records.length} 注 · ${first.multiple || 1} 倍</span>
+                <span>${records.length} 注</span>
+                <span>${first.multiple || 1} 倍</span>
                 <span>花费 ${formatCompactMoney(stats.totalCost)}</span>
                 ${first.entryLabel && !["普通", "随机"].includes(first.entryLabel) ? `<span class="wallet-entry-badge">${first.entryLabel}</span>` : ""}
                 ${isDltAddOn ? `<span class="wallet-play-badge">追加</span>` : ""}
@@ -2011,7 +2012,7 @@
           </div>
           <div class="wallet-ticket-head-right">
             <span class="wallet-status is-${status}">${statusText}</span>
-            <button class="delete-btn wallet-ticket-delete has-icon" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本张电子票">${ICON.trash}<span>删除</span></button>
+            <button class="delete-btn wallet-ticket-delete" type="button" data-delete-batch="${batch.batchId}" aria-label="删除本张电子票">${ICON.trash}</button>
           </div>
         </div>
         <div class="wallet-draw-panel${draw ? "" : " is-pending"}">

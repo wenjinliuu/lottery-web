@@ -22,7 +22,7 @@ assert.match(html, /id="latestDraws" class="home-draw-carousel"/);
 assert.match(html, /class="home-floating-scan"/);
 assert.doesNotMatch(html, /class="home-brand"/);
 assert.doesNotMatch(html, /class="page-title"/);
-assert.match(html, /styles\.css\?v=3\.5\.3/);
+assert.match(html, /styles\.css\?v=3\.5\.4/);
 assert.match(html, /id="profitNetValue"/);
 assert.doesNotMatch(html, /id="profitSub"/);
 assert.match(html, /class="wallet-sticky-shell"/);
@@ -57,7 +57,7 @@ assert.match(headers, /\/sw\.js[\s\S]*no-cache/, "service worker updates should 
 assert.match(app, /LotteryPrizeRules\.evaluateTicket/, "app should use the standalone prize rules module");
 assert.match(app, /backupChecksum/, "backup v2 should include integrity checking");
 assert.match(app, /renderMonthlyStats/, "monthly statistics should be wired");
-assert.match(app, /const APP_VERSION = "3\.5\.3"/);
+assert.match(app, /const APP_VERSION = "3\.5\.4"/);
 assert.match(app, /renderWalletTickets/, "electronic ticket wallet should be wired");
 assert.match(app, /renderManualTool/, "all-game manual picker should be wired");
 assert.match(app, /const MAX_SYSTEM_COMBINATIONS = 2000/, "system entries should have a safe combination cap");
@@ -83,7 +83,7 @@ assert.match(app, /本期开奖号码尚未更新/, "pending tickets should keep
 assert.match(app, /isBaseline:\s*true/, "the all-time chart should start from zero");
 assert.match(app, /开奖号码尚未更新，请稍后再试/, "stale same-day draw data should be visible");
 assert.doesNotMatch(app, /frontend_schedule_inference/, "the frontend must not invent draw issues");
-assert.match(sw, /lottery-pocket-v3\.5\.3/);
+assert.match(sw, /lottery-pocket-v3\.5\.4/);
 assert.match(sw, /self\.skipWaiting\(\)/, "new visual assets should activate immediately");
 assert.match(sw, /isVersionedAppAsset/, "CSS and JavaScript should prefer fresh network assets");
 assert.match(styles, /--safe-top:\s*env\(safe-area-inset-top/, "page safe area must always resolve");
@@ -96,14 +96,16 @@ assert.match(styles, /\[data-theme="dark"\] \.wallet-ticket[\s\S]*linear-gradien
 assert.match(styles, /\.wallet-ticket \.wallet-draw-panel[\s\S]*border:\s*1px solid/, "draw number panels should use a soft solid ticket border");
 assert.match(styles, /\.home-draw-carousel \.draw-prize-tag[\s\S]*width:\s*fit-content/, "first-prize labels should stay compact");
 assert.match(styles, /#dataStatusSummary[\s\S]*text-overflow:\s*ellipsis/, "data status subtitle should truncate safely");
-assert.match(styles, /\.wallet-ticket\.is-winning[\s\S]*--ticket-edge-color:\s*rgba\(16,185,129,.58\)/, "winning tickets should use one soft green edge");
+assert.match(styles, /\.wallet-ticket\.is-winning[\s\S]*--ticket-edge-color:\s*rgba\(16,185,129,.32\)/, "winning tickets should use one restrained green edge");
 assert.match(styles, /\.wallet-ticket[\s\S]*-webkit-mask-image:[\s\S]*data:image\/svg\+xml/, "wallet ticket body should use an irregular torn-paper mask");
-assert.match(styles, /-webkit-mask-size:\s*calc\(100% - 28px\)/, "the center mask must leave both torn edges visible");
+assert.match(styles, /-webkit-mask-size:\s*calc\(100% - 20px\)/, "the center mask must leave both subtle torn edges visible");
 assert.match(styles, /\.wallet-ticket[\s\S]*border-radius:\s*0 !important/, "wallet ticket must not retain a rounded-card contour");
 assert.match(styles, /\.wallet-ticket::before,[\s\S]*content:\s*none !important/, "legacy side-notch overlays must be disabled");
+assert.match(styles, /\.wallet-ticket-delete[\s\S]*border-radius:\s*50%/, "ticket delete control should be a compact icon circle");
+assert.match(app, /class="delete-btn wallet-ticket-delete"[^>]*>\$\{ICON\.trash\}<\/button>/, "ticket delete control must render only the trash icon");
 assert.match(styles, /\.wallet-ticket[\s\S]*clip-path:\s*none !important/, "wallet tickets must not use the sharp polygon contour");
 assert.match(styles, /\.entry-mode-icon svg[\s\S]*stroke:\s*currentColor/, "manual-entry icons should inherit their mode color");
 assert.match(styles, /\.ticket-add\.is-tool-mode \.ticket-add-panel[\s\S]*height:\s*100dvh/, "manual entry should use the full screen");
 assert.match(styles, /\.record-status-filter-chips[\s\S]*repeat\(4/, "all records should expose a second status-filter row");
 
-console.log("Product v3.5.3 tests passed");
+console.log("Product v3.5.4 tests passed");
