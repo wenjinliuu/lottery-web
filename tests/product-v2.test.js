@@ -98,6 +98,7 @@ assert.match(styles, /\.home-draw-carousel \.draw-prize-tag[\s\S]*width:\s*fit-c
 assert.match(styles, /#dataStatusSummary[\s\S]*text-overflow:\s*ellipsis/, "data status subtitle should truncate safely");
 assert.match(styles, /\.wallet-ticket\.is-winning[\s\S]*--ticket-edge-color:\s*rgba\(16,185,129,.58\)/, "winning tickets should use one soft green edge");
 assert.match(styles, /\.wallet-ticket[\s\S]*-webkit-mask-image:[\s\S]*data:image\/svg\+xml/, "wallet ticket body should use an irregular torn-paper mask");
+assert.match(styles, /-webkit-mask-size:\s*calc\(100% - 28px\)/, "the center mask must leave both torn edges visible");
 assert.match(styles, /\.wallet-ticket[\s\S]*border-radius:\s*0 !important/, "wallet ticket must not retain a rounded-card contour");
 assert.match(styles, /\.wallet-ticket::before,[\s\S]*content:\s*none !important/, "legacy side-notch overlays must be disabled");
 assert.match(styles, /\.wallet-ticket[\s\S]*clip-path:\s*none !important/, "wallet tickets must not use the sharp polygon contour");
