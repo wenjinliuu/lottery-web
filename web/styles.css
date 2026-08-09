@@ -5639,12 +5639,14 @@ body { width: 100%; }
 }
 
 /*
- * v3.5.4 电子票据视觉：
+ * v3.5.5 电子票据视觉：
  * 以近白票纸为主体，只保留极浅彩种染色；左右使用两条不同的小幅密波遮罩。
+ * 用与票体遮罩同源的曲线路径绘制彩种描边，使左右边线逐齿贴合，顶部与底部保留细直线。
  * 顶部与底部保持平直，不叠加圆角卡片，也不使用大面积彩色光雾。
  */
 .wallet-ticket {
-  --ticket-edge-color: rgba(var(--wallet-rgb), .15);
+  --ticket-outline-color: rgba(var(--wallet-rgb), .42);
+  --ticket-edge-color: rgba(var(--wallet-rgb), .22);
   isolation: isolate;
   overflow: hidden !important;
   padding: 16px 18px 13px !important;
@@ -5658,9 +5660,12 @@ body { width: 100%; }
       rgba(255,255,255,.88) 68%,
       rgba(var(--wallet-rgb),.024) 100%),
     rgba(255,255,255,.91) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 rgba(var(--wallet-rgb),.055) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--wallet-rgb),.23),
+    inset 0 -1px 0 rgba(var(--wallet-rgb),.19),
+    inset 0 2px 0 rgba(255,255,255,.48) !important;
   filter:
-    drop-shadow(0 0 .35px var(--ticket-edge-color))
+    drop-shadow(0 0 .7px var(--ticket-outline-color))
     drop-shadow(0 7px 13px rgba(34,48,84,.065)) !important;
   backdrop-filter: blur(10px) saturate(1.02);
   -webkit-backdrop-filter: blur(10px) saturate(1.02);
@@ -5683,8 +5688,38 @@ body { width: 100%; }
 }
 .wallet-ticket::before,
 .wallet-ticket::after {
-  content: none !important;
-  display: none !important;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  display: block !important;
+  width: 14px;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  content: "" !important;
+  background: var(--ticket-outline-color);
+  box-shadow: none;
+  transform: none;
+  pointer-events: none;
+  -webkit-mask-position: left top;
+  -webkit-mask-repeat: repeat-y;
+  mask-position: left top;
+  mask-repeat: repeat-y;
+}
+.wallet-ticket::before {
+  left: 0;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='210' viewBox='0 0 14 210'%3E%3Cpath fill='none' stroke='white' stroke-width='1.35' d='M6.8 0C8.2 3.3 4.8 6.8 6.3 10.4C7.9 14.3 4.7 18.2 6.1 22.3C7.7 26.6 5 30.6 6.7 34.8C8.1 38.5 4.6 42.8 6.2 47C7.9 51.2 5.1 55.5 6.8 59.7C8.3 63.7 4.9 67.8 6.1 72.2C7.6 76.6 4.7 80.8 6.4 85C8.1 89.4 5 93.5 6.6 97.9C8 102 4.8 106.5 6.2 110.8C7.8 115.2 4.7 119.4 6.5 123.9C8.2 128 5 132.1 6.7 136.4C8 140.5 4.6 144.8 6.1 149.1C7.7 153.5 4.9 157.7 6.6 162C8.1 166.1 4.8 170.4 6.3 174.9C7.8 179.1 5 183.4 6.8 187.6C8.2 191.6 4.8 196 6.2 200.2C7.6 204 5.4 207.4 6.8 210'/%3E%3C/svg%3E");
+  -webkit-mask-size: 14px 210px;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='210' viewBox='0 0 14 210'%3E%3Cpath fill='none' stroke='white' stroke-width='1.35' d='M6.8 0C8.2 3.3 4.8 6.8 6.3 10.4C7.9 14.3 4.7 18.2 6.1 22.3C7.7 26.6 5 30.6 6.7 34.8C8.1 38.5 4.6 42.8 6.2 47C7.9 51.2 5.1 55.5 6.8 59.7C8.3 63.7 4.9 67.8 6.1 72.2C7.6 76.6 4.7 80.8 6.4 85C8.1 89.4 5 93.5 6.6 97.9C8 102 4.8 106.5 6.2 110.8C7.8 115.2 4.7 119.4 6.5 123.9C8.2 128 5 132.1 6.7 136.4C8 140.5 4.6 144.8 6.1 149.1C7.7 153.5 4.9 157.7 6.6 162C8.1 166.1 4.8 170.4 6.3 174.9C7.8 179.1 5 183.4 6.8 187.6C8.2 191.6 4.8 196 6.2 200.2C7.6 204 5.4 207.4 6.8 210'/%3E%3C/svg%3E");
+  mask-size: 14px 210px;
+}
+.wallet-ticket::after {
+  right: 0;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='197' viewBox='0 0 14 197'%3E%3Cpath fill='none' stroke='white' stroke-width='1.35' d='M7.1 0C5.3 3.4 8.4 6.8 6.8 10.3C5.2 14 8 17.7 6.5 21.4C4.9 25.4 8.1 29.1 6.7 33C5.1 36.9 8.4 40.7 6.8 44.8C5.2 48.8 7.9 52.7 6.4 56.8C4.8 60.7 8.2 64.7 6.7 68.8C5.2 72.8 8.5 76.8 6.9 81C5.3 84.9 8 89 6.5 93.1C4.9 97.2 8.2 101.1 6.8 105.3C5.2 109.4 8.4 113.4 6.9 117.6C5.4 121.7 8 125.7 6.4 129.9C4.9 134 8.3 138.1 6.8 142.3C5.1 146.3 8.2 150.4 6.6 154.6C5 158.8 8.4 162.8 6.9 167C5.3 171.2 8.1 175.2 6.5 179.4C4.9 183.3 8.2 187.4 6.8 191.3C5.6 194 7.6 195.8 7.1 197'/%3E%3C/svg%3E");
+  -webkit-mask-size: 14px 197px;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='197' viewBox='0 0 14 197'%3E%3Cpath fill='none' stroke='white' stroke-width='1.35' d='M7.1 0C5.3 3.4 8.4 6.8 6.8 10.3C5.2 14 8 17.7 6.5 21.4C4.9 25.4 8.1 29.1 6.7 33C5.1 36.9 8.4 40.7 6.8 44.8C5.2 48.8 7.9 52.7 6.4 56.8C4.8 60.7 8.2 64.7 6.7 68.8C5.2 72.8 8.5 76.8 6.9 81C5.3 84.9 8 89 6.5 93.1C4.9 97.2 8.2 101.1 6.8 105.3C5.2 109.4 8.4 113.4 6.9 117.6C5.4 121.7 8 125.7 6.4 129.9C4.9 134 8.3 138.1 6.8 142.3C5.1 146.3 8.2 150.4 6.6 154.6C5 158.8 8.4 162.8 6.9 167C5.3 171.2 8.1 175.2 6.5 179.4C4.9 183.3 8.2 187.4 6.8 191.3C5.6 194 7.6 195.8 7.1 197'/%3E%3C/svg%3E");
+  mask-size: 14px 197px;
 }
 .wallet-ticket > * { position: relative; z-index: 2; }
 .wallet-ticket-top { gap: 9px; }
@@ -5741,19 +5776,30 @@ body { width: 100%; }
 }
 .wallet-ticket-delete .icn { width: 14px; height: 14px; }
 .wallet-ticket.is-winning {
-  --ticket-edge-color: rgba(16,185,129,.32);
+  --ticket-outline-color: rgba(16,185,129,.48);
+  --ticket-edge-color: rgba(16,185,129,.24);
   background:
     linear-gradient(145deg, rgba(16,185,129,.045), rgba(255,255,255,.93) 48%, rgba(250,204,21,.035)),
     rgba(255,255,255,.91) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.92) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(16,185,129,.22),
+    inset 0 -1px 0 rgba(16,185,129,.19),
+    inset 0 2px 0 rgba(255,255,255,.46) !important;
 }
 [data-theme="dark"] .wallet-ticket {
+  --ticket-outline-color: rgba(var(--wallet-rgb), .52);
+  --ticket-edge-color: rgba(var(--wallet-rgb), .30);
   background:
     linear-gradient(145deg, rgba(var(--wallet-rgb),.095), rgba(20,26,42,.97) 46%, rgba(13,18,31,.97)),
     #111827 !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.055) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--wallet-rgb),.30),
+    inset 0 -1px 0 rgba(var(--wallet-rgb),.24),
+    inset 0 2px 0 rgba(255,255,255,.035) !important;
 }
 [data-theme="dark"] .wallet-ticket.is-winning {
+  --ticket-outline-color: rgba(52,211,153,.58);
+  --ticket-edge-color: rgba(52,211,153,.32);
   background:
     linear-gradient(145deg, rgba(16,185,129,.10), rgba(20,27,40,.97) 48%, rgba(250,204,21,.04)),
     #111827 !important;

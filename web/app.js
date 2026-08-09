@@ -11,7 +11,7 @@
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
   const SYSTEM_GAMES = new Set(["ssq", "dlt"]);
   const MAX_SYSTEM_COMBINATIONS = 2000;
-  const APP_VERSION = "3.5.4";
+  const APP_VERSION = "3.5.5";
   const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
