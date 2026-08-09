@@ -5639,63 +5639,48 @@ body { width: 100%; }
 }
 
 /*
- * v3.5.2 电子票据边缘：
- * 保留淡色玻璃票面，将规则票孔替换成不等幅、带轻微弧度的自然撕纸边。
+ * v3.5.3 电子票据轮廓：
+ * 票体自身使用左右两条不同的长周期曲线遮罩，形成柔和、不等幅的自然撕边。
+ * 顶部与底部保持平直方角，不再用圆角矩形叠加侧边缺口。
  */
 .wallet-ticket {
   --ticket-edge-color: rgba(var(--wallet-rgb), .26);
   isolation: isolate;
-  overflow: visible !important;
-  border: 1px solid var(--ticket-edge-color) !important;
-  border-radius: 24px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
   clip-path: none !important;
   background:
     radial-gradient(62% 58% at 84% 8%, rgba(var(--wallet-rgb), .17), transparent 67%),
     radial-gradient(76% 86% at 2% 100%, rgba(var(--wallet-rgb), .075), transparent 72%),
     linear-gradient(135deg, rgba(255,255,255,.82) 0%, rgba(255,255,255,.58) 48%, rgba(var(--wallet-rgb),.065) 100%) !important;
-  box-shadow:
-    0 11px 26px rgba(34,48,84,.085),
-    inset 0 1px 0 rgba(255,255,255,.82) !important;
-  filter: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.88), inset 0 -1px 0 rgba(var(--wallet-rgb),.10) !important;
+  filter:
+    drop-shadow(0 0 .65px var(--ticket-edge-color))
+    drop-shadow(0 10px 16px rgba(34,48,84,.10)) !important;
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-mask-image:
+    linear-gradient(#fff 0 0),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='260' viewBox='0 0 20 260'%3E%3Cpath fill='white' d='M9.2 0C11.4 4.2 6.3 8.9 8 13.6C9.9 18.6 5.5 23.7 7.4 28.8C9.8 34.4 5.9 40.2 8.6 45.8C11.2 51.1 6.4 56.8 8 62.3C9.9 68.4 5.1 74.5 7 80.8C8.8 86.4 5.8 92.3 8.9 97.8C11.1 102.1 7.2 108.4 8.1 114.2C9.2 120.6 4.9 126.2 7.5 132.1C10.3 138.2 6.1 144.3 8.6 150C10.8 155.1 5.7 161.2 7.8 167.4C9.8 173.2 6.6 178.5 8.9 184.6C11 190.3 5.6 196.2 7.2 202.4C8.7 208.1 5 214.5 7.9 220.2C10.4 225.1 6.7 231.7 8.5 237.3C10.2 243 6.5 249.6 9.2 260H20V0Z'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='247' viewBox='0 0 20 247'%3E%3Cpath fill='white' d='M0 0H10.1C7.1 5.1 11.7 10.2 9.2 15.4C6.6 21 11.1 26.2 8.6 31.8C6.4 37 10.4 42.8 8 48.7C5.8 54.6 10.8 60.2 9 66.1C7 72.4 11.5 78.1 8.5 83.9C5.9 88.8 10.1 95 8.8 100.8C7.3 107.1 11.7 113.2 9.2 119.1C6.5 125.1 10.6 130.7 8.1 136.3C5.5 142.2 10.7 148.4 8.6 154.4C6.6 160.2 11.2 166.2 9 172.2C6.7 178.5 10.1 184.3 8 190.2C5.7 196.1 10.9 202.2 8.8 208.4C6.8 214.1 11.4 220 9.1 226.3C7.1 232.1 11.7 238.2 10.1 247H0Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: calc(100% - 20px) 100%, 20px 260px, 20px 247px;
+  -webkit-mask-position: center, left top, right top;
+  -webkit-mask-repeat: no-repeat, repeat-y, repeat-y;
+  -webkit-mask-composite: source-over;
+  mask-image:
+    linear-gradient(#fff 0 0),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='260' viewBox='0 0 20 260'%3E%3Cpath fill='white' d='M9.2 0C11.4 4.2 6.3 8.9 8 13.6C9.9 18.6 5.5 23.7 7.4 28.8C9.8 34.4 5.9 40.2 8.6 45.8C11.2 51.1 6.4 56.8 8 62.3C9.9 68.4 5.1 74.5 7 80.8C8.8 86.4 5.8 92.3 8.9 97.8C11.1 102.1 7.2 108.4 8.1 114.2C9.2 120.6 4.9 126.2 7.5 132.1C10.3 138.2 6.1 144.3 8.6 150C10.8 155.1 5.7 161.2 7.8 167.4C9.8 173.2 6.6 178.5 8.9 184.6C11 190.3 5.6 196.2 7.2 202.4C8.7 208.1 5 214.5 7.9 220.2C10.4 225.1 6.7 231.7 8.5 237.3C10.2 243 6.5 249.6 9.2 260H20V0Z'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='247' viewBox='0 0 20 247'%3E%3Cpath fill='white' d='M0 0H10.1C7.1 5.1 11.7 10.2 9.2 15.4C6.6 21 11.1 26.2 8.6 31.8C6.4 37 10.4 42.8 8 48.7C5.8 54.6 10.8 60.2 9 66.1C7 72.4 11.5 78.1 8.5 83.9C5.9 88.8 10.1 95 8.8 100.8C7.3 107.1 11.7 113.2 9.2 119.1C6.5 125.1 10.6 130.7 8.1 136.3C5.5 142.2 10.7 148.4 8.6 154.4C6.6 160.2 11.2 166.2 9 172.2C6.7 178.5 10.1 184.3 8 190.2C5.7 196.1 10.9 202.2 8.8 208.4C6.8 214.1 11.4 220 9.1 226.3C7.1 232.1 11.7 238.2 10.1 247H0Z'/%3E%3C/svg%3E");
+  mask-size: calc(100% - 20px) 100%, 20px 260px, 20px 247px;
+  mask-position: center, left top, right top;
+  mask-repeat: no-repeat, repeat-y, repeat-y;
+  mask-composite: add;
 }
 .wallet-ticket::before,
 .wallet-ticket::after {
-  content: "";
-  position: absolute;
-  z-index: 6;
-  top: 14px !important;
-  bottom: 14px !important;
-  inset-inline: auto !important;
-  width: 14px !important;
-  height: auto !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  clip-path: none !important;
-  background: var(--page) !important;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='134' viewBox='0 0 14 134'%3E%3Cpath fill='white' d='M0 0H7.1C9.3 4.2 5.4 8.9 7.8 13.8C10.1 18.7 5.7 23.2 7 28.8C8.5 34.1 4.5 39.4 6.6 45.2C8.7 51.3 5 56.8 8.3 62.2C11 67.1 6 73.4 7.9 79.1C10.2 84.8 5.3 91 7.2 97.8C9.1 104.1 4.4 110.4 6.8 117.3C9 123.1 5.8 128.8 7.6 134H0Z'/%3E%3C/svg%3E");
-  -webkit-mask-size: 14px 134px;
-  -webkit-mask-position: left top;
-  -webkit-mask-repeat: repeat-y;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='134' viewBox='0 0 14 134'%3E%3Cpath fill='white' d='M0 0H7.1C9.3 4.2 5.4 8.9 7.8 13.8C10.1 18.7 5.7 23.2 7 28.8C8.5 34.1 4.5 39.4 6.6 45.2C8.7 51.3 5 56.8 8.3 62.2C11 67.1 6 73.4 7.9 79.1C10.2 84.8 5.3 91 7.2 97.8C9.1 104.1 4.4 110.4 6.8 117.3C9 123.1 5.8 128.8 7.6 134H0Z'/%3E%3C/svg%3E");
-  mask-size: 14px 134px;
-  mask-position: left top;
-  mask-repeat: repeat-y;
-  box-shadow: none !important;
-  pointer-events: none;
-}
-.wallet-ticket::before {
-  left: -1px !important;
-  right: auto !important;
-  filter: drop-shadow(1px 0 0 var(--ticket-edge-color));
-  transform: none !important;
-}
-.wallet-ticket::after {
-  right: -1px !important;
-  left: auto !important;
-  filter: drop-shadow(1px 0 0 var(--ticket-edge-color));
-  transform: scaleX(-1) !important;
+  content: none !important;
+  display: none !important;
 }
 .wallet-ticket > * { position: relative; z-index: 2; }
 .wallet-ticket.is-winning {
@@ -5728,11 +5713,29 @@ body { width: 100%; }
 .wallet-ticket .wallet-winning-sparkles {
   position: absolute;
   z-index: 5 !important;
-  inset: 2px;
+  inset: 0;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 0;
   opacity: 1 !important;
   pointer-events: none;
+}
+
+/* 开奖号码条采用与彩种一致的轻柔实线票面，避免虚线和撕边同时争夺注意力。 */
+.wallet-ticket .wallet-draw-panel {
+  border: 1px solid rgba(var(--wallet-rgb),.18);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.28), transparent),
+    rgba(var(--wallet-rgb),.055);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52);
+}
+.wallet-ticket .wallet-draw-panel.is-pending {
+  border-color: rgba(100,116,139,.13);
+  background: rgba(100,116,139,.035);
+}
+[data-theme="dark"] .wallet-ticket .wallet-draw-panel {
+  border-color: rgba(var(--wallet-rgb),.24);
+  background: rgba(var(--wallet-rgb),.075);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
 }
 .wallet-ticket .wallet-winning-sparkles i {
   position: absolute;
