@@ -11,8 +11,8 @@
   const DEFAULT_VISIBLE_DRAWS = new Set(GAME_ORDER);
   const SYSTEM_GAMES = new Set(["ssq", "dlt"]);
   const MAX_SYSTEM_COMBINATIONS = 2000;
-  const APP_VERSION = "3.5.5";
-  const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data";
+  const APP_VERSION = "3.6.0";
+  const LOTTERY_DATA_BASE_URL = "https://raw.githubusercontent.com/wenjinliuu/lottery-data-repo/main/public_data/v2";
   const REMOTE_GAME_KEYS = { k8: "kl8" };
   const GAME_CHART_COLORS = { ssq: "#ef4444", dlt: "#3b82f6", k8: "#f05a28", fc3d: "#239fc5", pl3: "#bf5ea1", pl5: "#9b4f91", qlc: "#ff9c34", qxc: "#525ba7" };
   const GAME_CONFIGS = {
@@ -67,8 +67,7 @@
     ticketScanAddDraft: null,
     nextDrawRefreshing: false,
     nextDrawRefreshAvailableAt: 0,
-    health: null,
-    healthError: "",
+    repositoryError: "",
     monthCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     statsYear: new Date().getFullYear(),
     statsMonth: String(new Date().getMonth() + 1),
@@ -84,8 +83,8 @@
     initTheme();
     initControls();
     bindEvents();
-    await Promise.all([loadCalendar(), loadDraws(), loadHealth()]);
-    /* 电子票默认展示对应开奖号：启动时并行缓存全部彩种最近 50 期。 */
+    await loadDraws();
+    /* 电子票默认展示对应开奖号：启动时并行缓存全部彩种最近 30 期。 */
     await loadAllGameHistories();
     await loadRecords();
     await reconcileInferredRecords(false);
@@ -672,52 +671,24 @@
     renderTodayRecommend();
   }
 
-  /* ===== 今日开奖：从 calendar.json 计算当日开奖彩种并渲染彩色 chip ===== */
+  /* ===== 今日开奖：从 V2 bootstrap.schedule 计算当日开奖彩种 ===== */
 
   async function loadCalendar() {
-    try {
-      const url = `${LOTTERY_DATA_BASE_URL}/calendar.json?t=${Date.now()}`;
-      state.calendar = await fetchJson(url);
-      renderTodayRecommend();
-      renderDrawUpdateStatus();
-      renderDataStatus();
-      return true;
-    } catch (e) {
-      state.calendar = null;
-      renderTodayRecommend();
-      renderDrawUpdateStatus();
-      renderDataStatus();
-      return false;
-    }
-  }
-
-  async function loadHealth() {
-    try {
-      state.health = await fetchJson(`${LOTTERY_DATA_BASE_URL}/health.json?t=${Date.now()}`);
-      state.healthError = "";
-      renderDataStatus();
-      return true;
-    } catch (error) {
-      state.health = null;
-      state.healthError = String(error?.message || "健康数据读取失败");
-      renderDataStatus();
-      return false;
-    }
+    return loadDraws(false);
   }
 
   function getDataStatusModel() {
     const online = navigator.onLine !== false;
     const latestAt = state.latestUpdatedAt || "";
     const calendarAt = state.calendar?.updated_at || state.calendar?.updatedAt || "";
-    const healthAt = state.health?.updated_at || state.health?.updatedAt || "";
     const inferred = state.draws.filter((draw) => draw.nextStatus === "inferred").length;
     const unavailable = state.draws.filter((draw) => draw.nextStatus === "unavailable" || !draw.nextExpect).length;
     const pendingDraws = getPendingDrawUpdates();
     const pendingNames = pendingDraws.map((item) => item.label).join("、");
-    const remoteOk = state.health?.ok !== false && Boolean(state.health);
+    const remoteOk = Boolean(latestAt && calendarAt && state.draws.length);
     const pwa = state.pwaState || window.LotteryPWA?.getState?.() || {};
     const backup = getBackupHealth();
-    const tone = !online || state.health?.ok === false ? "error" : (!remoteOk || inferred || unavailable || pendingDraws.length || backup.tone === "warn" || pwa.offlineDataUsed) ? "warn" : "ok";
+    const tone = !online ? "error" : (!remoteOk || inferred || unavailable || pendingDraws.length || backup.tone === "warn" || pwa.offlineDataUsed) ? "warn" : "ok";
     return {
       tone,
       summary: !online
@@ -727,7 +698,7 @@
           : tone === "ok" ? "开奖数据、应用与本地备份状态正常" : "部分数据仍在确认，建议查看下方状态",
       items: [
         { label: "网络", value: online ? "在线" : "离线", tone: online ? "ok" : "error" },
-        { label: "开奖仓库", value: remoteOk ? "运行正常" : state.healthError ? "暂时不可用" : "状态待确认", tone: remoteOk ? "ok" : "warn" },
+        { label: "开奖仓库", value: remoteOk ? "V2 镜像正常" : state.repositoryError ? "暂时不可用" : "状态待确认", tone: remoteOk ? "ok" : "warn" },
         { label: "最新开奖", value: pendingDraws.length ? `${pendingNames}待更新` : latestAt ? formatStatusTime(latestAt) : "尚未载入", tone: pendingDraws.length || !latestAt ? "warn" : "ok" },
         { label: "今日开奖号", value: pendingDraws.length ? `${pendingNames}尚未更新` : "已同步", tone: pendingDraws.length ? "warn" : "ok" },
         { label: "开奖日历", value: calendarAt ? formatStatusTime(calendarAt) : "尚未载入", tone: calendarAt ? (inferred ? "warn" : "ok") : "warn" },
@@ -736,7 +707,7 @@
         { label: "离线应用", value: pwa.installed ? "已安装" : pwa.registered ? "已启用" : pwa.supported === false ? "浏览器不支持" : "正在准备", tone: pwa.registered || pwa.installed ? "ok" : "warn" },
         { label: "应用版本", value: `v${APP_VERSION}${pwa.updateReady ? " · 可更新" : ""}`, tone: pwa.updateReady ? "warn" : "ok" }
       ],
-      healthAt
+      healthAt: latestAt
     };
   }
 
@@ -822,10 +793,10 @@
 
   async function refreshDataStatus() {
     if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.disabled = true;
-    const results = await Promise.all([loadHealth(), loadCalendar(), loadDraws(false)]);
+    const result = await loadDraws(false);
     renderDataStatus();
     if (els.dataStatusRefreshBtn) els.dataStatusRefreshBtn.disabled = false;
-    toast(results.every(Boolean) ? "数据状态已更新" : "部分状态暂时无法获取");
+    toast(result ? "数据状态已更新" : "数据状态暂时无法获取");
   }
 
   async function installPwa() {
@@ -919,6 +890,7 @@
       const payload = await fetchRemoteDraws();
       state.draws = payload.draws;
       state.latestUpdatedAt = payload.updatedAt || "";
+      state.repositoryError = "";
       els.historySummary.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无开奖数据";
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = payload.updatedAt ? `更新于 ${formatDateTime(payload.updatedAt)}` : "暂无更新时间";
       renderDraws();
@@ -929,6 +901,7 @@
     } catch (error) {
       state.draws = [];
       state.latestUpdatedAt = "";
+      state.repositoryError = String(error?.message || "V2 镜像读取失败");
       if (els.latestDrawsUpdated) els.latestDrawsUpdated.textContent = "暂无更新时间";
       renderDrawsError();
       renderDrawUpdateStatus();
@@ -949,8 +922,8 @@
     state.nextDrawRefreshAvailableAt = now + 10000;
     renderDraftHead();
     try {
-      const [calendarOk, drawsOk] = await Promise.all([loadCalendar(), loadDraws(false)]);
-      if (!calendarOk && !drawsOk) {
+      const drawsOk = await loadDraws(false);
+      if (!drawsOk) {
         if (showToast) toast("刷新失败，请检查网络后重试");
         return false;
       }
@@ -991,13 +964,14 @@
 
   async function fetchRemoteDraws() {
     const cacheBust = `t=${Date.now()}`;
-    const latest = await fetchJson(`${LOTTERY_DATA_BASE_URL}/latest.json?${cacheBust}`);
-    const latestByLocalKey = normalizeRemoteLatest(latest.draws || {});
-    /* 首屏只读取 latest.json。各彩种近 50 期在用户打开往期或核对旧记录时按需加载。 */
+    const bootstrap = await fetchJson(`${LOTTERY_DATA_BASE_URL}/bootstrap.json?${cacheBust}`);
+    state.calendar = normalizeV2Schedule(bootstrap.schedule || {}, bootstrap.generated_at || "");
+    const latestByLocalKey = normalizeRemoteLatest(bootstrap.latest || {}, bootstrap.schedule || {});
+    /* 首屏只读取 bootstrap.json。各彩种最近 30 期按需加载。 */
     const previousHistory = state.draws.filter((draw) => state.loadedHistoryGames.has(draw.gameKey));
     const draws = dedupeDraws(previousHistory.concat(Object.values(latestByLocalKey)));
     return {
-      updatedAt: latest.updated_at || latest.updatedAt || "",
+      updatedAt: bootstrap.generated_at || "",
       draws
     };
   }
@@ -1043,22 +1017,46 @@
     return response.json();
   }
 
-  function normalizeRemoteLatest(remoteDraws) {
+  function normalizeV2Schedule(remoteSchedule, generatedAt) {
+    return {
+      generated_at: generatedAt,
+      lotteries: Object.fromEntries(Object.entries(remoteSchedule).map(([remoteKey, entry]) => {
+        const next = entry?.next || {};
+        return [remoteKey, {
+          name: entry?.name || "",
+          draw_weekdays: entry?.weekdays || [],
+          draw_time: entry?.draw_time || "",
+          sale_close_time: entry?.sale_close_time || "",
+          next_issue: next.issue || "",
+          next_draw_date: next.date || "",
+          next_open_time: next.open_time || "",
+          next_buy_end_time: next.buy_end_time || "",
+          next_status: next.status || "unavailable",
+          next_source: next.source || "none",
+          next_confirmed: next.confirmed === true,
+          next_basis_issue: next.basis_issue || ""
+        }];
+      }))
+    };
+  }
+
+  function normalizeRemoteLatest(remoteDraws, remoteSchedule = {}) {
     return Object.keys(remoteDraws).reduce((map, remoteKey) => {
       const gameKey = remoteKey === "kl8" ? "k8" : remoteKey;
-      if (GAME_CONFIGS[gameKey]) map[gameKey] = convertRemoteDraw(remoteDraws[remoteKey], gameKey);
+      if (GAME_CONFIGS[gameKey]) map[gameKey] = convertRemoteDraw(remoteDraws[remoteKey], gameKey, remoteSchedule[remoteKey]);
       return map;
     }, {});
   }
 
-  function convertRemoteDraw(remoteDraw, gameKeyOverride) {
+  function convertRemoteDraw(remoteDraw, gameKeyOverride, scheduleEntry = null) {
     const gameKey = gameKeyOverride || (remoteDraw.lottery_type === "kl8" ? "k8" : remoteDraw.lottery_type);
     const drawValues = convertRemoteNumbers(gameKey, remoteDraw.numbers || {});
     const openCode = buildOpenCodeFromDrawValues(gameKey, drawValues);
-    const prizeList = normalizeRemotePrizeList(remoteDraw.prize_details);
+    const prizeList = normalizeRemotePrizeList(remoteDraw.prizes || remoteDraw.prize_details);
     const firstPrize = findPrizeByName(prizeList, "一等奖");
     const expect = String(remoteDraw.issue || "");
-    const openDate = String(remoteDraw.draw_date || "");
+    const openDate = String(remoteDraw.date || remoteDraw.draw_date || "");
+    const next = scheduleEntry?.next || {};
     return {
       id: [gameKey, expect, openDate].filter(Boolean).join("_"),
       gameKey,
@@ -1069,22 +1067,22 @@
       deadline: String(remoteDraw.deadline || ""),
       openCode,
       drawValues,
-      saleAmount: String(remoteDraw.sales_amount || ""),
-      totalMoney: String(remoteDraw.prize_pool || ""),
+      saleAmount: String(remoteDraw.sales || remoteDraw.sales_amount || ""),
+      totalMoney: String(remoteDraw.pool || remoteDraw.prize_pool || ""),
       prizeList,
       firstPrize,
-      nextExpect: String(remoteDraw.next_issue || ""),
-      nextOpenDate: String(remoteDraw.next_draw_date || ""),
-      nextOpenTime: String(remoteDraw.next_open_time || ""),
-      nextBuyEndTime: String(remoteDraw.next_buy_end_time || ""),
-      nextStatus: String(remoteDraw.next_status || (remoteDraw.next_confirmed === false ? "inferred" : "confirmed")),
-      nextSource: String(remoteDraw.next_source || "class_api"),
-      nextConfirmed: remoteDraw.next_confirmed !== false,
-      nextBasisIssue: String(remoteDraw.next_basis_issue || remoteDraw.issue || ""),
-      nextResolutionReason: String(remoteDraw.next_resolution_reason || ""),
-      classLastExpect: String(remoteDraw.class_last_issue || ""),
-      dataSource: "lottery-data-repo",
-      fetchedAt: String(remoteDraw.fetched_at || remoteDraw.source?.fetched_at || "")
+      nextExpect: String(next.issue || ""),
+      nextOpenDate: String(next.date || ""),
+      nextOpenTime: String(next.open_time || ""),
+      nextBuyEndTime: String(next.buy_end_time || ""),
+      nextStatus: String(next.status || "unavailable"),
+      nextSource: String(next.source || "none"),
+      nextConfirmed: next.confirmed === true,
+      nextBasisIssue: String(next.basis_issue || remoteDraw.issue || ""),
+      nextResolutionReason: "",
+      classLastExpect: "",
+      dataSource: "lottery-data-repo-v2",
+      fetchedAt: String(remoteDraw.fetched_at || "")
     };
   }
 
@@ -1115,12 +1113,12 @@
   function normalizeRemotePrizeList(prizeDetails) {
     if (!Array.isArray(prizeDetails)) return [];
     return prizeDetails.map((item) => ({
-      prizeName: String(item.prize_name || item.prize_level || ""),
-      require: String(item.require || ""),
-      num: Number(item.winning_count || 0),
-      singleBonus: String(item.prize_amount || ""),
-      prize: String(item.prize_amount || ""),
-      addBonus: String(item.additional_amount || item.additional_prize_amount || item.add_prize_amount || item.append_prize_amount || item.addition_amount || "")
+      prizeName: String(item.name || item.prize_name || item.prize_level || ""),
+      require: String(item.match || item.require || ""),
+      num: Number(item.winners ?? item.winning_count ?? 0),
+      singleBonus: String(item.amount ?? item.prize_amount ?? ""),
+      prize: String(item.amount ?? item.prize_amount ?? ""),
+      addBonus: String(item.extra_amount ?? item.additional_amount ?? item.additional_prize_amount ?? "")
     }));
   }
 
@@ -1487,7 +1485,7 @@
   }
 
   function getNextOpenDateMMDD(gameKey) {
-    /* 优先从 calendar.json 取下次开奖日期 */
+    /* 优先从 V2 bootstrap.schedule 取下次开奖日期 */
     if (state.calendar && state.calendar.lotteries) {
       const remoteKey = REMOTE_GAME_KEYS[gameKey] || gameKey;
       const entry = state.calendar.lotteries[remoteKey] || state.calendar.lotteries[gameKey];
