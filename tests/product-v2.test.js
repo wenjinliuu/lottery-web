@@ -57,7 +57,10 @@ assert.match(headers, /\/sw\.js[\s\S]*no-cache/, "service worker updates should 
 assert.match(app, /LotteryPrizeRules\.evaluateTicket/, "app should use the standalone prize rules module");
 assert.match(app, /backupChecksum/, "backup v2 should include integrity checking");
 assert.match(app, /renderMonthlyStats/, "monthly statistics should be wired");
-assert.match(app, /const APP_VERSION = "3\.5\.5"/);
+assert.match(app, /const APP_VERSION = "3\.6\.0"/);
+assert.match(app, /public_data\/v2/, "web data source should use the V2 GitHub mirror");
+assert.match(app, /bootstrap\.json/, "startup should read the V2 bootstrap payload");
+assert.doesNotMatch(app, /\/latest\.json|\/calendar\.json|\/health\.json/, "V1 endpoints must not remain");
 assert.match(app, /renderWalletTickets/, "electronic ticket wallet should be wired");
 assert.match(app, /renderManualTool/, "all-game manual picker should be wired");
 assert.match(app, /const MAX_SYSTEM_COMBINATIONS = 2000/, "system entries should have a safe combination cap");
@@ -78,12 +81,12 @@ assert.match(app, /compactK8/, "Happy8 home cards should use a compact preview")
 assert.match(app, /month-stack-segment/, "annual statistics should stack costs by lottery game");
 assert.match(app, /openMonthStackDetails/, "monthly bars should expose game-level details");
 assert.doesNotMatch(app, /expandedWalletDraws|data-wallet-draw/, "wallet draw numbers should be visible without tapping the logo");
-assert.match(app, /loadAllGameHistories/, "all eight 50-period history files should load on startup");
+assert.match(app, /loadAllGameHistories/, "all eight V2 30-period history files should load on startup");
 assert.match(app, /本期开奖号码尚未更新/, "pending tickets should keep a visible draw-data status");
 assert.match(app, /isBaseline:\s*true/, "the all-time chart should start from zero");
 assert.match(app, /开奖号码尚未更新，请稍后再试/, "stale same-day draw data should be visible");
 assert.doesNotMatch(app, /frontend_schedule_inference/, "the frontend must not invent draw issues");
-assert.match(sw, /lottery-pocket-v3\.5\.5/);
+assert.match(sw, /lottery-pocket-v3\.6\.0/);
 assert.match(sw, /self\.skipWaiting\(\)/, "new visual assets should activate immediately");
 assert.match(sw, /isVersionedAppAsset/, "CSS and JavaScript should prefer fresh network assets");
 assert.match(styles, /--safe-top:\s*env\(safe-area-inset-top/, "page safe area must always resolve");
@@ -111,4 +114,4 @@ assert.match(styles, /\.entry-mode-icon svg[\s\S]*stroke:\s*currentColor/, "manu
 assert.match(styles, /\.ticket-add\.is-tool-mode \.ticket-add-panel[\s\S]*height:\s*100dvh/, "manual entry should use the full screen");
 assert.match(styles, /\.record-status-filter-chips[\s\S]*repeat\(4/, "all records should expose a second status-filter row");
 
-console.log("Product v3.5.5 tests passed");
+console.log("Product v3.6.0 tests passed");
